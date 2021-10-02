@@ -5,7 +5,7 @@ using System.Collections.Generic;
 
 namespace ECS
 {
-    class EcsVector<T> : IEnumerable<T>
+    class SimpleVector<T> : IEnumerable<T>
     {
         private T[] _elements;
         private int _end = 0;
@@ -14,7 +14,7 @@ namespace ECS
 
         public ref T this[int i] { get { return ref _elements[i]; } }
 
-        public EcsVector(int reserved = 0)
+        public SimpleVector(int reserved = 0)
         {
             _elements = new T[reserved];
         }
@@ -27,6 +27,7 @@ namespace ECS
             _end++;
         }
 
+        //TODO: enumerate by reference
         public IEnumerator<T> GetEnumerator()
         {
             for (int i = 0; i < _end; i++)
