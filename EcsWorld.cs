@@ -59,6 +59,13 @@ namespace ECS
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static int ToIdx(this EntityType entity) => (int)entity.GetId();
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static ref T AddComponent<T>(this EntityType entity, EcsWorld world, T component = default)
+            => ref world.AddComponent<T>(entity);
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void AddTag<T>(this EntityType entity, EcsWorld world) => world.AddTag<T>(entity);
     }
 
     class EcsException : Exception
@@ -229,8 +236,49 @@ namespace ECS
     }
     class Program
     {
+        struct Comp1 { public int i; }
+        struct Comp2 { public float f; }
+        struct Tag1 { }
+        struct Tag2 { }
+
+
         static void Main(string[] args)
         {
+            var world = new EcsWorld();
+
+            ref var entity1 = ref world.Create();
+            entity1.AddComponent<Comp1>(world).i = 10;
+            entity1.AddComponent<Comp2>(world).f = 0.5f;
+            entity1.AddTag<Tag1>(world);
+            entity1.AddTag<Tag2>(world);
+
+            ref var entity2 = ref world.Create();
+            entity2.AddComponent<Comp1>(world).i = 10;
+            entity2.AddComponent<Comp2>(world).f = 0.5f;
+            entity2.AddTag<Tag2>(world);
+
+            ref var entity3 = ref world.Create();
+            entity3.AddComponent<Comp1>(world).i = 10;
+            entity3.AddComponent<Comp2>(world).f = 0.5f;
+            entity3.AddTag<Tag1>(world);
+
+            var filter = new SimpleVector<int>();
+
+            Type GetType<T>() => default(Comp1).GetType();
+
+            var comps = new Type[] { GetType<Comp1>(), GetType<Comp2>(), GetType<Tag1>(), GetType<Tag2>() };
+            var excludes = new Type[] { };
+            world.GetView(ref filter, in comps, in excludes);//should be only 0
+
+            comps = new Type[] { GetType<Comp2>() };
+            excludes = new Type[] { };
+            world.GetView(ref filter, in comps, in excludes);//should be all
+
+            comps = new Type[] { GetType<Comp1>(), GetType<Comp2>(), GetType<Tag2>() };
+            excludes = new Type[] { GetType<Tag1>() };
+            world.GetView(ref filter, in comps, in excludes);//should be only 1
+
+            int a = 0;
         }
     }
 }
