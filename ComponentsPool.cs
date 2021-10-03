@@ -12,6 +12,7 @@ namespace ECS
         public bool Contains(int i);
     }
 
+    //TODO: implement tags
     class ComponentsPool<T> : IComponentsPool
     {
         private SparseSet<T> _components;
