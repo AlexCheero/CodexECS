@@ -148,37 +148,6 @@ namespace ECS
         #endregion
 
 #region Components methods
-        interface IComponentsPool
-        {
-            public HashSet<int> EntitiesSet();
-        }
-        class ComponentsPool<T> : IComponentsPool
-        {
-            private SparseSet<T> _components;
-
-            public ref T this[EntityType entity]
-            {
-                [MethodImpl(MethodImplOptions.AggressiveInlining)]
-                get { return ref _components[entity.ToIdx()]; } 
-            }
-
-            public ComponentsPool()
-            {
-                _components = new SparseSet<T>();
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public bool Contains(EntityType entity) => _components.Contains(entity.ToIdx());
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public ref T Add(EntityType entity, T value) => ref _components.Add(entity.ToIdx(), value);
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void Remove(EntityType entity) => _components.Remove(entity.ToIdx());
-
-            public HashSet<int> EntitiesSet() => _components._entitiesSet;
-        }
-
         private Dictionary<Guid, IComponentsPool> _componentsPools;
 
         //TODO: not sure about the way to store pools and get keys for them
@@ -230,25 +199,21 @@ namespace ECS
             if (types.Length == 0)
                 return;
 
-            var firstSet = _componentsPools[types[0].GUID].EntitiesSet();
-            foreach (var idx in firstSet)
+            var firstPool = _componentsPools[types[0].GUID];
+            for (int i = 0; i < firstPool.Length; i++)
             {
                 bool belongs = true;
-                for (int i = 1; i < types.Length; i++)
+                var idx = firstPool.IthEntity(i);
+                for (int j = 1; j < types.Length && belongs; j++)
                 {
-                    var set = _componentsPools[types[i].GUID].EntitiesSet();
-                    belongs &= set.Contains(idx);
-                    if (!belongs)
-                        goto LoopEnd;
+                    var pool = _componentsPools[types[j].GUID];
+                    belongs &= pool.Contains(idx);
                 }
-                for (int i = 0; i < excludes.Length; i++)
+                for (int j = 0; j < excludes.Length && belongs; j++)
                 {
-                    var set = _componentsPools[excludes[i].GUID].EntitiesSet();
-                    belongs &= !set.Contains(idx);
-                    if (!belongs)
-                        goto LoopEnd;
+                    var pool = _componentsPools[excludes[j].GUID];
+                    belongs &= !pool.Contains(idx);
                 }
-            LoopEnd:
                 if (belongs)
                     filter.Add(idx);
             }
