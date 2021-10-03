@@ -145,29 +145,30 @@ namespace ECS
             _entites.Add(lastEntity);
             return ref _entites[_entites.Length - 1];
         }
-        #endregion
+#endregion
 
 #region Components methods
         private Dictionary<Guid, IComponentsPool> _componentsPools;
 
         //TODO: not sure about the way to store pools and get keys for them
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private Guid TypeKey<T>() { return default(T).GetType().GUID; }
+        private Guid TypeKey<T>() => default(T).GetType().GUID;
 
         public bool HaveComponent<T>(EntityType entity)
         {
             var key = TypeKey<T>();
             if (!_componentsPools.ContainsKey(key))
                 return false;
-            var pool = _componentsPools[key] as ComponentsPool<T>;
-            if (pool == null)
+            if (_componentsPools[key] as ComponentsPool<T> == null
+                && _componentsPools[key] as TagsPool<T> == null)
+            {
                 throw new EcsException("invalid pool");
-            return pool.Contains(entity);
+            }
+            return _componentsPools[key].Contains(entity);
         }
 
         public ref T AddComponent<T>(EntityType entity, T component = default)
         {
-            //TODO: update filters on assign
             var key = TypeKey<T>();
             if (!_componentsPools.ContainsKey(key))
                 _componentsPools.Add(key, new ComponentsPool<T>());
@@ -175,6 +176,17 @@ namespace ECS
             if (pool == null)
                 throw new EcsException("invalid pool");
             return ref pool.Add(entity, component);
+        }
+
+        public void AddTag<T>(EntityType entity)
+        {
+            var key = TypeKey<T>();
+            if (!_componentsPools.ContainsKey(key))
+                _componentsPools.Add(key, new TagsPool<T>());
+            var pool = _componentsPools[key] as TagsPool<T>;
+            if (pool == null)
+                throw new EcsException("invalid pool");
+            pool.Add(entity);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -185,15 +197,10 @@ namespace ECS
             return ref pool[entity];
         }
 
-        public void RemoveComponent<T>(EntityType entity)
-        {
-            var key = TypeKey<T>();
-            var pool = _componentsPools[key] as ComponentsPool<T>;
-            pool.Remove(entity);
-        }
+        public void RemoveComponent<T>(EntityType entity) => _componentsPools[TypeKey<T>()].Remove(entity);
 #endregion
 #region Filters methods
-        public void GetView(ref SimpleVector<int> filter, in Type[] types, in Type[] excludes)
+        public void GetView(ref SimpleVector<int> filter, in Type[] types, in Type[] excludes = null)
         {
             filter.Clear();
             if (types.Length == 0)
@@ -209,7 +216,7 @@ namespace ECS
                     var pool = _componentsPools[types[j].GUID];
                     belongs &= pool.Contains(idx);
                 }
-                for (int j = 0; j < excludes.Length && belongs; j++)
+                for (int j = 0; excludes != null && j < excludes.Length && belongs; j++)
                 {
                     var pool = _componentsPools[excludes[j].GUID];
                     belongs &= !pool.Contains(idx);

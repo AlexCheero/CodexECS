@@ -1,5 +1,5 @@
-﻿
-using System;
+﻿using System;
+
 namespace ECS
 {
     class SimpleVector<T>
