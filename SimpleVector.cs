@@ -1,11 +1,8 @@
 ﻿
 using System;
-using System.Collections;
-using System.Collections.Generic;
-
 namespace ECS
 {
-    class SimpleVector<T> : IEnumerable<T>
+    class SimpleVector<T>
     {
         private T[] _elements;
         private int _end = 0;
@@ -19,24 +16,22 @@ namespace ECS
             _elements = new T[reserved];
         }
 
+        public void Clear()
+        {
+            _end = 0;
+        }
+
         public void Add(T element)
         {
             if (_end >= _elements.Length)
-                Array.Resize(ref _elements, _elements.Length > 0 ? _elements.Length * 2 : 2);
+            {
+                var newLength = _elements.Length > 0 ? _elements.Length * 2 : 2;
+                while (_end >= newLength)
+                    newLength *= 2;
+                Array.Resize(ref _elements, newLength);
+            }
             _elements[_end] = element;
             _end++;
-        }
-
-        //TODO: enumerate by reference
-        public IEnumerator<T> GetEnumerator()
-        {
-            for (int i = 0; i < _end; i++)
-                yield return _elements[i];
-        }
-
-        IEnumerator IEnumerable.GetEnumerator()
-        {
-            yield return GetEnumerator();
         }
     }
 }

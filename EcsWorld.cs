@@ -56,6 +56,9 @@ namespace ECS
             version <<= BitSizeHalved;
             entity = entity.GetId() | version;
         }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static int ToIdx(this EntityType entity) => (int)entity.GetId();
     }
 
     class EcsException : Exception
@@ -68,7 +71,7 @@ namespace ECS
         public EcsWorld(int entitiesReserved = 32)
         {
             _entites = new SimpleVector<EntityType>(entitiesReserved);
-            _componentsPools = new Dictionary<Type, IComponentsPool>();
+            _componentsPools = new Dictionary<Guid, IComponentsPool>();
         }
 
 #region Entities methods
@@ -86,7 +89,7 @@ namespace ECS
         {
             if (other.IsNull() || !IsEnitityInRange(other))
                 throw new EcsException("wrong entity");
-            return ref _entites[(int)other.GetId()];
+            return ref _entites[other.ToIdx()];
         }
 
         public bool IsDead(EntityType entity)
@@ -145,7 +148,10 @@ namespace ECS
         #endregion
 
 #region Components methods
-        interface IComponentsPool { }
+        interface IComponentsPool
+        {
+            public HashSet<int> EntitiesSet();
+        }
         class ComponentsPool<T> : IComponentsPool
         {
             private SparseSet<T> _components;
@@ -153,7 +159,7 @@ namespace ECS
             public ref T this[EntityType entity]
             {
                 [MethodImpl(MethodImplOptions.AggressiveInlining)]
-                get { return ref _components[(int)entity]; } 
+                get { return ref _components[entity.ToIdx()]; } 
             }
 
             public ComponentsPool()
@@ -162,17 +168,26 @@ namespace ECS
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public bool Contains(EntityType entity) => _components.Contains((int)entity);
+            public bool Contains(EntityType entity) => _components.Contains(entity.ToIdx());
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public ref T Assign(EntityType entity, T value) => ref _components.Assign((int)entity, value);
+            public ref T Add(EntityType entity, T value) => ref _components.Add(entity.ToIdx(), value);
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public void Remove(EntityType entity) => _components.Remove(entity.ToIdx());
+
+            public HashSet<int> EntitiesSet() => _components._entitiesSet;
         }
 
-        private Dictionary<Type, IComponentsPool> _componentsPools;
+        private Dictionary<Guid, IComponentsPool> _componentsPools;
+
+        //TODO: not sure about the way to store pools and get keys for them
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private Guid TypeKey<T>() { return default(T).GetType().GUID; }
 
         public bool HaveComponent<T>(EntityType entity)
         {
-            var key = default(T).GetType();
+            var key = TypeKey<T>();
             if (!_componentsPools.ContainsKey(key))
                 return false;
             var pool = _componentsPools[key] as ComponentsPool<T>;
@@ -181,25 +196,62 @@ namespace ECS
             return pool.Contains(entity);
         }
 
-        public ref T AssignComponent<T>(EntityType entity, T component = default)
+        public ref T AddComponent<T>(EntityType entity, T component = default)
         {
             //TODO: update filters on assign
-            var key = component.GetType();
+            var key = TypeKey<T>();
             if (!_componentsPools.ContainsKey(key))
                 _componentsPools.Add(key, new ComponentsPool<T>());
             var pool = _componentsPools[key] as ComponentsPool<T>;
             if (pool == null)
                 throw new EcsException("invalid pool");
-            return ref pool.Assign(entity, component);
+            return ref pool.Add(entity, component);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ref T GetComponent<T>(EntityType entity)
         {
-            //TODO: not sure about the way to store pools and get keys for them
-            var key = default(T).GetType();
+            var key = TypeKey<T>();
             var pool = _componentsPools[key] as ComponentsPool<T>;
             return ref pool[entity];
+        }
+
+        public void RemoveComponent<T>(EntityType entity)
+        {
+            var key = TypeKey<T>();
+            var pool = _componentsPools[key] as ComponentsPool<T>;
+            pool.Remove(entity);
+        }
+#endregion
+#region Filters methods
+        public void GetView(ref SimpleVector<int> filter, in Type[] types, in Type[] excludes)
+        {
+            filter.Clear();
+            if (types.Length == 0)
+                return;
+
+            var firstSet = _componentsPools[types[0].GUID].EntitiesSet();
+            foreach (var idx in firstSet)
+            {
+                bool belongs = true;
+                for (int i = 1; i < types.Length; i++)
+                {
+                    var set = _componentsPools[types[i].GUID].EntitiesSet();
+                    belongs &= set.Contains(idx);
+                    if (!belongs)
+                        goto LoopEnd;
+                }
+                for (int i = 0; i < excludes.Length; i++)
+                {
+                    var set = _componentsPools[excludes[i].GUID].EntitiesSet();
+                    belongs &= !set.Contains(idx);
+                    if (!belongs)
+                        goto LoopEnd;
+                }
+            LoopEnd:
+                if (belongs)
+                    filter.Add(idx);
+            }
         }
 #endregion
     }
