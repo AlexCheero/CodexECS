@@ -305,7 +305,8 @@ namespace ECS
 
             for(int i = 0; i < filter.Length; i++)
             {
-                ref var entity = ref world.GetById(i);
+                var id = filter[i];
+                ref var entity = ref world.GetById(id);
                 var comp1 = entity.GetComponent<Comp1>(world);
                 if (entity.Have<Comp2>(world))
                 {
