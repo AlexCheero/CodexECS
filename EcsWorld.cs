@@ -119,7 +119,7 @@ namespace ECS
 
         public bool IsDead(EntityType entity)
         {
-            return GetById(entity) != entity.GetId();
+            return GetById(entity).GetId() != entity.GetId();
         }
 
         private ref EntityType GetRecycled()
@@ -236,6 +236,8 @@ namespace ECS
             for (int i = 0; i < firstPool.Length; i++)
             {
                 bool belongs = true;
+                //TODO: check if entity is dead
+                //TODO: rename method or define what should be returned- entity or its id?
                 var idx = firstPool.IthEntity(i);
                 for (int j = 1; j < types.Length && belongs; j++)
                 {
@@ -253,13 +255,14 @@ namespace ECS
         }
 #endregion
     }
+
+    //usage example:
     class Program
     {
         struct Comp1 { public int i; }
         struct Comp2 { public float f; }
         struct Tag1 { }
         struct Tag2 { }
-
 
         static void Main(string[] args)
         {
@@ -297,7 +300,10 @@ namespace ECS
             excludes = new Type[] { GetType<Tag1>() };
             world.GetView(ref filter, in comps, in excludes);//should be only 1
 
-            int a = 0;
+            for(int i = 0; i < filter.Length; i++)
+            {
+
+            }
         }
     }
 }
