@@ -60,12 +60,30 @@ namespace ECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static int ToIdx(this EntityType entity) => (int)entity.GetId();
 
+#region World methods forwarded
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static ref T AddComponent<T>(this EntityType entity, EcsWorld world, T component = default)
             => ref world.AddComponent<T>(entity);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void AddTag<T>(this EntityType entity, EcsWorld world) => world.AddTag<T>(entity);
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static bool IsDead(this EntityType entity, EcsWorld world) => world.IsDead(entity);
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static bool HaveComponent<T>(this EntityType entity, EcsWorld world)
+            => world.HaveComponent<T>(entity);
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static ref T GetComponent<T>(this EntityType entity, EcsWorld world)
+            => ref world.GetComponent<T>(entity);
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void RemoveComponent<T>(this EntityType entity, EcsWorld world)
+            => world.RemoveComponent<T>(entity);
+
+#endregion
     }
 
     class EcsException : Exception
@@ -204,6 +222,7 @@ namespace ECS
             return ref pool[entity];
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void RemoveComponent<T>(EntityType entity) => _componentsPools[TypeKey<T>()].Remove(entity);
 #endregion
 #region Filters methods
