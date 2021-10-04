@@ -264,7 +264,7 @@ namespace ECS
 
             var filter = new SimpleVector<int>();
 
-            Type GetType<T>() => default(Comp1).GetType();
+            Type GetType<T>() => default(T).GetType();
 
             var comps = new Type[] { GetType<Comp1>(), GetType<Comp2>(), GetType<Tag1>(), GetType<Tag2>() };
             var excludes = new Type[] { };
