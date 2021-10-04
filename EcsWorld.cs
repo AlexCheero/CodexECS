@@ -228,6 +228,7 @@ namespace ECS
         public void RemoveComponent<T>(EntityType entity) => _componentsPools[TypeKey<T>()].Remove(entity);
 #endregion
 #region Filters methods
+        //TODO: implement sortable groups
         public void GetView(ref SimpleVector<int> filter, in Type[] types, in Type[] excludes = null)
         {
             filter.Clear();
@@ -264,8 +265,10 @@ namespace ECS
     {
         struct Comp1 { public int i; }
         struct Comp2 { public float f; }
+        struct Comp3 { public uint ui; }
         struct Tag1 { }
         struct Tag2 { }
+        struct Tag3 { }
 
         static void Main(string[] args)
         {
@@ -281,6 +284,7 @@ namespace ECS
             entity2.AddComponent<Comp1>(world).i = 10;
             entity2.AddComponent<Comp2>(world).f = 0.5f;
             entity2.AddTag<Tag2>(world);
+            entity2.AddTag<Tag3>(world);
 
             ref var entity3 = ref world.Create();
             entity3.AddComponent<Comp1>(world).i = 10;
@@ -308,12 +312,12 @@ namespace ECS
                 var id = filter[i];
                 ref var entity = ref world.GetById(id);
                 var comp1 = entity.GetComponent<Comp1>(world);
-                if (entity.Have<Comp2>(world))
+                if (!entity.Have<Comp3>(world))
                 {
                     //do smth
                     int a = 0;
                 }
-                if (!entity.Have<Tag1>(world))
+                if (entity.Have<Tag3>(world))
                 {
                     //do smth
                     int a = 0;
