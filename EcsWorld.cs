@@ -72,8 +72,8 @@ namespace ECS
         public static bool IsDead(this EntityType entity, EcsWorld world) => world.IsDead(entity);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static bool HaveComponent<T>(this EntityType entity, EcsWorld world)
-            => world.HaveComponent<T>(entity);
+        public static bool Have<T>(this EntityType entity, EcsWorld world)
+            => world.Have<T>(entity);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static ref T GetComponent<T>(this EntityType entity, EcsWorld world)
@@ -110,7 +110,7 @@ namespace ECS
         private bool IsEnitityInRange(EntityType entity) => IsEnitityInRange(entity.GetId());
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private ref EntityType GetById(int id)
+        public ref EntityType GetById(int id)
         {
             if (id == EntityExtension.NullEntity.GetId() || !IsEnitityInRange(id))
                 throw new EcsException("wrong entity id");
@@ -118,7 +118,7 @@ namespace ECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private ref EntityType GetById(EntityType other) => ref GetById(other.ToId());
+        public ref EntityType GetById(EntityType other) => ref GetById(other.ToId());
 
         public bool IsDead(int id) => GetById(id).GetId() != id;
 
@@ -181,7 +181,7 @@ namespace ECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private Guid TypeKey<T>() => default(T).GetType().GUID;
 
-        public bool HaveComponent<T>(EntityType entity)
+        public bool Have<T>(EntityType entity)
         {
             var key = TypeKey<T>();
             if (!_componentsPools.ContainsKey(key))
@@ -305,7 +305,18 @@ namespace ECS
 
             for(int i = 0; i < filter.Length; i++)
             {
-
+                ref var entity = ref world.GetById(i);
+                var comp1 = entity.GetComponent<Comp1>(world);
+                if (entity.Have<Comp2>(world))
+                {
+                    //do smth
+                    int a = 0;
+                }
+                if (!entity.Have<Tag1>(world))
+                {
+                    //do smth
+                    int a = 0;
+                }
             }
         }
     }
