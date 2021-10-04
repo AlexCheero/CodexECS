@@ -233,6 +233,8 @@ namespace ECS
 #endregion
 #region Filters methods
         //TODO: implement sortable groups
+        //TODO: probably it is better to register all needed views at start, and update them on adding/removing
+        //      components, using some kind of filter graph (somewhat similar to flecs)
         public void GetView(ref SimpleVector<int> filter, in Type[] types, in Type[] excludes = null)
         {
             filter.Clear();
