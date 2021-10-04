@@ -99,6 +99,8 @@ namespace ECS
             _componentsPools = new Dictionary<Guid, IComponentsPool>();
         }
 
+        //TODO: implement world copy
+
 #region Entities methods
         private SimpleVector<EntityType> _entites;
         private EntityType _recycleListHead = EntityExtension.NullEntity;
@@ -118,6 +120,7 @@ namespace ECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        //TODO: return entities by reference only for internal usage
         public ref EntityType GetById(EntityType other) => ref GetById(other.ToId());
 
         public bool IsDead(int id) => GetById(id).GetId() != id;
@@ -155,6 +158,7 @@ namespace ECS
             GetById(entity).SetNullId();
         }
 
+        //TODO: not sure if it or any other public method should return by reference
         public ref EntityType Create()
         {
             if (!_recycleListHead.IsNull())
@@ -312,6 +316,7 @@ namespace ECS
                 var id = filter[i];
                 ref var entity = ref world.GetById(id);
                 var comp1 = entity.GetComponent<Comp1>(world);
+                ref var comp2 = ref entity.GetComponent<Comp2>(world);
                 if (!entity.Have<Comp3>(world))
                 {
                     //do smth
