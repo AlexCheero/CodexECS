@@ -58,7 +58,7 @@ namespace ECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static int ToIdx(this EntityType entity) => (int)entity.GetId();
+        public static int ToId(this EntityType entity) => (int)entity.GetId();
 
 #region World methods forwarded
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -104,23 +104,25 @@ namespace ECS
         private EntityType _recycleListHead = EntityExtension.NullEntity;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool IsEnitityInRange(EntityType entity)
+        private bool IsEnitityInRange(int id) => id < _entites.Length;
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private bool IsEnitityInRange(EntityType entity) => IsEnitityInRange(entity.GetId());
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private ref EntityType GetById(int id)
         {
-            return entity.GetId() < _entites.Length;
+            if (id == EntityExtension.NullEntity.GetId() || !IsEnitityInRange(id))
+                throw new EcsException("wrong entity id");
+            return ref _entites[id];
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private ref EntityType GetById(EntityType other)
-        {
-            if (other.IsNull() || !IsEnitityInRange(other))
-                throw new EcsException("wrong entity");
-            return ref _entites[other.ToIdx()];
-        }
+        private ref EntityType GetById(EntityType other) => ref GetById(other.ToId());
 
-        public bool IsDead(EntityType entity)
-        {
-            return GetById(entity).GetId() != entity.GetId();
-        }
+        public bool IsDead(int id) => GetById(id).GetId() != id;
+
+        public bool IsDead(EntityType entity) => IsDead(entity.ToId());
 
         private ref EntityType GetRecycled()
         {
@@ -236,21 +238,22 @@ namespace ECS
             for (int i = 0; i < firstPool.Length; i++)
             {
                 bool belongs = true;
-                //TODO: check if entity is dead
-                //TODO: rename method or define what should be returned- entity or its id?
-                var idx = firstPool.IthEntity(i);
+                var id = firstPool.IthEntityId(i);
+                if (IsDead(id))
+                    continue;
+
                 for (int j = 1; j < types.Length && belongs; j++)
                 {
                     var pool = _componentsPools[types[j].GUID];
-                    belongs &= pool.Contains(idx);
+                    belongs &= pool.Contains(id);
                 }
                 for (int j = 0; excludes != null && j < excludes.Length && belongs; j++)
                 {
                     var pool = _componentsPools[excludes[j].GUID];
-                    belongs &= !pool.Contains(idx);
+                    belongs &= !pool.Contains(id);
                 }
                 if (belongs)
-                    filter.Add(idx);
+                    filter.Add(id);
             }
         }
 #endregion

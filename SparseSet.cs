@@ -10,7 +10,7 @@ namespace ECS
         private SimpleVector<T> _values;
 
         public int Length => _values.Length;
-        public int IthEntity(int i) => _dense[i];
+        public int IthOuterIdx(int i) => _dense[i];
         public ref T this[int i] { get { return ref _values[_sparse[i]]; } }
 
         public SparseSet()
@@ -68,7 +68,7 @@ namespace ECS
         private SimpleVector<int> _dense;
 
         public int Length => _dense.Length;
-        public int IthEntity(int i) => _dense[i];
+        public int IthOuterIdx(int i) => _dense[i];
 
         public LightSparseSet()
         {

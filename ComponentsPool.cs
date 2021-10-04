@@ -6,7 +6,8 @@ namespace ECS
     interface IComponentsPool
     {
         public int Length { get; }
-        public int IthEntity(int i);
+        //method for iteration over all entities that have this component
+        public int IthEntityId(int i);
         public bool Contains(int i);
         public bool Contains(EntityType entity);
         void Remove(EntityType entity);
@@ -24,22 +25,22 @@ namespace ECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public int IthEntity(int i) => _components.IthEntity(i);
+        public int IthEntityId(int i) => _components.IthOuterIdx(i);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Contains(int i) => _components.Contains(i);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Contains(EntityType entity) => _components.Contains(entity.ToIdx());
+        public bool Contains(EntityType entity) => _components.Contains(entity.ToId());
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Remove(EntityType entity) => _components.Remove(entity.ToIdx());
+        public void Remove(EntityType entity) => _components.Remove(entity.ToId());
         #endregion
 
         public ref T this[EntityType entity]
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get { return ref _components[entity.ToIdx()]; }
+            get { return ref _components[entity.ToId()]; }
         }
 
         public ComponentsPool()
@@ -48,7 +49,7 @@ namespace ECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ref T Add(EntityType entity, T value) => ref _components.Add(entity.ToIdx(), value);
+        public ref T Add(EntityType entity, T value) => ref _components.Add(entity.ToId(), value);
     }
 
     class TagsPool<T> : IComponentsPool
@@ -63,16 +64,16 @@ namespace ECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public int IthEntity(int i) => _tags.IthEntity(i);
+        public int IthEntityId(int i) => _tags.IthOuterIdx(i);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Contains(int i) => _tags.Contains(i);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Contains(EntityType entity) => _tags.Contains(entity.ToIdx());
+        public bool Contains(EntityType entity) => _tags.Contains(entity.ToId());
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Remove(EntityType entity) => _tags.Remove(entity.ToIdx());
+        public void Remove(EntityType entity) => _tags.Remove(entity.ToId());
         #endregion
 
         public TagsPool()
@@ -81,6 +82,6 @@ namespace ECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Add(EntityType entity) => _tags.Add(entity.ToIdx());
+        public void Add(EntityType entity) => _tags.Add(entity.ToId());
     }
 }
