@@ -188,12 +188,10 @@ namespace ECS
             GetRefById(entity).SetNullId();
         }
 
-        //TODO: not sure if it or any other public method should return by reference
-        //TODO: should I return by reference here?
-        public ref EntityType Create()
+        public EntityType Create()
         {
             if (!_recycleListHead.IsNull())
-                return ref GetRecycled();
+                return GetRecycled();
 
             var lastEntity = (EntityType)_entites.Length;
             if (lastEntity == EntityExtension.NullEntity)
@@ -204,7 +202,7 @@ namespace ECS
                 EcsExceptionThrower.ThrowException("lastEntity version should always be 0");
             
             _entites.Add(lastEntity);
-            return ref _entites[_entites.Length - 1];
+            return _entites[_entites.Length - 1];
         }
 #endregion
 
@@ -310,19 +308,19 @@ namespace ECS
         {
             var world = new EcsWorld();
 
-            ref var entity1 = ref world.Create();
+            var entity1 = world.Create();
             entity1.AddComponent<Comp1>(world).i = 10;
             entity1.AddComponent<Comp2>(world).f = 0.5f;
             entity1.AddTag<Tag1>(world);
             entity1.AddTag<Tag2>(world);
 
-            ref var entity2 = ref world.Create();
+            var entity2 = world.Create();
             entity2.AddComponent<Comp1>(world).i = 10;
             entity2.AddComponent<Comp2>(world).f = 0.5f;
             entity2.AddTag<Tag2>(world);
             entity2.AddTag<Tag3>(world);
 
-            ref var entity3 = ref world.Create();
+            var entity3 = world.Create();
             entity3.AddComponent<Comp1>(world).i = 10;
             entity3.AddComponent<Comp2>(world).f = 0.5f;
             entity3.AddTag<Tag1>(world);
