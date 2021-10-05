@@ -14,7 +14,7 @@ namespace ECS
         static EntityExtension()
         {
             if (NullEntity.GetVersion() > 0)
-                throw new EcsException("NullEntity should always have 0 version");
+                EcsExceptionThrower.ThrowException("NullEntity should always have 0 version");
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -28,7 +28,7 @@ namespace ECS
         public static void SetId(this ref EntityType entity, EntityType id)
         {
             if (id.GetId() >= NullEntity)
-                throw new EcsException("set overflow id");
+                EcsExceptionThrower.ThrowException("set overflow id");
             entity = id.GetId() | entity.GetVersion();
         }
 
@@ -86,10 +86,17 @@ namespace ECS
 #endregion
     }
 
-    //TODO: create class to encapsulate exception throws
     class EcsException : Exception
     {
         public EcsException(string msg) : base(msg) { }
+    }
+
+    static class EcsExceptionThrower
+    {
+        public static void ThrowException(string message)
+        {
+            throw new EcsException(message);
+        }
     }
 
     class EcsWorld
@@ -136,7 +143,7 @@ namespace ECS
         public ref EntityType GetById(int id)
         {
             if (id == EntityExtension.NullEntity.GetId() || !IsEnitityInRange(id))
-                throw new EcsException("wrong entity id");
+                EcsExceptionThrower.ThrowException("wrong entity id");
             return ref _entites[id];
         }
 
@@ -167,11 +174,11 @@ namespace ECS
         public void Delete(EntityType entity)
         {
             if (IsDead(entity))
-                throw new EcsException("trying to delete already dead entity");
+                EcsExceptionThrower.ThrowException("trying to delete already dead entity");
             if (!IsEnitityInRange(entity))
-                throw new EcsException("trying to delete wrong entity");
+                EcsExceptionThrower.ThrowException("trying to delete wrong entity");
             if (entity.IsNull())
-                throw new EcsException("trying to delete null entity");
+                EcsExceptionThrower.ThrowException("trying to delete null entity");
             ref var recycleListEnd = ref _recycleListHead;
             while (!recycleListEnd.IsNull())
                 recycleListEnd = ref GetById(recycleListEnd);
@@ -186,13 +193,12 @@ namespace ECS
                 return ref GetRecycled();
 
             var lastEntity = (EntityType)_entites.Length;
-            //TODO: wrap all throws in ifdef
             if (lastEntity == EntityExtension.NullEntity)
-                throw new EcsException("entity limit reached");
+                EcsExceptionThrower.ThrowException("entity limit reached");
             if (_entites.Length < 0)
-                throw new EcsException("entities vector length overflow");
+                EcsExceptionThrower.ThrowException("entities vector length overflow");
             if (lastEntity.GetVersion() > 0)
-                throw new EcsException("lastEntity version should always be 0");
+                EcsExceptionThrower.ThrowException("lastEntity version should always be 0");
             
             _entites.Add(lastEntity);
             return ref _entites[_entites.Length - 1];
@@ -214,7 +220,7 @@ namespace ECS
             if (_componentsPools[key] as ComponentsPool<T> == null
                 && _componentsPools[key] as TagsPool<T> == null)
             {
-                throw new EcsException("invalid pool");
+                EcsExceptionThrower.ThrowException("invalid pool");
             }
             return _componentsPools[key].Contains(entity);
         }
@@ -226,7 +232,7 @@ namespace ECS
                 _componentsPools.Add(key, new ComponentsPool<T>());
             var pool = _componentsPools[key] as ComponentsPool<T>;
             if (pool == null)
-                throw new EcsException("invalid pool");
+                EcsExceptionThrower.ThrowException("invalid pool");
             return ref pool.Add(entity, component);
         }
 
@@ -237,7 +243,7 @@ namespace ECS
                 _componentsPools.Add(key, new TagsPool<T>());
             var pool = _componentsPools[key] as TagsPool<T>;
             if (pool == null)
-                throw new EcsException("invalid pool");
+                EcsExceptionThrower.ThrowException("invalid pool");
             pool.Add(entity);
         }
 

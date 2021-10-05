@@ -40,16 +40,16 @@ namespace ECS
             }
 
             if (_sparse[outerIdx] > -1)
-                throw new EcsException("sparse set already have element at this index");
+                EcsExceptionThrower.ThrowException("sparse set already have element at this index");
             
             _sparse[outerIdx] = _values.Length;
             _values.Add(value);
             _dense.Add(outerIdx);
 
             if (_values.Length != _dense.Length)
-                throw new EcsException("_values.Length != _dense.Length");
+                EcsExceptionThrower.ThrowException("_values.Length != _dense.Length");
             if (_dense[_sparse[outerIdx]] != outerIdx)
-                throw new EcsException("wrong sparse set idices");
+                EcsExceptionThrower.ThrowException("wrong sparse set idices");
 
             return ref _values[_sparse[outerIdx]];
         }
@@ -115,13 +115,13 @@ namespace ECS
             }
 
             if (_sparse[outerIdx] > -1)
-                throw new EcsException("sparse set already have element at this index");
+                EcsExceptionThrower.ThrowException("sparse set already have element at this index");
 
             _sparse[outerIdx] = _dense.Length;
             _dense.Add(outerIdx);
 
             if (_dense[_sparse[outerIdx]] != outerIdx)
-                throw new EcsException("wrong sparse set idices");
+                EcsExceptionThrower.ThrowException("wrong sparse set idices");
         }
 
         //TODO: maybe should shrink set after removing?
