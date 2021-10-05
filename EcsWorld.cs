@@ -60,6 +60,7 @@ namespace ECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static int ToId(this EntityType entity) => (int)entity.GetId();
 
+        //TODO: check versions of all entities that uses these methods
 #region World methods forwarded
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static ref T AddComponent<T>(this EntityType entity, EcsWorld world, T component = default)
@@ -82,7 +83,6 @@ namespace ECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void RemoveComponent<T>(this EntityType entity, EcsWorld world)
             => world.RemoveComponent<T>(entity);
-
 #endregion
     }
 
@@ -140,7 +140,7 @@ namespace ECS
         private bool IsEnitityInRange(EntityType entity) => IsEnitityInRange(entity.GetId());
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ref EntityType GetById(int id)
+        private ref EntityType GetRefById(int id)
         {
             if (id == EntityExtension.NullEntity.GetId() || !IsEnitityInRange(id))
                 EcsExceptionThrower.ThrowException("wrong entity id");
@@ -148,21 +148,23 @@ namespace ECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        //TODO: return entities by reference only for internal usage
-        public ref EntityType GetById(EntityType other) => ref GetById(other.ToId());
+        private ref EntityType GetRefById(EntityType other) => ref GetRefById(other.ToId());
 
-        public bool IsDead(int id) => GetById(id).GetId() != id;
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public EntityType GetById(int id) => GetRefById(id);
+
+        public bool IsDead(int id) => GetRefById(id).GetId() != id;
 
         public bool IsDead(EntityType entity) => IsDead(entity.ToId());
 
         private ref EntityType GetRecycled()
         {
             ref var curr = ref _recycleListHead;
-            ref var next = ref GetById(curr);
+            ref var next = ref GetRefById(curr);
             while (!next.IsNull())
             {
                 curr = ref next;
-                next = ref GetById(next);
+                next = ref GetRefById(next);
             }
 
             next.SetId(curr);
@@ -181,12 +183,13 @@ namespace ECS
                 EcsExceptionThrower.ThrowException("trying to delete null entity");
             ref var recycleListEnd = ref _recycleListHead;
             while (!recycleListEnd.IsNull())
-                recycleListEnd = ref GetById(recycleListEnd);
+                recycleListEnd = ref GetRefById(recycleListEnd);
             recycleListEnd.SetId(entity);
-            GetById(entity).SetNullId();
+            GetRefById(entity).SetNullId();
         }
 
         //TODO: not sure if it or any other public method should return by reference
+        //TODO: should I return by reference here?
         public ref EntityType Create()
         {
             if (!_recycleListHead.IsNull())
@@ -343,7 +346,7 @@ namespace ECS
             for(int i = 0; i < filter.Length; i++)
             {
                 var id = filter[i];
-                ref var entity = ref world.GetById(id);
+                var entity = world.GetById(id);
                 var comp1 = entity.GetComponent<Comp1>(world);
                 ref var comp2 = ref entity.GetComponent<Comp2>(world);
                 if (!entity.Have<Comp3>(world))
