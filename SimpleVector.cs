@@ -16,6 +16,14 @@ namespace ECS
             _elements = new T[reserved];
         }
 
+        public void Copy(in SimpleVector<T> other)
+        {
+            _end = other._end;
+            if (_elements.Length < _end)
+                Array.Resize(ref _elements, other._elements.Length);
+            Array.Copy(other._elements, _elements, _end);
+        }
+
         public void Clear()
         {
             _end = 0;

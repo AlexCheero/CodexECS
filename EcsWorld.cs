@@ -86,6 +86,7 @@ namespace ECS
 #endregion
     }
 
+    //TODO: create class to encapsulate exception throws
     class EcsException : Exception
     {
         public EcsException(string msg) : base(msg) { }
@@ -99,7 +100,27 @@ namespace ECS
             _componentsPools = new Dictionary<Guid, IComponentsPool>();
         }
 
-        //TODO: implement world copy
+        public void Copy(in EcsWorld other)
+        {
+            _entites.Copy(other._entites);
+            //TODO: implement dict, that can be iterated without creating enumerator.
+            //      it shoud have KeysIntersection and KeysDifference methods
+            //      probably also should have custom set class for intersection and difference
+            //      that allows to iterate through it, without creating enumerator.
+
+            //draft non performant way:
+            var keysToRemove = new HashSet<Guid>(_componentsPools.Keys);
+            keysToRemove.ExceptWith(other._componentsPools.Keys);
+            foreach (var key in keysToRemove)
+                _componentsPools[key].Clear();
+            foreach (var kvp in other._componentsPools)
+            {
+                if (_componentsPools.ContainsKey(kvp.Key))
+                    _componentsPools[kvp.Key].Copy(kvp.Value);
+                else
+                    _componentsPools.Add(kvp.Key, kvp.Value.Dulicate());
+            }
+        }
 
 #region Entities methods
         private SimpleVector<EntityType> _entites;
@@ -330,6 +351,9 @@ namespace ECS
                     int a = 0;
                 }
             }
+
+            var world2 = new EcsWorld();
+            world2.Copy(world);
         }
     }
 }

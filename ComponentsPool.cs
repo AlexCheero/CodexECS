@@ -10,7 +10,10 @@ namespace ECS
         public int IthEntityId(int i);
         public bool Contains(int i);
         public bool Contains(EntityType entity);
-        void Remove(EntityType entity);
+        public void Remove(EntityType entity);
+        public void Clear();
+        public void Copy(in IComponentsPool other);
+        public IComponentsPool Dulicate();
     }
 
     class ComponentsPool<T> : IComponentsPool
@@ -35,7 +38,27 @@ namespace ECS
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Remove(EntityType entity) => _components.Remove(entity.ToId());
-        #endregion
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Clear() => _components.Clear();
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Copy(in IComponentsPool other)
+        {
+            var otherPool = other as ComponentsPool<T>;
+            if (otherPool == null)
+                throw new EcsException("trying to copy from pool of different type");
+            _components.Copy(otherPool._components);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public IComponentsPool Dulicate()
+        {
+            var newPool = new ComponentsPool<T>();
+            newPool.Copy(this);
+            return newPool;
+        }
+#endregion
 
         public ref T this[EntityType entity]
         {
@@ -74,7 +97,27 @@ namespace ECS
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Remove(EntityType entity) => _tags.Remove(entity.ToId());
-        #endregion
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Clear() => _tags.Clear();
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Copy(in IComponentsPool other)
+        {
+            var otherPool = other as TagsPool<T>;
+            if (otherPool == null)
+                throw new EcsException("trying to copy from pool of different type");
+            _tags.Copy(otherPool._tags);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public IComponentsPool Dulicate()
+        {
+            var newPool = new TagsPool<T>();
+            newPool.Copy(this);
+            return newPool;
+        }
+#endregion
 
         public TagsPool()
         {

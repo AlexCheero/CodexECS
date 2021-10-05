@@ -55,9 +55,28 @@ namespace ECS
         }
 
         //TODO: maybe should shrink set after removing?
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Remove(int outerIdx)
         {
             _sparse[outerIdx] = -1;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Clear()
+        {
+            Array.Fill(_sparse, -1);
+        }
+
+        public void Copy(in SparseSet<T> other)
+        {
+            if (_sparse.Length < other._sparse.Length)
+                Array.Resize(ref _sparse, other._sparse.Length);
+            else if (_sparse.Length > other._sparse.Length)
+                Array.Fill(_sparse, -1, other._sparse.Length, _sparse.Length - other._sparse.Length);
+            Array.Copy(other._sparse, _sparse, other._sparse.Length);
+
+            _dense.Copy(other._dense);
+            _values.Copy(other._values);
         }
     }
 
@@ -106,9 +125,27 @@ namespace ECS
         }
 
         //TODO: maybe should shrink set after removing?
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Remove(int outerIdx)
         {
             _sparse[outerIdx] = -1;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Clear()
+        {
+            Array.Fill(_sparse, -1);
+        }
+
+        public void Copy(in LightSparseSet<T> other)
+        {
+            if (_sparse.Length < other._sparse.Length)
+                Array.Resize(ref _sparse, other._sparse.Length);
+            else if (_sparse.Length > other._sparse.Length)
+                Array.Fill(_sparse, -1, other._sparse.Length, _sparse.Length - other._sparse.Length);
+            Array.Copy(other._sparse, _sparse, other._sparse.Length);
+
+            _dense.Copy(other._dense);
         }
     }
 }
