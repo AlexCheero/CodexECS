@@ -104,7 +104,7 @@ namespace ECS
         public EcsWorld(int entitiesReserved = 32)
         {
             _entites = new SimpleVector<EntityType>(entitiesReserved);
-            _componentsPools = new Dictionary<Guid, IComponentsPool>();
+            _componentsPools = new Dictionary<Type, IComponentsPool>();
         }
 
         public void Copy(in EcsWorld other)
@@ -206,11 +206,11 @@ namespace ECS
 #endregion
 
 #region Components methods
-        private Dictionary<Guid, IComponentsPool> _componentsPools;
+        private Dictionary<Type, IComponentsPool> _componentsPools;
 
         //TODO: not sure about the way to store pools and get keys for them
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private Guid TypeKey<T>() => default(T).GetType().GUID;
+        private Type TypeKey<T>() => default(T).GetType();
 
         public bool Have<T>(EntityType entity)
         {
@@ -268,7 +268,7 @@ namespace ECS
             if (types.Length == 0)
                 return;
 
-            var firstPool = _componentsPools[types[0].GUID];
+            var firstPool = _componentsPools[types[0]];
             for (int i = 0; i < firstPool.Length; i++)
             {
                 bool belongs = true;
@@ -278,12 +278,12 @@ namespace ECS
 
                 for (int j = 1; j < types.Length && belongs; j++)
                 {
-                    var pool = _componentsPools[types[j].GUID];
+                    var pool = _componentsPools[types[j]];
                     belongs &= pool.Contains(id);
                 }
                 for (int j = 0; excludes != null && j < excludes.Length && belongs; j++)
                 {
-                    var pool = _componentsPools[excludes[j].GUID];
+                    var pool = _componentsPools[excludes[j]];
                     belongs &= !pool.Contains(id);
                 }
                 if (belongs)
