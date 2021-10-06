@@ -6,6 +6,7 @@ namespace ECS
     interface IComponentsPool
     {
         public int Length { get; }
+        //TODO: probably should use enumerator
         //method for iteration over all entities that have this component
         public int IthEntityId(int i);
         public bool Contains(int i);

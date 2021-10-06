@@ -110,22 +110,21 @@ namespace ECS
         public void Copy(in EcsWorld other)
         {
             _entites.Copy(other._entites);
-            //TODO: implement dict, that can be iterated without creating enumerator.
-            //      it shoud have KeysIntersection and KeysDifference methods
-            //      probably also should have custom set class for intersection and difference
-            //      that allows to iterate through it, without creating enumerator.
-
-            //draft non performant way:
-            var keysToRemove = new HashSet<Guid>(_componentsPools.Keys);
-            keysToRemove.ExceptWith(other._componentsPools.Keys);
-            foreach (var key in keysToRemove)
-                _componentsPools[key].Clear();
-            foreach (var kvp in other._componentsPools)
+            foreach (var key in _componentsPools.Keys)
             {
-                if (_componentsPools.ContainsKey(kvp.Key))
-                    _componentsPools[kvp.Key].Copy(kvp.Value);
+                if (!other._componentsPools.ContainsKey(key))
+                {
+                    _componentsPools[key].Clear();
+                }
+            }
+
+            foreach (var key in other._componentsPools.Keys)
+            {
+                var otherPool = other._componentsPools[key];
+                if (_componentsPools.ContainsKey(key))
+                    _componentsPools[key].Copy(otherPool);
                 else
-                    _componentsPools.Add(kvp.Key, kvp.Value.Dulicate());
+                    _componentsPools.Add(key, otherPool.Dulicate());
             }
         }
 
