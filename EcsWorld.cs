@@ -93,6 +93,7 @@ namespace ECS
 
     static class EcsExceptionThrower
     {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void ThrowException(string message)
         {
             throw new EcsException(message);
@@ -105,6 +106,8 @@ namespace ECS
         {
             _entites = new SimpleVector<EntityType>(entitiesReserved);
             _componentsPools = new Dictionary<Type, IComponentsPool>();
+            //TODO: don't forget to copy
+            _filtersGraph = new GraphNode<Type, SimpleVector<int>>();
         }
 
         public void Copy(in EcsWorld other)
@@ -257,8 +260,14 @@ namespace ECS
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void RemoveComponent<T>(EntityType entity) => _componentsPools[TypeKey<T>()].Remove(entity);
-#endregion
-#region Filters methods
+        #endregion
+        #region Filters methods
+        private GraphNode<Type, SimpleVector<int>> _filtersGraph;
+
+        public void RegisterFilter(SimpleVector<int> filter)
+        {
+
+        }
         //TODO: implement sortable groups
         //TODO: probably it is better to register all needed views at start, and update them on adding/removing
         //      components, using some kind of filter graph (somewhat similar to flecs)

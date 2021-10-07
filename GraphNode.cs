@@ -1,13 +1,14 @@
 ﻿namespace ECS
 {
-    class GraphNode<T>
+    class GraphNode<K, V>
     {
-        private T[] _indetifiers;
+        private K[] _indetifiers;
+        private V _value;
 
-        private GraphNode<T>[] _next;
-        private GraphNode<T>[] _prev;
+        private GraphNode<K, V>[] _next;
+        private GraphNode<K, V>[] _prev;
 
-        public GraphNode<T> Get(T[] indetifiers)
+        public GraphNode<K, V> Get(K[] indetifiers)
         {
             //check real equality
             if (_indetifiers == indetifiers)
@@ -21,9 +22,9 @@
             return Move(_indetifiers/*.Diff(intersect)*/, false).Move(intersect/*.Diff(indetifiers)*/, true);
         }
 
-        private GraphNode<T> Move(T[] indetifiersDiff, bool forward)
+        private GraphNode<K, V> Move(K[] indetifiersDiff, bool forward)
         {
-            GraphNode<T> Step(GraphNode<T> from, GraphNode<T>[] nodes, T step)
+            GraphNode<K, V> Step(GraphNode<K, V> from, GraphNode<K, V>[] nodes, K step)
             {
                 foreach (var node in nodes)
                 {
@@ -37,7 +38,7 @@
             }
 
             //forward = !_indetifiers.Contains(indetifiersDiff[0]);???
-            GraphNode<T> destination = this;
+            GraphNode<K, V> destination = this;
             for (int i = 0; i < indetifiersDiff.Length; i++)
                 //check destination for null
                 destination = Step(destination, forward ? _next : _prev, indetifiersDiff[i]);
