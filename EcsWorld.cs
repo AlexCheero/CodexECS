@@ -107,7 +107,7 @@ namespace ECS
             _entites = new SimpleVector<EntityType>(entitiesReserved);
             _componentsPools = new Dictionary<Type, IComponentsPool>();
             //TODO: don't forget to copy
-            _filtersGraph = new GraphNode<Type, SimpleVector<int>>();
+            //_filtersGraph = new Node<Type, SimpleVector<int>>();
         }
 
         public void Copy(in EcsWorld other)
@@ -262,7 +262,7 @@ namespace ECS
         public void RemoveComponent<T>(EntityType entity) => _componentsPools[TypeKey<T>()].Remove(entity);
         #endregion
         #region Filters methods
-        private GraphNode<Type, SimpleVector<int>> _filtersGraph;
+        //private GraphNode<Type, SimpleVector<int>> _filtersGraph;
 
         public void RegisterFilter(SimpleVector<int> filter)
         {
