@@ -108,6 +108,7 @@ namespace ECS
             _componentsPools = new Dictionary<Type, IComponentsPool>();
             //TODO: don't forget to copy
             //_filtersGraph = new Node<Type, SimpleVector<int>>();
+            _filters = new FilteresCollection();
         }
 
         public void Copy(in EcsWorld other)
@@ -264,9 +265,16 @@ namespace ECS
         #region Filters methods
         //private GraphNode<Type, SimpleVector<int>> _filtersGraph;
 
-        public void RegisterFilter(SimpleVector<int> filter)
-        {
+        private FilteresCollection _filters;
 
+        public void RegisterFilter(IEnumerable<Type> comps, IEnumerable<Type> excludes)
+        {
+            _filters.TryAdd(comps, excludes);
+        }
+
+        public SimpleVector<int> GetView(IEnumerable<Type> comps, IEnumerable<Type> excludes)
+        {
+            return _filters.Get(comps, excludes);
         }
         //TODO: implement sortable groups
         //TODO: probably it is better to register all needed views at start, and update them on adding/removing

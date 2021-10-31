@@ -4,33 +4,33 @@
     {
         private class Node
         {
-            private K[] _indetifiers;
+            private K[] _identifiers;
             private V _value;
 
             private SimpleVector<Node> _next;
             private SimpleVector<Node> _prev;
 
-            public Node Get(K[] indetifiers)
+            public Node Get(K[] identifiers)
             {
                 //check real equality
-                if (_indetifiers == indetifiers)
+                if (_identifiers == identifiers)
                     return this;//same node
 
-                var intersect = _indetifiers/*.Intersect(indetifiers)*/;
-                if (intersect == _indetifiers)
-                    return Move(_indetifiers/*.Diff(indetifiers)*/, true);//forward node
+                var intersect = _identifiers/*.Intersect(indetifiers)*/;
+                if (intersect == _identifiers)
+                    return Move(_identifiers/*.Diff(indetifiers)*/, true);//forward node
 
                 //backward and then forward node
-                return Move(_indetifiers/*.Diff(intersect)*/, false).Move(intersect/*.Diff(indetifiers)*/, true);
+                return Move(_identifiers/*.Diff(intersect)*/, false).Move(intersect/*.Diff(indetifiers)*/, true);
             }
 
-            private Node Move(K[] indetifiersDiff, bool forward)
+            private Node Move(K[] identifiersDiff, bool forward)
             {
                 Node Step(Node from, SimpleVector<Node> nodes, K step)
                 {
                     for (int i = 0; i < nodes.Length; i++)
                     {
-                        var diff = from._indetifiers/*.Diff(nodes[i]._indetifiers)*/;
+                        var diff = from._identifiers/*.Diff(nodes[i]._indetifiers)*/;
                         //check that diff.Length is always 1
                         if (diff[0].Equals(step))
                             return nodes[i];
@@ -41,9 +41,9 @@
 
                 //forward = !_indetifiers.Contains(indetifiersDiff[0]);???
                 Node destination = this;
-                for (int i = 0; i < indetifiersDiff.Length; i++)
+                for (int i = 0; i < identifiersDiff.Length; i++)
                     //check destination for null
-                    destination = Step(destination, forward ? _next : _prev, indetifiersDiff[i]);
+                    destination = Step(destination, forward ? _next : _prev, identifiersDiff[i]);
 
                 return destination;
             }
