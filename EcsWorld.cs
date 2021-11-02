@@ -108,7 +108,7 @@ namespace ECS
             _componentsPools = new Dictionary<Type, IComponentsPool>();
             //TODO: don't forget to copy
             //_filtersGraph = new Node<Type, SimpleVector<int>>();
-            _filters = new FilteresCollection();
+            _filters = new FiltersCollection();
         }
 
         public void Copy(in EcsWorld other)
@@ -259,20 +259,29 @@ namespace ECS
             return ref pool[entity];
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void RemoveComponent<T>(EntityType entity) => _componentsPools[TypeKey<T>()].Remove(entity);
+        public void RemoveComponent<T>(EntityType entity)
+        {
+            for (int i = 0; i < _filters._filters.Length; i++)
+            {
+                var fltr = _filters._filters[i];
+                if (fltr.Comps.Contains(typeof(T)) /*&& fltr.FilteredEntities.Contains(entity.ToId())*/)//TODO: move debug check elswhere
+                    fltr.FilteredEntities.Remove(entity.ToId());
+                //TODO: update filters according to excludes
+            }
+            _componentsPools[TypeKey<T>()].Remove(entity);
+        }
         #endregion
         #region Filters methods
         //private GraphNode<Type, SimpleVector<int>> _filtersGraph;
 
-        private FilteresCollection _filters;
+        private FiltersCollection _filters;
 
         public void RegisterFilter(IEnumerable<Type> comps, IEnumerable<Type> excludes)
         {
             _filters.TryAdd(comps, excludes);
         }
 
-        public SimpleVector<int> GetView(IEnumerable<Type> comps, IEnumerable<Type> excludes)
+        public HashSet<int> GetView(IEnumerable<Type> comps, IEnumerable<Type> excludes)
         {
             return _filters.Get(comps, excludes);
         }
