@@ -231,6 +231,12 @@ namespace ECS
 
         public ref T AddComponent<T>(EntityType entity, T component = default)
         {
+            /*
+             * get all FiltersTrieLeaf this entity belongs to
+             * check if any of their excludes contains components type
+             * update exclude filters
+             * add entity to filter with new type of component
+             */
             var key = TypeKey<T>();
             if (!_componentsPools.ContainsKey(key))
                 _componentsPools.Add(key, new ComponentsPool<T>());
@@ -242,6 +248,8 @@ namespace ECS
 
         public void AddTag<T>(EntityType entity)
         {
+            //same as for AddComponent
+
             var key = TypeKey<T>();
             if (!_componentsPools.ContainsKey(key))
                 _componentsPools.Add(key, new TagsPool<T>());
@@ -261,13 +269,12 @@ namespace ECS
 
         public void RemoveComponent<T>(EntityType entity)
         {
-            for (int i = 0; i < _filters._filters.Length; i++)
-            {
-                var fltr = _filters._filters[i];
-                if (fltr.Comps.Contains(typeof(T)) /*&& fltr.FilteredEntities.Contains(entity.ToId())*/)//TODO: move debug check elswhere
-                    fltr.FilteredEntities.Remove(entity.ToId());
-                //TODO: update filters according to excludes
-            }
+            /*
+             * get from FitersTrie all filters this entity belongs to
+             * remove entity from this filters
+             * get all FiltersTrieLeaf which still contains entity
+             * update exclude filters
+             */
             _componentsPools[TypeKey<T>()].Remove(entity);
         }
         #endregion
@@ -281,6 +288,7 @@ namespace ECS
             _filters.TryAdd(comps, excludes);
         }
 
+        //TODO: maybe shouldn't use HashSet and use sorted array with uniqueness check
         public HashSet<int> GetView(IEnumerable<Type> comps, IEnumerable<Type> excludes)
         {
             return _filters.Get(comps, excludes);

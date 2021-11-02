@@ -2,6 +2,7 @@
 
 namespace ECS
 {
+    //TODO: try to use standart list instead
     class SimpleVector<T>
     {
         private T[] _elements;
