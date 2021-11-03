@@ -6,86 +6,6 @@ using EntityType = System.UInt32;
 //TODO: cover with tests
 namespace ECS
 {
-    static class EntityExtension
-    {
-        public const int BitSizeHalved = sizeof(EntityType) * 4;
-        public const EntityType NullEntity = (1 << BitSizeHalved) - 1;
-        
-        static EntityExtension()
-        {
-            if (NullEntity.GetVersion() > 0)
-                EcsExceptionThrower.ThrowException("NullEntity should always have 0 version");
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static EntityType GetId(this EntityType entity)
-        {
-            var id = entity << BitSizeHalved;
-            id >>= BitSizeHalved;
-            return id;
-        }
-
-        public static void SetId(this ref EntityType entity, EntityType id)
-        {
-            if (id.GetId() >= NullEntity)
-                EcsExceptionThrower.ThrowException("set overflow id");
-            entity = id.GetId() | entity.GetVersion();
-        }
-
-        public static void SetNullId(this ref EntityType entity)
-        {
-            entity = NullEntity.GetId() | entity.GetVersion();
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static bool IsNull(this in EntityType entity)
-        {
-            return entity.GetId() == NullEntity.GetId();
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static EntityType GetVersion(this EntityType entity)
-        {
-            return entity >> BitSizeHalved;
-        }
-
-        public static void IncrementVersion(this ref EntityType entity)
-        {
-            EntityType version = entity.GetVersion();
-            version++;
-            version <<= BitSizeHalved;
-            entity = entity.GetId() | version;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static int ToId(this EntityType entity) => (int)entity.GetId();
-
-        //TODO: check versions of all entities that uses these methods
-#region World methods forwarded
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static ref T AddComponent<T>(this EntityType entity, EcsWorld world, T component = default)
-            => ref world.AddComponent<T>(entity);
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void AddTag<T>(this EntityType entity, EcsWorld world) => world.AddTag<T>(entity);
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static bool IsDead(this EntityType entity, EcsWorld world) => world.IsDead(entity);
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static bool Have<T>(this EntityType entity, EcsWorld world)
-            => world.Have<T>(entity);
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static ref T GetComponent<T>(this EntityType entity, EcsWorld world)
-            => ref world.GetComponent<T>(entity);
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void RemoveComponent<T>(this EntityType entity, EcsWorld world)
-            => world.RemoveComponent<T>(entity);
-#endregion
-    }
-
     class EcsException : Exception
     {
         public EcsException(string msg) : base(msg) { }
@@ -231,13 +151,17 @@ namespace ECS
 
         public ref T AddComponent<T>(EntityType entity, T component = default)
         {
-            /*
-             * get all FiltersTrieLeaf this entity belongs to
-             * check if any of their excludes contains components type
-             * update exclude filters
-             * add entity to filter with new type of component
-             */
             var key = TypeKey<T>();
+
+            var updateFilters = _addUpdateLists[key];
+            for (int i = 0; i < updateFilters.Count; i++)
+            {
+                var filter = updateFilters[i];
+                int id = entity.ToId();
+                if (filter.Contains(id))//TODO: probably this check is redundant
+                    filter.Remove(id);
+            }
+
             if (!_componentsPools.ContainsKey(key))
                 _componentsPools.Add(key, new ComponentsPool<T>());
             var pool = _componentsPools[key] as ComponentsPool<T>;
@@ -251,6 +175,16 @@ namespace ECS
             //same as for AddComponent
 
             var key = TypeKey<T>();
+
+            var updateFilters = _addUpdateLists[key];
+            for (int i = 0; i < updateFilters.Count; i++)
+            {
+                var filter = updateFilters[i];
+                int id = entity.ToId();
+                if (filter.Contains(id))//TODO: probably this check is redundant
+                    filter.Remove(id);
+            }
+
             if (!_componentsPools.ContainsKey(key))
                 _componentsPools.Add(key, new TagsPool<T>());
             var pool = _componentsPools[key] as TagsPool<T>;
@@ -269,13 +203,18 @@ namespace ECS
 
         public void RemoveComponent<T>(EntityType entity)
         {
-            /*
-             * get from FitersTrie all filters this entity belongs to
-             * remove entity from this filters
-             * get all FiltersTrieLeaf which still contains entity
-             * update exclude filters
-             */
-            _componentsPools[TypeKey<T>()].Remove(entity);
+            var key = TypeKey<T>();
+
+            var updateFilters = _removeUpdateLists[key];
+            for (int i = 0; i < updateFilters.Count; i++)
+            {
+                var filter = updateFilters[i];
+                int id = entity.ToId();
+                if (filter.Contains(id))//TODO: probably this check is redundant
+                    filter.Remove(id);
+            }
+
+            _componentsPools[key].Remove(entity);
         }
         #endregion
         #region Filters methods
@@ -283,9 +222,29 @@ namespace ECS
 
         private FiltersCollection _filters;
 
-        public void RegisterFilter(IEnumerable<Type> comps, IEnumerable<Type> excludes)
+        //TODO: init in ctor
+        //TODO: don't forget to copy update lists
+        Dictionary<Type, List<HashSet<int>>> _addUpdateLists = new Dictionary<Type, List<HashSet<int>>>();
+        Dictionary<Type, List<HashSet<int>>> _removeUpdateLists = new Dictionary<Type, List<HashSet<int>>>();
+
+        public void RegisterFilter(Type[] comps, Type[] excludes, HashSet<int> filter)
         {
-            _filters.TryAdd(comps, excludes);
+            for (int i = 0; i < comps.Length; i++)
+            {
+                if (!_addUpdateLists.ContainsKey(comps[i]))
+                    _addUpdateLists.Add(comps[i], new List<HashSet<int>>());
+                _addUpdateLists[comps[i]].Add(filter);//TODO: remove duplicates
+            }
+
+            if (excludes == null || excludes.Length < 1)
+                return;
+
+            for (int i = 0; i < excludes.Length; i++)
+            {
+                if (!_removeUpdateLists.ContainsKey(excludes[i]))
+                    _removeUpdateLists.Add(excludes[i], new List<HashSet<int>>());
+                _removeUpdateLists[excludes[i]].Add(filter);//TODO: remove duplicates
+            }
         }
 
         //TODO: maybe shouldn't use HashSet and use sorted array with uniqueness check
@@ -325,75 +284,5 @@ namespace ECS
             }
         }
 #endregion
-    }
-
-    //usage example:
-    class Program
-    {
-        struct Comp1 { public int i; }
-        struct Comp2 { public float f; }
-        struct Comp3 { public uint ui; }
-        struct Tag1 { }
-        struct Tag2 { }
-        struct Tag3 { }
-
-        static void Main(string[] args)
-        {
-            var world = new EcsWorld();
-
-            var entity1 = world.Create();
-            entity1.AddComponent<Comp1>(world).i = 10;
-            entity1.AddComponent<Comp2>(world).f = 0.5f;
-            entity1.AddTag<Tag1>(world);
-            entity1.AddTag<Tag2>(world);
-
-            var entity2 = world.Create();
-            entity2.AddComponent<Comp1>(world).i = 10;
-            entity2.AddComponent<Comp2>(world).f = 0.5f;
-            entity2.AddTag<Tag2>(world);
-            entity2.AddTag<Tag3>(world);
-
-            var entity3 = world.Create();
-            entity3.AddComponent<Comp1>(world).i = 10;
-            entity3.AddComponent<Comp2>(world).f = 0.5f;
-            entity3.AddTag<Tag1>(world);
-
-            var filter = new SimpleVector<int>();
-
-            Type GetType<T>() => default(T).GetType();
-
-            var comps = new Type[] { GetType<Comp1>(), GetType<Comp2>(), GetType<Tag1>(), GetType<Tag2>() };
-            var excludes = new Type[] { };
-            world.GetView(ref filter, in comps, in excludes);//should be only 0
-
-            comps = new Type[] { GetType<Comp2>() };
-            excludes = new Type[] { };
-            world.GetView(ref filter, in comps, in excludes);//should be all
-
-            comps = new Type[] { GetType<Comp1>(), GetType<Comp2>(), GetType<Tag2>() };
-            excludes = new Type[] { GetType<Tag1>() };
-            world.GetView(ref filter, in comps, in excludes);//should be only 1
-
-            for(int i = 0; i < filter.Length; i++)
-            {
-                var id = filter[i];
-                var entity = world.GetById(id);
-                var comp1 = entity.GetComponent<Comp1>(world);
-                ref var comp2 = ref entity.GetComponent<Comp2>(world);
-                if (!entity.Have<Comp3>(world))
-                {
-                    //do smth
-                    int a = 0;
-                }
-                if (entity.Have<Tag3>(world))
-                {
-                    //do smth
-                    int a = 0;
-                }
-            }
-
-            var world2 = new EcsWorld();
-            world2.Copy(world);
-        }
     }
 }

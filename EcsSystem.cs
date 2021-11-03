@@ -1,5 +1,6 @@
 ﻿//TODO: cover with tests
 using System;
+using System.Collections.Generic;
 
 namespace ECS
 {
@@ -7,12 +8,14 @@ namespace ECS
     {
         protected static Type GetType<T>() => default(T).GetType();
 
+        //TODO: maybe should use HashSet instead
         protected Type[] _comps;
         protected Type[] _excludes;
+        protected HashSet<int> _filter;
 
         public void RegisterInWorld(EcsWorld world)
         {
-            world.RegisterFilter(_comps, _excludes);
+            world.RegisterFilter(_comps, _excludes, _filter);
         }
 
         protected abstract void Iterate(EcsWorld world, int id);
