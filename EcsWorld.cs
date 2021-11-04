@@ -159,7 +159,7 @@ namespace ECS
                 var filter = updateFilters[i];
                 int id = entity.ToId();
                 if (filter.Contains(id))//TODO: probably this check is redundant
-                    filter.Remove(id);
+                    filter.Remove(id);//TODO: add to add lists and remove from remove lists and vice versa for remove component
             }
 
             if (!_componentsPools.ContainsKey(key))
@@ -226,6 +226,16 @@ namespace ECS
         //TODO: don't forget to copy update lists
         Dictionary<Type, List<HashSet<int>>> _addUpdateLists = new Dictionary<Type, List<HashSet<int>>>();
         Dictionary<Type, List<HashSet<int>>> _removeUpdateLists = new Dictionary<Type, List<HashSet<int>>>();
+        /* TODO:
+         * on RegisterFilter filter should be checked if it already in this collection (like in FiltersCollection)
+         * and added if not, RegisterFilter's filter parameter should be ref, to replace it with already existing one
+         * so that systems with same filters share common filter
+         * update lists should contain only indices for filters in this internal collection and, therefore it's type
+         * should be Dictionary<Type, List<int>> or use HashSet (maybe only in debug) to make sure it has no duplicates
+         * than, on entitiy deletion, it should be quite fast to iterate over all internal collection, to remove entity
+         * from every filter it belongs to
+         */
+        List<HashSet<int>> _internalFiltersCollection;
 
         public void RegisterFilter(Type[] comps, Type[] excludes, HashSet<int> filter)
         {
