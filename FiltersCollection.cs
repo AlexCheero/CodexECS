@@ -4,48 +4,38 @@ using System.Collections.Generic;
 
 namespace ECS
 {
+    struct Filter
+    {
+        public HashSet<Type> Comps;
+        public HashSet<Type> Excludes;
+        public HashSet<int> FilteredEntities;
+    }
+
+    class FilterComparer : IEqualityComparer<Filter>
+    {
+        public bool Equals(Filter x, Filter y)
+        {
+            return x.Comps.SetEquals(y.Comps) && x.Excludes.SetEquals(y.Excludes);
+        }
+
+        public int GetHashCode(Filter filter)
+        {
+            int hash = 17;
+            foreach (var comp in filter.Comps)
+                hash = hash * 23 + comp.GetHashCode();
+            foreach (var comp in filter.Excludes)
+                hash = hash * 23 + comp.GetHashCode();
+            return hash;
+        }
+    }
+
     class FiltersCollection
     {
-        public struct Filter
+        private HashSet<Filter> _collection;
+
+        public FiltersCollection()
         {
-            public HashSet<Type> Comps;
-            public HashSet<Type> Excludes;
-            public HashSet<int> FilteredEntities;
-        }
-
-        //TODO: make set/get methods and/or iterator
-        public SimpleVector<Filter> _filters;
-
-        private bool IsFilteresEqual(Filter filter, IEnumerable<Type> comps, IEnumerable<Type> excludes)
-        {
-            return filter.Comps.SetEquals(comps) && filter.Excludes.SetEquals(excludes);
-        }
-
-        public HashSet<int> Get(IEnumerable<Type> comps, IEnumerable<Type> excludes)
-        {
-            for (int i = 0; i < _filters.Length; i++)
-            {
-                var filter = _filters[i];
-                if (IsFilteresEqual(filter, comps, excludes))
-                    return filter.FilteredEntities;
-            }
-            return null;
-        }
-
-        public bool TryAdd(IEnumerable<Type> comps, IEnumerable<Type> excludes)
-        {
-            if (Get(comps, excludes) != null)
-                return false;
-
-            _filters.Add(
-                new Filter
-                {
-                    Comps = new HashSet<Type>(comps),
-                    Excludes = new HashSet<Type>(excludes),
-                    FilteredEntities = new HashSet<int>()
-                });
-
-            return true;
+            _collection = new HashSet<Filter>(new FilterComparer());
         }
     }
 }

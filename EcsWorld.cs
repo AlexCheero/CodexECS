@@ -260,7 +260,7 @@ namespace ECS
         //TODO: maybe shouldn't use HashSet and use sorted array with uniqueness check
         public HashSet<int> GetView(IEnumerable<Type> comps, IEnumerable<Type> excludes)
         {
-            return _filters.Get(comps, excludes);
+            throw new NotImplementedException();
         }
         //TODO: implement sortable groups
         //TODO: probably it is better to register all needed views at start, and update them on adding/removing
