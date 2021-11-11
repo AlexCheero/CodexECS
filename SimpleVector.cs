@@ -2,7 +2,7 @@
 
 namespace ECS
 {
-    //TODO: try to use standart list instead
+    //TODO: rename to simple list to match c# style
     class SimpleVector<T>
     {
         private T[] _elements;

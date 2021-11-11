@@ -1,11 +1,13 @@
 ﻿using System;
+//TODO: measure if standart containers really affects performanse and git rid of them or use them everywhere
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 
 namespace ECS
 {
     class SparseSet<T>
     {
-        private int[] _sparse;
+        private int[] _sparse;//TODO: why not SimpleVector?
         private SimpleVector<int> _dense;
         private SimpleVector<T> _values;
 

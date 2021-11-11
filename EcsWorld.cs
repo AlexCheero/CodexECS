@@ -26,9 +26,11 @@ namespace ECS
         {
             _entites = new SimpleVector<EntityType>(entitiesReserved);
             _componentsPools = new Dictionary<Type, IComponentsPool>();
+            
             //TODO: don't forget to copy
-            //_filtersGraph = new Node<Type, SimpleVector<int>>();
-            _filters = new FiltersCollection();
+            _addUpdateLists = new Dictionary<Type, List<HashSet<int>>>();
+            _removeUpdateLists = new Dictionary<Type, List<HashSet<int>>>();
+            _filtersCollection = new FiltersCollection();
         }
 
         public void Copy(in EcsWorld other)
@@ -132,13 +134,9 @@ namespace ECS
 #region Components methods
         private Dictionary<Type, IComponentsPool> _componentsPools;
 
-        //TODO: not sure about the way to store pools and get keys for them
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private Type TypeKey<T>() => default(T).GetType();
-
         public bool Have<T>(EntityType entity)
         {
-            var key = TypeKey<T>();
+            var key = typeof(T);
             if (!_componentsPools.ContainsKey(key))
                 return false;
             if (_componentsPools[key] as ComponentsPool<T> == null
@@ -151,7 +149,7 @@ namespace ECS
 
         public ref T AddComponent<T>(EntityType entity, T component = default)
         {
-            var key = TypeKey<T>();
+            var key = typeof(T);
 
             var updateFilters = _addUpdateLists[key];
             for (int i = 0; i < updateFilters.Count; i++)
@@ -174,7 +172,7 @@ namespace ECS
         {
             //same as for AddComponent
 
-            var key = TypeKey<T>();
+            var key = typeof(T);
 
             var updateFilters = _addUpdateLists[key];
             for (int i = 0; i < updateFilters.Count; i++)
@@ -196,14 +194,14 @@ namespace ECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ref T GetComponent<T>(EntityType entity)
         {
-            var key = TypeKey<T>();
+            var key = typeof(T);
             var pool = _componentsPools[key] as ComponentsPool<T>;
             return ref pool[entity];
         }
 
         public void RemoveComponent<T>(EntityType entity)
         {
-            var key = TypeKey<T>();
+            var key = typeof(T);
 
             var updateFilters = _removeUpdateLists[key];
             for (int i = 0; i < updateFilters.Count; i++)
@@ -218,14 +216,10 @@ namespace ECS
         }
         #endregion
         #region Filters methods
-        //private GraphNode<Type, SimpleVector<int>> _filtersGraph;
-
-        private FiltersCollection _filters;
-
         //TODO: init in ctor
         //TODO: don't forget to copy update lists
-        Dictionary<Type, List<HashSet<int>>> _addUpdateLists = new Dictionary<Type, List<HashSet<int>>>();
-        Dictionary<Type, List<HashSet<int>>> _removeUpdateLists = new Dictionary<Type, List<HashSet<int>>>();
+        private Dictionary<Type, List<HashSet<int>>> _addUpdateLists = new Dictionary<Type, List<HashSet<int>>>();
+        private Dictionary<Type, List<HashSet<int>>> _removeUpdateLists = new Dictionary<Type, List<HashSet<int>>>();
         /* TODO:
          * on RegisterFilter filter should be checked if it already in this collection (like in FiltersCollection)
          * and added if not, RegisterFilter's filter parameter should be ref, to replace it with already existing one
@@ -235,25 +229,30 @@ namespace ECS
          * than, on entitiy deletion, it should be quite fast to iterate over all internal collection, to remove entity
          * from every filter it belongs to
          */
-        List<HashSet<int>> _internalFiltersCollection;
+        private FiltersCollection _filtersCollection;
 
-        public void RegisterFilter(Type[] comps, Type[] excludes, HashSet<int> filter)
+        public void RegisterFilter(IEnumerable<Type> comps, IEnumerable<Type> excludes, HashSet<int> filter)
         {
-            for (int i = 0; i < comps.Length; i++)
+
+        }
+
+        public void RegisterFilter(HashSet<Type> comps, HashSet<Type> excludes, HashSet<int> filter)
+        {
+            foreach (var comp in comps)
             {
-                if (!_addUpdateLists.ContainsKey(comps[i]))
-                    _addUpdateLists.Add(comps[i], new List<HashSet<int>>());
-                _addUpdateLists[comps[i]].Add(filter);//TODO: remove duplicates
+                if (!_addUpdateLists.ContainsKey(comp))
+                    _addUpdateLists.Add(comp, new List<HashSet<int>>());
+                _addUpdateLists[comp].Add(filter);//TODO: remove duplicates
             }
 
-            if (excludes == null || excludes.Length < 1)
+            if (excludes == null || excludes.Count < 1)
                 return;
 
-            for (int i = 0; i < excludes.Length; i++)
+            foreach (var exclude in excludes)
             {
-                if (!_removeUpdateLists.ContainsKey(excludes[i]))
-                    _removeUpdateLists.Add(excludes[i], new List<HashSet<int>>());
-                _removeUpdateLists[excludes[i]].Add(filter);//TODO: remove duplicates
+                if (!_removeUpdateLists.ContainsKey(exclude))
+                    _removeUpdateLists.Add(exclude, new List<HashSet<int>>());
+                _removeUpdateLists[exclude].Add(filter);//TODO: remove duplicates
             }
         }
 

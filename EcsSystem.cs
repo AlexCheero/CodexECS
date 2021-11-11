@@ -8,9 +8,8 @@ namespace ECS
     {
         protected static Type GetType<T>() => default(T).GetType();
 
-        //TODO: maybe should use HashSet instead
-        protected Type[] _comps;
-        protected Type[] _excludes;
+        protected HashSet<Type> _comps;
+        protected HashSet<Type> _excludes;
         protected HashSet<int> _filter;
 
         public void RegisterInWorld(EcsWorld world)
