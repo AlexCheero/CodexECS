@@ -23,8 +23,13 @@ namespace ECS
                 int hash = 17;
                 foreach (var comp in Comps)
                     hash = hash * 23 + comp.GetHashCode();
-                foreach (var comp in Excludes)
-                    hash = hash * 23 + comp.GetHashCode();
+                
+                if (Excludes != null)
+                {
+                    foreach (var comp in Excludes)
+                        hash = hash * 23 + comp.GetHashCode();
+                }
+                
                 _cachedHash = hash;
                 return hash;
             }
@@ -42,7 +47,7 @@ namespace ECS
         {
             //TODO: use only one TypeComparer, don't create it every time it is needed
             Comps = new SortedSet<Type>(comps, new TypeComparer());
-            Excludes = new SortedSet<Type>(excludes, new TypeComparer());
+            Excludes = excludes != null ? new SortedSet<Type>(excludes, new TypeComparer()) : null;
             FilteredEntities = filter;
             _cachedHash = null;//TODO: probably should calculate hash immediately
         }
@@ -52,7 +57,9 @@ namespace ECS
     {
         public bool Equals(Filter x, Filter y)
         {
-            return x.Comps.SetEquals(y.Comps) && x.Excludes.SetEquals(y.Excludes);
+            bool compsEq = x.Comps.SetEquals(y.Comps);
+            bool excludesEq = x.Excludes != null ? x.Excludes.SetEquals(y.Excludes) : y.Excludes == null;
+            return compsEq && excludesEq;
         }
 
         public int GetHashCode(Filter filter) => filter.HashCode;
@@ -81,12 +88,9 @@ namespace ECS
             _typeComparer = new TypeComparer();
         }
 
-        //TODO: check excludes for null everywhere
         private int GetHashFromComponents(Type[] comps, Type[] excludes)
         {
             Array.Sort(comps, _typeComparer);
-            Array.Sort(excludes, _typeComparer);
-
             int hash = 17;
             hash = hash * 23 + comps[0].GetHashCode();
             for (int i = 1; i < comps.Length; i++)
@@ -99,15 +103,19 @@ namespace ECS
                 hash = hash * 23 + comps[i].GetHashCode();
             }
 
-            hash = hash * 23 + excludes[0].GetHashCode();
-            for (int i = 1; i < excludes.Length; i++)
+            if (excludes != null)
             {
-                var curr = excludes[i];
-                var prev = excludes[i - 1];
-                if (curr == prev)
-                    continue;
+                Array.Sort(excludes, _typeComparer);
+                hash = hash * 23 + excludes[0].GetHashCode();
+                for (int i = 1; i < excludes.Length; i++)
+                {
+                    var curr = excludes[i];
+                    var prev = excludes[i - 1];
+                    if (curr == prev)
+                        continue;
 
-                hash = hash * 23 + excludes[i].GetHashCode();
+                    hash = hash * 23 + excludes[i].GetHashCode();
+                }
             }
 
             return hash;
