@@ -28,8 +28,8 @@ namespace ECS
             _componentsPools = new Dictionary<Type, IComponentsPool>();
             
             //TODO: don't forget to copy
-            _addUpdateLists = new Dictionary<Type, List<HashSet<int>>>();
-            _removeUpdateLists = new Dictionary<Type, List<HashSet<int>>>();
+            _compsUpdateLists = new Dictionary<Type, List<HashSet<int>>>();
+            _excludesUpdateLists = new Dictionary<Type, List<HashSet<int>>>();
             _filtersCollection = new FiltersCollection();
         }
 
@@ -151,7 +151,7 @@ namespace ECS
         {
             var key = typeof(T);
 
-            var updateFilters = _addUpdateLists[key];
+            var updateFilters = _compsUpdateLists[key];
             for (int i = 0; i < updateFilters.Count; i++)
             {
                 var filter = updateFilters[i];
@@ -174,7 +174,7 @@ namespace ECS
 
             var key = typeof(T);
 
-            var updateFilters = _addUpdateLists[key];
+            var updateFilters = _compsUpdateLists[key];
             for (int i = 0; i < updateFilters.Count; i++)
             {
                 var filter = updateFilters[i];
@@ -203,7 +203,7 @@ namespace ECS
         {
             var key = typeof(T);
 
-            var updateFilters = _removeUpdateLists[key];
+            var updateFilters = _excludesUpdateLists[key];
             for (int i = 0; i < updateFilters.Count; i++)
             {
                 var filter = updateFilters[i];
@@ -216,10 +216,8 @@ namespace ECS
         }
         #endregion
         #region Filters methods
-        //TODO: init in ctor
-        //TODO: don't forget to copy update lists
-        private Dictionary<Type, List<HashSet<int>>> _addUpdateLists = new Dictionary<Type, List<HashSet<int>>>();
-        private Dictionary<Type, List<HashSet<int>>> _removeUpdateLists = new Dictionary<Type, List<HashSet<int>>>();
+        private Dictionary<Type, List<HashSet<int>>> _compsUpdateLists;
+        private Dictionary<Type, List<HashSet<int>>> _excludesUpdateLists;
         /* TODO:
          * on RegisterFilter filter should be checked if it already in this collection (like in FiltersCollection)
          * and added if not, RegisterFilter's filter parameter should be ref, to replace it with already existing one
@@ -231,65 +229,15 @@ namespace ECS
          */
         private FiltersCollection _filtersCollection;
 
-        public void RegisterFilter(IEnumerable<Type> comps, IEnumerable<Type> excludes, HashSet<int> filter)
+        public void RegisterFilter(Type[] comps, Type[] excludes, ref HashSet<int> filter)
         {
-
-        }
-
-        public void RegisterFilter(HashSet<Type> comps, HashSet<Type> excludes, HashSet<int> filter)
-        {
-            foreach (var comp in comps)
+            bool addded = _filtersCollection.GetOrAdd(comps, excludes, ref filter);
+            if (addded)
             {
-                if (!_addUpdateLists.ContainsKey(comp))
-                    _addUpdateLists.Add(comp, new List<HashSet<int>>());
-                _addUpdateLists[comp].Add(filter);//TODO: remove duplicates
-            }
-
-            if (excludes == null || excludes.Count < 1)
-                return;
-
-            foreach (var exclude in excludes)
-            {
-                if (!_removeUpdateLists.ContainsKey(exclude))
-                    _removeUpdateLists.Add(exclude, new List<HashSet<int>>());
-                _removeUpdateLists[exclude].Add(filter);//TODO: remove duplicates
-            }
-        }
-
-        //TODO: maybe shouldn't use HashSet and use sorted array with uniqueness check
-        public HashSet<int> GetView(IEnumerable<Type> comps, IEnumerable<Type> excludes)
-        {
-            throw new NotImplementedException();
-        }
-        //TODO: implement sortable groups
-        //TODO: probably it is better to register all needed views at start, and update them on adding/removing
-        //      components, using some kind of filter graph (somewhat similar to flecs)
-        public void GetView(ref SimpleVector<int> filter, in Type[] types, in Type[] excludes = null)
-        {
-            filter.Clear();
-            if (types.Length == 0)
-                return;
-
-            var firstPool = _componentsPools[types[0]];
-            for (int i = 0; i < firstPool.Length; i++)
-            {
-                bool belongs = true;
-                var id = firstPool.IthEntityId(i);
-                if (IsDead(id))
-                    continue;
-
-                for (int j = 1; j < types.Length && belongs; j++)
+                foreach (var comp in comps)
                 {
-                    var pool = _componentsPools[types[j]];
-                    belongs &= pool.Contains(id);
+
                 }
-                for (int j = 0; excludes != null && j < excludes.Length && belongs; j++)
-                {
-                    var pool = _componentsPools[excludes[j]];
-                    belongs &= !pool.Contains(id);
-                }
-                if (belongs)
-                    filter.Add(id);
             }
         }
 #endregion
