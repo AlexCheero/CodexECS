@@ -106,6 +106,9 @@ namespace ECS
                 EcsExceptionThrower.ThrowException("trying to delete wrong entity");
             if (entity.IsNull())
                 EcsExceptionThrower.ThrowException("trying to delete null entity");
+
+            _filtersCollection.RemoveId(entity.ToId());
+
             ref var recycleListEnd = ref _recycleListHead;
             while (!recycleListEnd.IsNull())
                 recycleListEnd = ref GetRefById(recycleListEnd);
@@ -147,17 +150,33 @@ namespace ECS
             return _componentsPools[key].Contains(entity);
         }
 
+        private void UpdateIdInFiltersOnAdd(int id, HashSet<HashSet<int>> filters)
+        {
+            foreach (var filter in filters)
+            {
+                if (filter.Contains(id))
+                    EcsExceptionThrower.ThrowException("filter should not contain this entity!");
+                filter.Add(id);
+            }
+        }
+
+        private void UpdateIdInFiltersOnRemove(int id, HashSet<HashSet<int>> filters)
+        {
+            foreach (var filter in filters)
+            {
+                if (!filter.Contains(id))
+                    EcsExceptionThrower.ThrowException("filter should contain this entity!");
+                filter.Remove(id);
+            }
+        }
+
         public ref T AddComponent<T>(EntityType entity, T component = default)
         {
             var key = typeof(T);
 
-            var updateFilters = _compsUpdateSets[key];
-            foreach (var filter in updateFilters)
-            {
-                int id = entity.ToId();
-                if (filter.Contains(id))//TODO: probably this check is redundant
-                    filter.Remove(id);//TODO: add to add lists and remove from remove lists and vice versa for remove component
-            }
+            int id = entity.ToId();
+            UpdateIdInFiltersOnAdd(id, _compsUpdateSets[key]);
+            UpdateIdInFiltersOnRemove(id, _excludesUpdateSets[key]);
 
             if (!_componentsPools.ContainsKey(key))
                 _componentsPools.Add(key, new ComponentsPool<T>());
@@ -169,17 +188,11 @@ namespace ECS
 
         public void AddTag<T>(EntityType entity)
         {
-            //same as for AddComponent
-
             var key = typeof(T);
 
-            var updateFilters = _compsUpdateSets[key];
-            foreach (var filter in updateFilters)
-            {
-                int id = entity.ToId();
-                if (filter.Contains(id))//TODO: probably this check is redundant
-                    filter.Remove(id);
-            }
+            int id = entity.ToId();
+            UpdateIdInFiltersOnAdd(id, _compsUpdateSets[key]);
+            UpdateIdInFiltersOnRemove(id, _excludesUpdateSets[key]);
 
             if (!_componentsPools.ContainsKey(key))
                 _componentsPools.Add(key, new TagsPool<T>());
@@ -201,13 +214,9 @@ namespace ECS
         {
             var key = typeof(T);
 
-            var updateFilters = _excludesUpdateSets[key];
-            foreach (var filter in updateFilters)
-            {
-                int id = entity.ToId();
-                if (filter.Contains(id))//TODO: probably this check is redundant
-                    filter.Remove(id);
-            }
+            int id = entity.ToId();
+            UpdateIdInFiltersOnRemove(id, _compsUpdateSets[key]);
+            UpdateIdInFiltersOnAdd(id, _excludesUpdateSets[key]);
 
             _componentsPools[key].Remove(entity);
         }

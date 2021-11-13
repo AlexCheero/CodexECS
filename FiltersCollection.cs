@@ -58,5 +58,14 @@ namespace ECS
                 filter = dummy.FilteredEntities;
             return addNew;
         }
+
+        public void RemoveId(int id)
+        {
+            foreach (var filter in _collection)
+            {
+                if (filter.FilteredEntities.Contains(id))
+                    filter.FilteredEntities.Remove(id);
+            }
+        }
     }
 }
