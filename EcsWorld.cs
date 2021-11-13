@@ -222,17 +222,10 @@ namespace ECS
         }
         #endregion
         #region Filters methods
+        //TODO: FiltersCollection should hold it's entries not in HashSet but in something that allows
+        //      indexed access and update sets should contain only indices to allow fast copy
         private Dictionary<Type, HashSet<HashSet<int>>> _compsUpdateSets;
         private Dictionary<Type, HashSet<HashSet<int>>> _excludesUpdateSets;
-        /* TODO:
-         * on RegisterFilter filter should be checked if it already in this collection (like in FiltersCollection)
-         * and added if not, RegisterFilter's filter parameter should be ref, to replace it with already existing one
-         * so that systems with same filters share common filter
-         * update lists should contain only indices for filters in this internal collection and, therefore it's type
-         * should be Dictionary<Type, List<int>> or use HashSet (maybe only in debug) to make sure it has no duplicates
-         * than, on entitiy deletion, it should be quite fast to iterate over all internal collection, to remove entity
-         * from every filter it belongs to
-         */
         private FiltersCollection _filtersCollection;
 
         private void AddFilterToUpdateSets(Type[] comps, HashSet<int> filter, Dictionary<Type, HashSet<HashSet<int>>> sets)
