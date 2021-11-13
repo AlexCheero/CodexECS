@@ -8,23 +8,19 @@ namespace ECS
     {
         protected static Type GetType<T>() => default(T).GetType();
 
-        //TODO: duplicated from Filter. maybe its better to hold just filter instance
-        //      and update sets in EcsWorld almost duplicate the type of filters collection
-        protected Type[] _comps;
-        protected Type[] _excludes;
-        protected HashSet<int> _filter;
+        protected EcsFilter Filter;
 
         //TODO: maybe should register itself in ctor?
         public void RegisterInWorld(EcsWorld world)
         {
-            world.RegisterFilter(_comps, _excludes, ref _filter);
+            world.RegisterFilter(ref Filter);
         }
 
         protected abstract void Iterate(EcsWorld world, int id);
 
         public virtual void Tick(EcsWorld world)
         {
-            foreach (var id in _filter)
+            foreach (var id in Filter.FilteredEntities)
                 Iterate(world, id);
         }
     }

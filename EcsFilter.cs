@@ -4,7 +4,7 @@ using System.Collections.Generic;
 
 namespace ECS
 {
-    struct Filter
+    struct EcsFilter
     {
         class TypeComparer : IComparer<Type>
         {
@@ -26,7 +26,7 @@ namespace ECS
 
         private static TypeComparer _typeComparer;
 
-        static Filter()
+        static EcsFilter()
         {
             _typeComparer = new TypeComparer();
         }
@@ -81,7 +81,7 @@ namespace ECS
             return hash;
         }
 
-        public Filter(int hash)//dummy ctor
+        public EcsFilter(int hash)//dummy ctor
         {
             Comps = null;
             Excludes = null;
@@ -89,7 +89,7 @@ namespace ECS
             _cachedHash = hash;
         }
 
-        public Filter(Type[] comps, Type[] excludes, HashSet<int> filter)
+        public EcsFilter(Type[] comps, Type[] excludes, HashSet<int> filter)
         {
             Comps = comps;
             Excludes = excludes;

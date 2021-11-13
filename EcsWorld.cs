@@ -249,14 +249,14 @@ namespace ECS
             }
         }
 
-        public void RegisterFilter(Type[] comps, Type[] excludes, ref HashSet<int> filter)
+        public void RegisterFilter(ref EcsFilter filter)
         {
-            bool addded = _filtersCollection.GetOrAdd(comps, excludes, ref filter);
+            bool addded = _filtersCollection.GetOrAdd(ref filter);
             if (addded)
             {
-                AddFilterToUpdateSets(comps, filter, _compsUpdateSets);
-                if (excludes != null)
-                    AddFilterToUpdateSets(excludes, filter, _excludesUpdateSets);
+                AddFilterToUpdateSets(filter.Comps, filter.FilteredEntities, _compsUpdateSets);
+                if (filter.Excludes != null)
+                    AddFilterToUpdateSets(filter.Excludes, filter.FilteredEntities, _excludesUpdateSets);
             }
         }
 #endregion

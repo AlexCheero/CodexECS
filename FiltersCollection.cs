@@ -6,7 +6,7 @@ namespace ECS
 {
     class FiltersCollection
     {
-        class FilterEqComparer : IEqualityComparer<Filter>
+        class FilterEqComparer : IEqualityComparer<EcsFilter>
         {
             //comps in this method should always be sorted
             //and, if equals, their length should alway be equal, because it will throw in Filter's
@@ -29,33 +29,32 @@ namespace ECS
                 return true;
             }
 
-            public bool Equals(Filter x, Filter y)
+            public bool Equals(EcsFilter x, EcsFilter y)
             {
                 bool compsEq = ComponentsEquals(x.Comps, y.Comps);
                 bool excludesEq = ComponentsEquals(x.Excludes, y.Excludes);
                 return compsEq && excludesEq;
             }
 
-            public int GetHashCode(Filter filter) => filter.HashCode;
+            public int GetHashCode(EcsFilter filter) => filter.HashCode;
         }
 
-        private HashSet<Filter> _collection;
+        private HashSet<EcsFilter> _collection;
         
         public FiltersCollection()
         {
-            _collection = new HashSet<Filter>(new FilterEqComparer());
+            _collection = new HashSet<EcsFilter>(new FilterEqComparer());
         }
 
-        public bool GetOrAdd(Type[] comps, Type[] excludes, ref HashSet<int> filter)
+        public bool GetOrAdd(ref EcsFilter filter)
         {
-            var hash = Filter.GetHashFromComponents(comps, excludes);
-            var dummy = new Filter(hash);
+            var dummy = new EcsFilter(filter.HashCode);
             var addNew = !_collection.TryGetValue(dummy, out dummy);
             if (addNew)
-                _collection.Add(new Filter(comps, excludes, filter));
+                _collection.Add(filter);
             else
                 //TODO: probably should force GC after adding all filters to remove duplicates
-                filter = dummy.FilteredEntities;
+                filter = dummy;
             return addNew;
         }
 
