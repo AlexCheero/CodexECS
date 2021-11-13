@@ -8,12 +8,14 @@ namespace ECS
     {
         public const int BitSizeHalved = sizeof(EntityType) * 4;
         public const EntityType NullEntity = (1 << BitSizeHalved) - 1;
-        
+
+#if DEBUG
         static EntityExtension()
         {
             if (NullEntity.GetVersion() > 0)
-                EcsExceptionThrower.ThrowException("NullEntity should always have 0 version");
+                throw new EcsException("NullEntity should always have 0 version");
         }
+#endif
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static EntityType GetId(this EntityType entity)
@@ -25,8 +27,10 @@ namespace ECS
 
         public static void SetId(this ref EntityType entity, EntityType id)
         {
+#if DEBUG
             if (id.GetId() >= NullEntity)
-                EcsExceptionThrower.ThrowException("set overflow id");
+                throw new EcsException("set overflow id");
+#endif
             entity = id.GetId() | entity.GetVersion();
         }
 

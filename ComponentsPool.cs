@@ -47,8 +47,10 @@ namespace ECS
         public void Copy(in IComponentsPool other)
         {
             var otherPool = other as ComponentsPool<T>;
+#if DEBUG
             if (otherPool == null)
-                EcsExceptionThrower.ThrowException("trying to copy from pool of different type");
+                throw new EcsException("trying to copy from pool of different type");
+#endif
             _components.Copy(otherPool._components);
         }
 
@@ -106,8 +108,10 @@ namespace ECS
         public void Copy(in IComponentsPool other)
         {
             var otherPool = other as TagsPool<T>;
+#if DEBUG
             if (otherPool == null)
-                EcsExceptionThrower.ThrowException("trying to copy from pool of different type");
+                throw new EcsException("trying to copy from pool of different type");
+#endif
             _tags.Copy(otherPool._tags);
         }
 

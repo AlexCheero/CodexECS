@@ -41,17 +41,21 @@ namespace ECS
                     _sparse[i] = -1;
             }
 
+#if DEBUG
             if (_sparse[outerIdx] > -1)
-                EcsExceptionThrower.ThrowException("sparse set already have element at this index");
-            
+                throw new EcsException("sparse set already have element at this index");
+#endif
+
             _sparse[outerIdx] = _values.Length;
             _values.Add(value);
             _dense.Add(outerIdx);
 
+#if DEBUG
             if (_values.Length != _dense.Length)
-                EcsExceptionThrower.ThrowException("_values.Length != _dense.Length");
+                throw new EcsException("_values.Length != _dense.Length");
             if (_dense[_sparse[outerIdx]] != outerIdx)
-                EcsExceptionThrower.ThrowException("wrong sparse set idices");
+                throw new EcsException("wrong sparse set idices");
+#endif
 
             return ref _values[_sparse[outerIdx]];
         }
@@ -116,14 +120,18 @@ namespace ECS
                     _sparse[i] = -1;
             }
 
+#if DEBUG
             if (_sparse[outerIdx] > -1)
-                EcsExceptionThrower.ThrowException("sparse set already have element at this index");
+                throw new EcsException("sparse set already have element at this index");
+#endif
 
             _sparse[outerIdx] = _dense.Length;
             _dense.Add(outerIdx);
 
+#if DEBUG
             if (_dense[_sparse[outerIdx]] != outerIdx)
-                EcsExceptionThrower.ThrowException("wrong sparse set idices");
+                throw new EcsException("wrong sparse set idices");
+#endif
         }
 
         //TODO: maybe should shrink set after removing?

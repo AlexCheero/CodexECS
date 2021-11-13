@@ -49,13 +49,12 @@ namespace ECS
             hash = hash * 23 + comps[0].GetHashCode();
             for (int i = 1; i < comps.Length; i++)
             {
+#if DEBUG
                 var curr = comps[i];
                 var prev = comps[i - 1];
                 if (curr == prev)
-                {
-                    EcsExceptionThrower.ThrowException("duplicated type in filter");
-                    continue;
-                }
+                    throw new EcsException("duplicated type in filter");
+#endif
 
                 hash = hash * 23 + comps[i].GetHashCode();
             }
@@ -66,13 +65,12 @@ namespace ECS
                 hash = hash * 23 + excludes[0].GetHashCode();
                 for (int i = 1; i < excludes.Length; i++)
                 {
+#if DEBUG
                     var curr = excludes[i];
                     var prev = excludes[i - 1];
                     if (curr == prev)
-                    {
-                        EcsExceptionThrower.ThrowException("duplicated type in filter");
-                        continue;
-                    }
+                        throw new EcsException("duplicated type in filter");
+#endif
 
                     hash = hash * 23 + excludes[i].GetHashCode();
                 }

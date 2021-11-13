@@ -11,15 +11,6 @@ namespace ECS
         public EcsException(string msg) : base(msg) { }
     }
 
-    static class EcsExceptionThrower
-    {
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void ThrowException(string message)
-        {
-            throw new EcsException(message);
-        }
-    }
-
     class EcsWorld
     {
         public EcsWorld(int entitiesReserved = 32)
@@ -67,8 +58,10 @@ namespace ECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private ref EntityType GetRefById(int id)
         {
+#if DEBUG
             if (id == EntityExtension.NullEntity.GetId() || !IsEnitityInRange(id))
-                EcsExceptionThrower.ThrowException("wrong entity id");
+                throw new EcsException("wrong entity id");
+#endif
             return ref _entites[id];
         }
 
@@ -100,12 +93,14 @@ namespace ECS
 
         public void Delete(EntityType entity)
         {
+#if DEBUG
             if (IsDead(entity))
-                EcsExceptionThrower.ThrowException("trying to delete already dead entity");
+                throw new EcsException("trying to delete already dead entity");
             if (!IsEnitityInRange(entity))
-                EcsExceptionThrower.ThrowException("trying to delete wrong entity");
+                throw new EcsException("trying to delete wrong entity");
             if (entity.IsNull())
-                EcsExceptionThrower.ThrowException("trying to delete null entity");
+                throw new EcsException("trying to delete null entity");
+#endif
 
             _filtersCollection.RemoveId(entity.ToId());
 
@@ -122,13 +117,15 @@ namespace ECS
                 return GetRecycled();
 
             var lastEntity = (EntityType)_entites.Length;
+#if DEBUG
             if (lastEntity == EntityExtension.NullEntity)
-                EcsExceptionThrower.ThrowException("entity limit reached");
+                throw new EcsException("entity limit reached");
             if (_entites.Length < 0)
-                EcsExceptionThrower.ThrowException("entities vector length overflow");
+                throw new EcsException("entities vector length overflow");
             if (lastEntity.GetVersion() > 0)
-                EcsExceptionThrower.ThrowException("lastEntity version should always be 0");
-            
+                throw new EcsException("lastEntity version should always be 0");
+#endif
+
             _entites.Add(lastEntity);
             return _entites[_entites.Length - 1];
         }
@@ -142,11 +139,13 @@ namespace ECS
             var key = typeof(T);
             if (!_componentsPools.ContainsKey(key))
                 return false;
+#if DEBUG
             if (_componentsPools[key] as ComponentsPool<T> == null
                 && _componentsPools[key] as TagsPool<T> == null)
             {
-                EcsExceptionThrower.ThrowException("invalid pool");
+                throw new EcsException("invalid pool");
             }
+#endif
             return _componentsPools[key].Contains(entity);
         }
 
@@ -154,8 +153,10 @@ namespace ECS
         {
             foreach (var filter in filters)
             {
+#if DEBUG
                 if (filter.Contains(id))
-                    EcsExceptionThrower.ThrowException("filter should not contain this entity!");
+                    throw new EcsException("filter should not contain this entity!");
+#endif
                 filter.Add(id);
             }
         }
@@ -164,8 +165,10 @@ namespace ECS
         {
             foreach (var filter in filters)
             {
+#if DEBUG
                 if (!filter.Contains(id))
-                    EcsExceptionThrower.ThrowException("filter should contain this entity!");
+                    throw new EcsException("filter should contain this entity!");
+#endif
                 filter.Remove(id);
             }
         }
@@ -181,8 +184,10 @@ namespace ECS
             if (!_componentsPools.ContainsKey(key))
                 _componentsPools.Add(key, new ComponentsPool<T>());
             var pool = _componentsPools[key] as ComponentsPool<T>;
+#if DEBUG
             if (pool == null)
-                EcsExceptionThrower.ThrowException("invalid pool");
+                throw new EcsException("invalid pool");
+#endif
             return ref pool.Add(entity, component);
         }
 
@@ -197,8 +202,10 @@ namespace ECS
             if (!_componentsPools.ContainsKey(key))
                 _componentsPools.Add(key, new TagsPool<T>());
             var pool = _componentsPools[key] as TagsPool<T>;
+#if DEBUG
             if (pool == null)
-                EcsExceptionThrower.ThrowException("invalid pool");
+                throw new EcsException("invalid pool");
+#endif
             pool.Add(entity);
         }
 
@@ -235,8 +242,10 @@ namespace ECS
                 if (!sets.ContainsKey(comp))
                     sets.Add(comp, new HashSet<HashSet<int>>());
 
+#if DEBUG
                 if (sets[comp].Contains(filter))
-                    EcsExceptionThrower.ThrowException("set already contains this filter!");
+                    throw new EcsException("set already contains this filter!");
+#endif
 
                 sets[comp].Add(filter);
             }
