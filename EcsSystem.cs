@@ -9,6 +9,7 @@ namespace ECS
         protected static Type GetType<T>() => default(T).GetType();
 
         //TODO: duplicated from Filter. maybe its better to hold just filter instance
+        //      and update sets in EcsWorld almost duplicate the type of filters collection
         protected Type[] _comps;
         protected Type[] _excludes;
         protected HashSet<int> _filter;

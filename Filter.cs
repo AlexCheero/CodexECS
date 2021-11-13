@@ -4,7 +4,7 @@ using System.Collections.Generic;
 
 namespace ECS
 {
-    struct Filter
+    class Filter
     {
         class TypeComparer : IComparer<Type>
         {

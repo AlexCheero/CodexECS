@@ -28,8 +28,8 @@ namespace ECS
             _componentsPools = new Dictionary<Type, IComponentsPool>();
             
             //TODO: don't forget to copy
-            _compsUpdateLists = new Dictionary<Type, List<HashSet<int>>>();
-            _excludesUpdateLists = new Dictionary<Type, List<HashSet<int>>>();
+            _compsUpdateSets = new Dictionary<Type, HashSet<HashSet<int>>>();
+            _excludesUpdateSets = new Dictionary<Type, HashSet<HashSet<int>>>();
             _filtersCollection = new FiltersCollection();
         }
 
@@ -151,10 +151,9 @@ namespace ECS
         {
             var key = typeof(T);
 
-            var updateFilters = _compsUpdateLists[key];
-            for (int i = 0; i < updateFilters.Count; i++)
+            var updateFilters = _compsUpdateSets[key];
+            foreach (var filter in updateFilters)
             {
-                var filter = updateFilters[i];
                 int id = entity.ToId();
                 if (filter.Contains(id))//TODO: probably this check is redundant
                     filter.Remove(id);//TODO: add to add lists and remove from remove lists and vice versa for remove component
@@ -174,10 +173,9 @@ namespace ECS
 
             var key = typeof(T);
 
-            var updateFilters = _compsUpdateLists[key];
-            for (int i = 0; i < updateFilters.Count; i++)
+            var updateFilters = _compsUpdateSets[key];
+            foreach (var filter in updateFilters)
             {
-                var filter = updateFilters[i];
                 int id = entity.ToId();
                 if (filter.Contains(id))//TODO: probably this check is redundant
                     filter.Remove(id);
@@ -203,10 +201,9 @@ namespace ECS
         {
             var key = typeof(T);
 
-            var updateFilters = _excludesUpdateLists[key];
-            for (int i = 0; i < updateFilters.Count; i++)
+            var updateFilters = _excludesUpdateSets[key];
+            foreach (var filter in updateFilters)
             {
-                var filter = updateFilters[i];
                 int id = entity.ToId();
                 if (filter.Contains(id))//TODO: probably this check is redundant
                     filter.Remove(id);
@@ -216,8 +213,8 @@ namespace ECS
         }
         #endregion
         #region Filters methods
-        private Dictionary<Type, List<HashSet<int>>> _compsUpdateLists;
-        private Dictionary<Type, List<HashSet<int>>> _excludesUpdateLists;
+        private Dictionary<Type, HashSet<HashSet<int>>> _compsUpdateSets;
+        private Dictionary<Type, HashSet<HashSet<int>>> _excludesUpdateSets;
         /* TODO:
          * on RegisterFilter filter should be checked if it already in this collection (like in FiltersCollection)
          * and added if not, RegisterFilter's filter parameter should be ref, to replace it with already existing one
@@ -229,15 +226,28 @@ namespace ECS
          */
         private FiltersCollection _filtersCollection;
 
+        private void AddFilterToUpdateSets(Type[] comps, HashSet<int> filter, Dictionary<Type, HashSet<HashSet<int>>> sets)
+        {
+            foreach (var comp in comps)
+            {
+                if (!sets.ContainsKey(comp))
+                    sets.Add(comp, new HashSet<HashSet<int>>());
+
+                if (sets[comp].Contains(filter))
+                    EcsExceptionThrower.ThrowException("set already contains this filter!");
+
+                sets[comp].Add(filter);
+            }
+        }
+
         public void RegisterFilter(Type[] comps, Type[] excludes, ref HashSet<int> filter)
         {
             bool addded = _filtersCollection.GetOrAdd(comps, excludes, ref filter);
             if (addded)
             {
-                foreach (var comp in comps)
-                {
-
-                }
+                AddFilterToUpdateSets(comps, filter, _compsUpdateSets);
+                if (excludes != null)
+                    AddFilterToUpdateSets(excludes, filter, _excludesUpdateSets);
             }
         }
 #endregion
