@@ -39,31 +39,101 @@ namespace ECS
             public int GetHashCode(EcsFilter filter) => filter.HashCode;
         }
 
-        private HashSet<EcsFilter> _collection;
-        
-        public FiltersCollection()
+        private HashSet<EcsFilter> _set;
+        private List<EcsFilter> _list;
+
+        private static FilterEqComparer _filterComparer;
+
+        static FiltersCollection()
         {
-            _collection = new HashSet<EcsFilter>(new FilterEqComparer());
+            _filterComparer = new FilterEqComparer();
         }
 
-        public bool GetOrAdd(ref EcsFilter filter)
+        public int Length => _list.Count;
+
+        public EcsFilter this[int i]
+        {
+            get
+            {
+#if DEBUG
+                if (i >= _list.Count)
+                    throw new EcsException("wrong filter index");
+#endif
+                return _list[i];
+            }
+        }
+
+        public FiltersCollection()
+        {
+            _set = new HashSet<EcsFilter>(_filterComparer);
+            _list = new List<EcsFilter>();
+        }
+
+        //TODO: probably should get rid of copy ctors in FiltersCollection and EcsWorld and just use _list.Clear,
+        //      RemoveRange/AddRange in FiltersCollection.Copy method
+        public FiltersCollection(FiltersCollection other)
+        {
+            _set = new HashSet<EcsFilter>(_filterComparer);
+            _list = new List<EcsFilter>();
+            for (int i = 0; i < other._list.Count; i++)
+                _list.Add(new EcsFilter());
+            Copy(other);
+        }
+
+        public int GetOrAdd(ref EcsFilter filter)
         {
             var dummy = new EcsFilter(filter.HashCode);
-            var addNew = !_collection.TryGetValue(dummy, out dummy);
+            var addNew = !_set.TryGetValue(dummy, out dummy);
+            var idx = -1;
             if (addNew)
-                _collection.Add(filter);
+            {
+                _set.Add(filter);
+                _list.Add(filter);
+                idx = _list.Count - 1;
+            }
             else
+            {
                 //TODO: probably should force GC after adding all filters to remove duplicates
                 filter = dummy;
-            return addNew;
+            }
+
+#if DEBUG
+            if (_list.Count != _set.Count)
+                throw new EcsException("desynch in FiltersCollection");
+#endif
+
+            return idx;
         }
 
         public void RemoveId(int id)
         {
-            foreach (var filter in _collection)
+            foreach (var filter in _set)
             {
                 if (filter.FilteredEntities.Contains(id))
                     filter.FilteredEntities.Remove(id);
+            }
+        }
+
+        //TODO: not sure about allocations in this method
+        public void Copy(FiltersCollection other)
+        {
+#if DEBUG
+            if (_list.Count != other._list.Count)
+                throw new EcsException("FiltersCollection lists should have same size");
+#endif
+
+            _set.Clear();
+            for (int i = 0; i < other._list.Count; i++)
+            {
+                var filterCopy = _list[i];
+                var otherFilter = other._list[i];
+                filterCopy.Comps = otherFilter.Comps;
+                filterCopy.Excludes = otherFilter.Excludes;
+                filterCopy.FilteredEntities.Clear();
+                foreach (var entity in otherFilter.FilteredEntities)
+                    filterCopy.FilteredEntities.Add(entity);
+                _list[i] = filterCopy;
+                _set.Add(filterCopy);
             }
         }
     }

@@ -9,8 +9,9 @@ namespace ECS
         private int _end = 0;
 
         public int Length => _end;
+        public int Reserved => _elements.Length;
 
-        public ref T this[int i] { get { return ref _elements[i]; } }
+        public ref T this[int i] { get => ref _elements[i]; }
 
         public SimpleVector(int reserved = 0)
         {
@@ -22,6 +23,7 @@ namespace ECS
             _end = other._end;
             if (_elements.Length < _end)
                 Array.Resize(ref _elements, other._elements.Length);
+            //TODO: test if any old entries stays in the array
             Array.Copy(other._elements, _elements, _end);
         }
 

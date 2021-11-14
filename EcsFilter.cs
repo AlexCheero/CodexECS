@@ -18,7 +18,6 @@ namespace ECS
             }
         }
 
-        //TODO: probably should make some (or all) fields private
         public Type[] Comps;
         public Type[] Excludes;
         //TODO: implement sortable groups

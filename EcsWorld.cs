@@ -18,10 +18,20 @@ namespace ECS
             _entites = new SimpleVector<EntityType>(entitiesReserved);
             _componentsPools = new Dictionary<Type, IComponentsPool>();
             
-            //TODO: don't forget to copy
-            _compsUpdateSets = new Dictionary<Type, HashSet<HashSet<int>>>();
-            _excludesUpdateSets = new Dictionary<Type, HashSet<HashSet<int>>>();
+            _compsUpdateSets = new Dictionary<Type, HashSet<int>>();
+            _excludesUpdateSets = new Dictionary<Type, HashSet<int>>();
             _filtersCollection = new FiltersCollection();
+        }
+
+        //this ctor not fully copies other world, but prepares for proper Copy method work
+        public EcsWorld(EcsWorld other)
+        {
+            _entites = new SimpleVector<EntityType>(other._entites.Reserved);
+            _componentsPools = new Dictionary<Type, IComponentsPool>();
+
+            _compsUpdateSets = other._compsUpdateSets;
+            _excludesUpdateSets = other._excludesUpdateSets;
+            _filtersCollection = new FiltersCollection(other._filtersCollection);
         }
 
         public void Copy(in EcsWorld other)
@@ -43,6 +53,10 @@ namespace ECS
                 else
                     _componentsPools.Add(key, otherPool.Dulicate());
             }
+
+            //update sets should be same for every copy of the world
+
+            _filtersCollection.Copy(other._filtersCollection);
         }
 
 #region Entities methods
@@ -149,27 +163,29 @@ namespace ECS
             return _componentsPools[key].Contains(entity);
         }
 
-        private void UpdateIdInFiltersOnAdd(int id, HashSet<HashSet<int>> filters)
+        private void UpdateIdInFiltersOnAdd(int id, HashSet<int> filterIds)
         {
-            foreach (var filter in filters)
+            foreach (var filterId in filterIds)
             {
+                var filer = _filtersCollection[filterId];
 #if DEBUG
-                if (filter.Contains(id))
+                if (filer.FilteredEntities.Contains(id))
                     throw new EcsException("filter should not contain this entity!");
 #endif
-                filter.Add(id);
+                filer.FilteredEntities.Add(id);
             }
         }
 
-        private void UpdateIdInFiltersOnRemove(int id, HashSet<HashSet<int>> filters)
+        private void UpdateIdInFiltersOnRemove(int id, HashSet<int> filterIds)
         {
-            foreach (var filter in filters)
+            foreach (var filterId in filterIds)
             {
+                var filer = _filtersCollection[filterId];
 #if DEBUG
-                if (!filter.Contains(id))
+                if (!filer.FilteredEntities.Contains(id))
                     throw new EcsException("filter should contain this entity!");
 #endif
-                filter.Remove(id);
+                filer.FilteredEntities.Remove(id);
             }
         }
 
@@ -188,6 +204,8 @@ namespace ECS
             if (pool == null)
                 throw new EcsException("invalid pool");
 #endif
+            //TODO: it seems that it is not necessary to cast pool, we can just add Add method to interface
+            //      and use unified method for adding both components and tags. check this out
             return ref pool.Add(entity, component);
         }
 
@@ -229,36 +247,36 @@ namespace ECS
         }
         #endregion
         #region Filters methods
-        //TODO: FiltersCollection should hold it's entries not in HashSet but in something that allows
-        //      indexed access and update sets should contain only indices to allow fast copy
-        private Dictionary<Type, HashSet<HashSet<int>>> _compsUpdateSets;
-        private Dictionary<Type, HashSet<HashSet<int>>> _excludesUpdateSets;
+        //update sets holds indices of filters by types
+        private Dictionary<Type, HashSet<int>> _compsUpdateSets;
+        private Dictionary<Type, HashSet<int>> _excludesUpdateSets;
         private FiltersCollection _filtersCollection;
 
-        private void AddFilterToUpdateSets(Type[] comps, HashSet<int> filter, Dictionary<Type, HashSet<HashSet<int>>> sets)
+        private void AddFilterToUpdateSets(Type[] comps, int filterIdx
+            , Dictionary<Type, HashSet<int>> sets)
         {
             foreach (var comp in comps)
             {
                 if (!sets.ContainsKey(comp))
-                    sets.Add(comp, new HashSet<HashSet<int>>());
+                    sets.Add(comp, new HashSet<int>());
 
 #if DEBUG
-                if (sets[comp].Contains(filter))
+                if (sets[comp].Contains(filterIdx))
                     throw new EcsException("set already contains this filter!");
 #endif
 
-                sets[comp].Add(filter);
+                sets[comp].Add(filterIdx);
             }
         }
 
         public void RegisterFilter(ref EcsFilter filter)
         {
-            bool addded = _filtersCollection.GetOrAdd(ref filter);
-            if (addded)
+            int idx = _filtersCollection.GetOrAdd(ref filter);
+            if (idx > -1)
             {
-                AddFilterToUpdateSets(filter.Comps, filter.FilteredEntities, _compsUpdateSets);
+                AddFilterToUpdateSets(filter.Comps, idx, _compsUpdateSets);
                 if (filter.Excludes != null)
-                    AddFilterToUpdateSets(filter.Excludes, filter.FilteredEntities, _excludesUpdateSets);
+                    AddFilterToUpdateSets(filter.Excludes, idx, _excludesUpdateSets);
             }
         }
 #endregion
