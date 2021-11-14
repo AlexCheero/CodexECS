@@ -1,6 +1,5 @@
 ﻿using System;
 
-//TODO: cover with tests
 namespace ECS
 {
     //usage example:
