@@ -19,8 +19,8 @@ namespace ECS
             _componentsPools = new Dictionary<Type, IComponentsPool>();
             
             //TODO: don't forget to copy
-            _compsUpdateSets = new Dictionary<Type, HashSet<int>>();
-            _excludesUpdateSets = new Dictionary<Type, HashSet<int>>();
+            _compsUpdateSets = new Dictionary<Type, HashSet<HashSet<int>>>();
+            _excludesUpdateSets = new Dictionary<Type, HashSet<HashSet<int>>>();
             _filtersCollection = new FiltersCollection();
         }
 
@@ -149,29 +149,27 @@ namespace ECS
             return _componentsPools[key].Contains(entity);
         }
 
-        private void UpdateIdInFiltersOnAdd(int id, HashSet<int> filterIds)
+        private void UpdateIdInFiltersOnAdd(int id, HashSet<HashSet<int>> filters)
         {
-            foreach (var filterId in filterIds)
+            foreach (var filter in filters)
             {
-                var filer = _filtersCollection[filterId];
 #if DEBUG
-                if (filer.FilteredEntities.Contains(id))
+                if (filter.Contains(id))
                     throw new EcsException("filter should not contain this entity!");
 #endif
-                filer.FilteredEntities.Add(id);
+                filter.Add(id);
             }
         }
 
-        private void UpdateIdInFiltersOnRemove(int id, HashSet<int> filterIds)
+        private void UpdateIdInFiltersOnRemove(int id, HashSet<HashSet<int>> filters)
         {
-            foreach (var filterId in filterIds)
+            foreach (var filter in filters)
             {
-                var filer = _filtersCollection[filterId];
 #if DEBUG
-                if (!filer.FilteredEntities.Contains(id))
+                if (!filter.Contains(id))
                     throw new EcsException("filter should contain this entity!");
 #endif
-                filer.FilteredEntities.Remove(id);
+                filter.Remove(id);
             }
         }
 
@@ -233,35 +231,34 @@ namespace ECS
         #region Filters methods
         //TODO: FiltersCollection should hold it's entries not in HashSet but in something that allows
         //      indexed access and update sets should contain only indices to allow fast copy
-        private Dictionary<Type, HashSet<int>> _compsUpdateSets;
-        private Dictionary<Type, HashSet<int>> _excludesUpdateSets;
+        private Dictionary<Type, HashSet<HashSet<int>>> _compsUpdateSets;
+        private Dictionary<Type, HashSet<HashSet<int>>> _excludesUpdateSets;
         private FiltersCollection _filtersCollection;
 
-        private void AddFilterToUpdateSets(Type[] comps, int filterIdx
-            , Dictionary<Type, HashSet<int>> sets)
+        private void AddFilterToUpdateSets(Type[] comps, HashSet<int> filter, Dictionary<Type, HashSet<HashSet<int>>> sets)
         {
             foreach (var comp in comps)
             {
                 if (!sets.ContainsKey(comp))
-                    sets.Add(comp, new HashSet<int>());
+                    sets.Add(comp, new HashSet<HashSet<int>>());
 
 #if DEBUG
-                if (sets[comp].Contains(filterIdx))
+                if (sets[comp].Contains(filter))
                     throw new EcsException("set already contains this filter!");
 #endif
 
-                sets[comp].Add(filterIdx);
+                sets[comp].Add(filter);
             }
         }
 
         public void RegisterFilter(ref EcsFilter filter)
         {
-            int idx = _filtersCollection.GetOrAdd(ref filter);
-            if (idx > -1)
+            bool addded = _filtersCollection.GetOrAdd(ref filter);
+            if (addded)
             {
-                AddFilterToUpdateSets(filter.Comps, idx, _compsUpdateSets);
+                AddFilterToUpdateSets(filter.Comps, filter.FilteredEntities, _compsUpdateSets);
                 if (filter.Excludes != null)
-                    AddFilterToUpdateSets(filter.Excludes, idx, _excludesUpdateSets);
+                    AddFilterToUpdateSets(filter.Excludes, filter.FilteredEntities, _excludesUpdateSets);
             }
         }
 #endregion
