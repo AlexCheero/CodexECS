@@ -6,9 +6,6 @@ namespace ECS
     interface IComponentsPool
     {
         public int Length { get; }
-        //TODO: probably should use enumerator
-        //method for iteration over all entities that have this component
-        public int IthEntityId(int i);
         public bool Contains(int i);
         public bool Contains(EntityType entity);
         public void Remove(EntityType entity);
@@ -27,9 +24,6 @@ namespace ECS
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get => _components.Length;
         }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public int IthEntityId(int i) => _components.IthOuterIdx(i);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Contains(int i) => _components.Contains(i);
@@ -88,9 +82,6 @@ namespace ECS
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get => _tags.Length;
         }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public int IthEntityId(int i) => _tags.IthOuterIdx(i);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Contains(int i) => _tags.Contains(i);

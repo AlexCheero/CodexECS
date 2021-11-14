@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 //TODO: measure if standart containers really affects performanse and git rid of them or use them everywhere
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
@@ -8,12 +9,11 @@ namespace ECS
     class SparseSet<T>
     {
         private int[] _sparse;//TODO: why not SimpleVector?
-        private SimpleVector<int> _dense;
+        private SimpleVector<int> _dense;//TODO: this field used only in debug purposes. remove or wrap in ifdef
         private SimpleVector<T> _values;
 
         public int Length => _values.Length;
-        public int IthOuterIdx(int i) => _dense[i];
-        public ref T this[int i] { get { return ref _values[_sparse[i]]; } }
+        public ref T this[int i] { get => ref _values[_sparse[i]]; }
 
         public SparseSet()
         {
@@ -60,7 +60,6 @@ namespace ECS
             return ref _values[_sparse[outerIdx]];
         }
 
-        //TODO: maybe should shrink set after removing?
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Remove(int outerIdx)
         {
@@ -86,6 +85,7 @@ namespace ECS
         }
     }
 
+    //TODO: it looks like it would be much easier and cheaper to remove this class and use bitset for tag pools
     //SparseSet implementation without values, for implementing tags
     class LightSparseSet<T>
     {
@@ -93,7 +93,6 @@ namespace ECS
         private SimpleVector<int> _dense;
 
         public int Length => _dense.Length;
-        public int IthOuterIdx(int i) => _dense[i];
 
         public LightSparseSet()
         {
@@ -134,7 +133,6 @@ namespace ECS
 #endif
         }
 
-        //TODO: maybe should shrink set after removing?
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Remove(int outerIdx)
         {
