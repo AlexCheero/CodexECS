@@ -10,7 +10,7 @@ namespace ECS
 
         public int Length => _end;
 
-        public ref T this[int i] { get { return ref _elements[i]; } }
+        public ref T this[int i] { get => ref _elements[i]; }
 
         public SimpleVector(int reserved = 0)
         {
