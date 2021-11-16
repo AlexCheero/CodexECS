@@ -73,7 +73,7 @@ namespace ECS
         }
 
         //all adding should be preformed only for initial world
-        public bool TryAdd(ref Type[] comps, ref Type[] excludes, out int idx)
+        public bool AddOrGet(ref Type[] comps, ref Type[] excludes, out int idx)
         {
             var dummy = new EcsFilter(EcsFilter.GetHashFromComponents(comps, excludes));
             var addNew = !_set.TryGetValue(dummy, out dummy);

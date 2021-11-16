@@ -12,7 +12,6 @@ namespace ECS
         protected Type[] Excludes;
         protected int FilteredSetId;
 
-        //TODO: maybe should register itself in ctor?
         public void RegisterInWorld(EcsWorld world)
         {
             FilteredSetId = world.RegisterFilter(ref Comps, ref Excludes);

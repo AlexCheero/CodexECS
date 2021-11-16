@@ -23,7 +23,6 @@ namespace ECS
             _end = other._end;
             if (_elements.Length < _end)
                 Array.Resize(ref _elements, other._elements.Length);
-            //TODO: test if any old entries stays in the array
             Array.Copy(other._elements, _elements, _end);
         }
 

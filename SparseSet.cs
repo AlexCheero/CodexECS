@@ -8,9 +8,12 @@ namespace ECS
 {
     class SparseSet<T>
     {
-        private int[] _sparse;//TODO: why not SimpleVector?
-        private SimpleVector<int> _dense;//TODO: this field used only in debug purposes. remove or wrap in ifdef
+        private int[] _sparse;
         private SimpleVector<T> _values;
+
+#if DEBUG
+        private SimpleVector<int> _dense;
+#endif
 
         public int Length => _values.Length;
         public ref T this[int i] { get => ref _values[_sparse[i]]; }
@@ -18,8 +21,10 @@ namespace ECS
         public SparseSet()
         {
             _sparse = new int[0];
-            _dense = new SimpleVector<int>();
             _values = new SimpleVector<T>();
+#if DEBUG
+            _dense = new SimpleVector<int>();
+#endif
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -48,9 +53,10 @@ namespace ECS
 
             _sparse[outerIdx] = _values.Length;
             _values.Add(value);
-            _dense.Add(outerIdx);
 
 #if DEBUG
+            _dense.Add(outerIdx);
+
             if (_values.Length != _dense.Length)
                 throw new EcsException("_values.Length != _dense.Length");
             if (_dense[_sparse[outerIdx]] != outerIdx)
@@ -80,12 +86,15 @@ namespace ECS
                 Array.Fill(_sparse, -1, other._sparse.Length, _sparse.Length - other._sparse.Length);
             Array.Copy(other._sparse, _sparse, other._sparse.Length);
 
-            _dense.Copy(other._dense);
             _values.Copy(other._values);
+
+#if DEBUG
+            _dense.Copy(other._dense);
+#endif
         }
     }
 
-    //TODO: it looks like it would be much easier and cheaper to remove this class and use bitset for tag pools
+    //TODO: probably should use some kind of bitsets inside of LightSparseSet
     //SparseSet implementation without values, for implementing tags
     class LightSparseSet<T>
     {

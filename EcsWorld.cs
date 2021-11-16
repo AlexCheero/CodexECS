@@ -204,8 +204,6 @@ namespace ECS
             if (pool == null)
                 throw new EcsException("invalid pool");
 #endif
-            //TODO: it seems that it is not necessary to cast pool, we can just add Add method to interface
-            //      and use unified method for adding both components and tags. check this out
             return ref pool.Add(entity, component);
         }
 
@@ -272,7 +270,7 @@ namespace ECS
         public int RegisterFilter(ref Type[] comps, ref Type[] excludes)
         {
             int filterId;
-            if (_filtersCollection.TryAdd(ref comps, ref excludes, out filterId))
+            if (_filtersCollection.AddOrGet(ref comps, ref excludes, out filterId))
             {
                 var filter = _filtersCollection[filterId];
                 AddFilterToUpdateSets(filter.Comps, filterId, _compsUpdateSets);
