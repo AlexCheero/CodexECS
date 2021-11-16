@@ -23,7 +23,7 @@ namespace ECS
             _filtersCollection = new FiltersCollection();
         }
 
-        //this ctor not fully copies other world, but prepares for proper Copy method work
+        //prealloc ctor
         public EcsWorld(EcsWorld other)
         {
             _entites = new SimpleVector<EntityType>(other._entites.Reserved);
@@ -31,7 +31,7 @@ namespace ECS
 
             _compsUpdateSets = other._compsUpdateSets;
             _excludesUpdateSets = other._excludesUpdateSets;
-            _filtersCollection = new FiltersCollection(other._filtersCollection);
+            _filtersCollection = new FiltersCollection(other._filtersCollection.Length);
         }
 
         public void Copy(in EcsWorld other)

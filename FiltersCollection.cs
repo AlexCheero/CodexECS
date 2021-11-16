@@ -63,21 +63,12 @@ namespace ECS
             }
         }
 
-        public FiltersCollection()
+        public FiltersCollection(int prealloc = 0)
         {
             _set = new HashSet<EcsFilter>(_filterComparer);
-            _list = new List<EcsFilter>();
-        }
-
-        //TODO: probably should get rid of copy ctors in FiltersCollection and EcsWorld and just use _list.Clear,
-        //      RemoveRange/AddRange in FiltersCollection.Copy method
-        public FiltersCollection(FiltersCollection other)
-        {
-            _set = new HashSet<EcsFilter>(_filterComparer);
-            _list = new List<EcsFilter>();
-            for (int i = 0; i < other._list.Count; i++)
-                _list.Add(new EcsFilter());
-            Copy(other);
+            _list = new List<EcsFilter>(prealloc);
+            for (int i = 0; i < prealloc; i++)
+                _list.Add(new EcsFilter { FilteredEntities = new HashSet<int>() });
         }
 
         public int GetOrAdd(ref EcsFilter filter)
