@@ -8,19 +8,22 @@ namespace ECS
     {
         protected static Type GetType<T>() => default(T).GetType();
 
-        protected EcsFilter Filter;
+        protected Type[] Comps;
+        protected Type[] Excludes;
+        protected int FilteredSetId;
 
         //TODO: maybe should register itself in ctor?
         public void RegisterInWorld(EcsWorld world)
         {
-            world.RegisterFilter(ref Filter);
+            FilteredSetId = world.RegisterFilter(ref Comps, ref Excludes);
         }
 
         protected abstract void Iterate(EcsWorld world, int id);
 
         public virtual void Tick(EcsWorld world)
         {
-            foreach (var id in Filter.FilteredEntities)
+            var filteredEntities = world.GetFilteredEntitiesById(FilteredSetId);
+            foreach (var id in filteredEntities)
                 Iterate(world, id);
         }
     }

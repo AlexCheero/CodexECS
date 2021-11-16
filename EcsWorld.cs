@@ -167,12 +167,12 @@ namespace ECS
         {
             foreach (var filterId in filterIds)
             {
-                var filer = _filtersCollection[filterId];
+                var filter = _filtersCollection[filterId];
 #if DEBUG
-                if (filer.FilteredEntities.Contains(id))
+                if (filter.FilteredEntities.Contains(id))
                     throw new EcsException("filter should not contain this entity!");
 #endif
-                filer.FilteredEntities.Add(id);
+                filter.FilteredEntities.Add(id);
             }
         }
 
@@ -180,12 +180,12 @@ namespace ECS
         {
             foreach (var filterId in filterIds)
             {
-                var filer = _filtersCollection[filterId];
+                var filter = _filtersCollection[filterId];
 #if DEBUG
-                if (!filer.FilteredEntities.Contains(id))
+                if (!filter.FilteredEntities.Contains(id))
                     throw new EcsException("filter should contain this entity!");
 #endif
-                filer.FilteredEntities.Remove(id);
+                filter.FilteredEntities.Remove(id);
             }
         }
 
@@ -269,16 +269,21 @@ namespace ECS
             }
         }
 
-        public void RegisterFilter(ref EcsFilter filter)
+        public int RegisterFilter(ref Type[] comps, ref Type[] excludes)
         {
-            int idx = _filtersCollection.GetOrAdd(ref filter);
-            if (idx > -1)
+            int filterId;
+            if (_filtersCollection.TryAdd(ref comps, ref excludes, out filterId))
             {
-                AddFilterToUpdateSets(filter.Comps, idx, _compsUpdateSets);
+                var filter = _filtersCollection[filterId];
+                AddFilterToUpdateSets(filter.Comps, filterId, _compsUpdateSets);
                 if (filter.Excludes != null)
-                    AddFilterToUpdateSets(filter.Excludes, idx, _excludesUpdateSets);
+                    AddFilterToUpdateSets(filter.Excludes, filterId, _excludesUpdateSets);
             }
+
+            return filterId;
         }
+
+        public HashSet<int> GetFilteredEntitiesById(int id) => _filtersCollection[id].FilteredEntities;
 #endregion
     }
 }

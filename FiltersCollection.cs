@@ -63,6 +63,7 @@ namespace ECS
             }
         }
 
+        //all prealloc should be performed only for world's copies
         public FiltersCollection(int prealloc = 0)
         {
             _set = new HashSet<EcsFilter>(_filterComparer);
@@ -71,29 +72,32 @@ namespace ECS
                 _list.Add(new EcsFilter { FilteredEntities = new HashSet<int>() });
         }
 
-        public int GetOrAdd(ref EcsFilter filter)
+        //all adding should be preformed only for initial world
+        public bool TryAdd(ref Type[] comps, ref Type[] excludes, out int idx)
         {
-            var dummy = new EcsFilter(filter.HashCode);
+            var dummy = new EcsFilter(EcsFilter.GetHashFromComponents(comps, excludes));
             var addNew = !_set.TryGetValue(dummy, out dummy);
-            var idx = -1;
             if (addNew)
             {
-                _set.Add(filter);
-                _list.Add(filter);
+                var newFilter = new EcsFilter(comps, excludes, new HashSet<int>());
+                _set.Add(newFilter);
+                _list.Add(newFilter);
                 idx = _list.Count - 1;
+
+#if DEBUG
+                if (_list.Count != _set.Count)
+                    throw new EcsException("FiltersCollection.TryAdd _set _list desynch");
+#endif
+                return true;
             }
             else
             {
                 //TODO: probably should force GC after adding all filters to remove duplicates
-                filter = dummy;
+                comps = dummy.Comps;
+                excludes = dummy.Excludes;
+                idx = _list.IndexOf(dummy);
+                return false;
             }
-
-#if DEBUG
-            if (_list.Count != _set.Count)
-                throw new EcsException("desynch in FiltersCollection");
-#endif
-
-            return idx;
         }
 
         public void RemoveId(int id)
@@ -105,7 +109,6 @@ namespace ECS
             }
         }
 
-        //TODO: not sure about allocations in this method
         public void Copy(FiltersCollection other)
         {
 #if DEBUG
