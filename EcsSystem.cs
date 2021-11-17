@@ -1,13 +1,10 @@
 ﻿//TODO: cover with tests
 using System;
-using System.Collections.Generic;
 
 namespace ECS
 {
     abstract class EcsSystem
     {
-        protected static Type GetType<T>() => default(T).GetType();
-
         protected Type[] Comps;
         protected Type[] Excludes;
         protected int FilteredSetId;
@@ -23,7 +20,7 @@ namespace ECS
         {
             var filteredEntities = world.GetFilteredEntitiesById(FilteredSetId);
             foreach (var id in filteredEntities)
-                Iterate(world, id);
+                Iterate(world, id);//TODO: maybe should pass entity = world.GetById(id) instead of id
         }
     }
 }
