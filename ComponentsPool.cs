@@ -1,4 +1,5 @@
-﻿using System.Runtime.CompilerServices;
+﻿using System.Collections;
+using System.Runtime.CompilerServices;
 using EntityType = System.UInt32;
 
 namespace ECS
@@ -74,7 +75,7 @@ namespace ECS
 
     class TagsPool<T> : IComponentsPool
     {
-        private LightSparseSet<T> _tags;
+        private BitArray _tags;
 
 #region Interface implementation
         public int Length
@@ -84,16 +85,16 @@ namespace ECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Contains(int i) => _tags.Contains(i);
+        public bool Contains(int i) => i < _tags.Count && _tags.Get(i);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Contains(EntityType entity) => _tags.Contains(entity.ToId());
+        public bool Contains(EntityType entity) => Contains(entity.ToId());
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Remove(EntityType entity) => _tags.Remove(entity.ToId());
+        public void Remove(EntityType entity) => _tags.Set(entity.ToId(), false);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Clear() => _tags.Clear();
+        public void Clear() => _tags.SetAll(false);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Copy(in IComponentsPool other)
@@ -103,24 +104,32 @@ namespace ECS
             if (otherPool == null)
                 throw new EcsException("trying to copy from pool of different type");
 #endif
-            _tags.Copy(otherPool._tags);
+            _tags.Length = otherPool._tags.Length;
+            _tags.SetAll(false);
+            _tags.Or(otherPool._tags);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public IComponentsPool Dulicate()
         {
-            var newPool = new TagsPool<T>();
+            var newPool = new TagsPool<T>(Length);
             newPool.Copy(this);
             return newPool;
         }
 #endregion
 
-        public TagsPool()
+        public TagsPool(int initialCapacity = 0)
         {
-            _tags = new LightSparseSet<T>();
+            _tags = new BitArray(initialCapacity);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Add(EntityType entity) => _tags.Add(entity.ToId());
+        public void Add(EntityType entity)
+        {
+            var id = entity.ToId();
+            if (id >= _tags.Length)
+                _tags.Length *= 2;
+            _tags.Set(entity.ToId(), true);
+        }
     }
 }
