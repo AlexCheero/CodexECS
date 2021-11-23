@@ -5,6 +5,7 @@ namespace ECS
 {
     abstract class EcsSystem
     {
+        //TODO: add check that Comps and Excludes doesn't intersects
         protected Type[] Comps;
         protected Type[] Excludes;
         protected int FilteredSetId;

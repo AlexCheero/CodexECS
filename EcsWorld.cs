@@ -194,6 +194,7 @@ namespace ECS
             var key = typeof(T);
 
             int id = entity.ToId();
+            //TODO: should add to filters on adding ALL components, not ANY
             UpdateIdInFiltersOnAdd(id, _compsUpdateSets[key]);
             UpdateIdInFiltersOnRemove(id, _excludesUpdateSets[key]);
 
