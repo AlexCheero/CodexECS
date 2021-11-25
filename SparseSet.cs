@@ -75,7 +75,13 @@ namespace ECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Clear()
         {
+            //TODO: make proper define
+#if UNITY
+            for (int i = 0; i < _sparse.Length; i++)
+                _sparse[i] = -1;
+#else
             Array.Fill(_sparse, -1);
+#endif
         }
 
         public void Copy(in SparseSet<T> other)
@@ -83,7 +89,15 @@ namespace ECS
             if (_sparse.Length < other._sparse.Length)
                 Array.Resize(ref _sparse, other._sparse.Length);
             else if (_sparse.Length > other._sparse.Length)
+            {
+                //TODO: make proper define
+#if UNITY
+                for (int i = other._sparse.Length; i < _sparse.Length; i++)
+                    _sparse[i] = -1;
+#else
                 Array.Fill(_sparse, -1, other._sparse.Length, _sparse.Length - other._sparse.Length);
+#endif
+            }
             Array.Copy(other._sparse, _sparse, other._sparse.Length);
 
             _values.Copy(other._values);

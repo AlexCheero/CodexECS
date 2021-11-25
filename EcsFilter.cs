@@ -1,5 +1,6 @@
 ﻿//TODO: cover with tests
 using System;
+using System.Collections;
 using System.Collections.Generic;
 
 namespace ECS
@@ -18,8 +19,11 @@ namespace ECS
             }
         }
 
+        //TODO: move Comps, Excludes and its masks to separate struct and use it both in filter and in system
         public Type[] Comps;
         public Type[] Excludes;
+        public BitArray CompsMask;
+        public BitArray ExcludesMask;
         //TODO: implement sortable groups
         public HashSet<int> FilteredEntities;
 
@@ -80,9 +84,9 @@ namespace ECS
 
         public EcsFilter(int hash)//dummy ctor
         {
-            Comps = null;
-            Excludes = null;
+            Comps = Excludes = null;
             FilteredEntities = null;
+            CompsMask = ExcludesMask = null;
             _cachedHash = hash;
         }
 
@@ -91,6 +95,7 @@ namespace ECS
             Comps = comps;
             Excludes = excludes;
             FilteredEntities = filter;
+            CompsMask = ExcludesMask = null;
             _cachedHash = GetHashFromComponents(Comps, Excludes);
         }
     }

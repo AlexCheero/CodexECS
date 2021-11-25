@@ -73,10 +73,16 @@ namespace ECS
         }
 
         //all adding should be preformed only for initial world
-        public bool AddOrGet(ref Type[] comps, ref Type[] excludes, out int idx)
+        public bool TryAdd(ref Type[] comps, ref Type[] excludes, out int idx)
         {
             var dummy = new EcsFilter(EcsFilter.GetHashFromComponents(comps, excludes));
+            //TODO: make proper define
+#if UNITY
+            var addNew = !_set.Contains(dummy);
+#else
+
             var addNew = !_set.TryGetValue(dummy, out dummy);
+#endif
             if (addNew)
             {
                 var newFilter = new EcsFilter(comps, excludes, new HashSet<int>());
@@ -92,6 +98,17 @@ namespace ECS
             }
             else
             {
+                //TODO: make proper define
+#if UNITY
+                foreach (var filter in _set)
+                {
+                    if (!_filterComparer.Equals(dummy, filter))
+                        continue;
+                    dummy = filter;
+                    break;
+                }
+#endif
+
                 //TODO: probably should force GC after adding all filters to remove duplicates
                 comps = dummy.Comps;
                 excludes = dummy.Excludes;
