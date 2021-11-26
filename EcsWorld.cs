@@ -225,10 +225,6 @@ namespace ECS
                 pass |= PassExcludeMask(filter.ExcludesMask, _masks[id]);
                 if (!pass)
                     continue;
-#if DEBUG
-                if (filter.FilteredEntities.Contains(id))
-                    throw new EcsException("filter should not contain this entity!");
-#endif
                 filter.FilteredEntities.Add(id);
             }
         }
@@ -253,10 +249,8 @@ namespace ECS
 
         private void UpdateFiltersOnAdd(Type key, int id)
         {
-#if DEBUG
             if (!_registeredComponents.ContainsKey(key))
-                throw new EcsException("component should be registered before adding it");
-#endif
+                _registeredComponents.Add(key, _registeredComponents.Count);
             if (_excludesUpdateSets.ContainsKey(key))
                 RemoveIdFromFilters(id, _excludesUpdateSets[key]);
 
@@ -265,6 +259,8 @@ namespace ECS
                 _masks[id].Length = componentId + 1;
             _masks[id].Set(componentId, true);
 
+            if (!_compsUpdateSets.ContainsKey(key))
+                _compsUpdateSets.Add(key, new HashSet<int>());
             AddIdToFlters(id, _compsUpdateSets[key]);
         }
 
@@ -283,6 +279,8 @@ namespace ECS
 #endif
             _masks[id].Set(componentId, false);
 
+            if (!_excludesUpdateSets.ContainsKey(key))
+                _excludesUpdateSets.Add(key, new HashSet<int>());
             AddIdToFlters(id, _excludesUpdateSets[key]);
         }
 
