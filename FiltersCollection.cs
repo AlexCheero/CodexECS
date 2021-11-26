@@ -1,5 +1,6 @@
 ﻿//TODO: cover with tests
 using System;
+using System.Collections;
 using System.Collections.Generic;
 
 namespace ECS
@@ -73,7 +74,8 @@ namespace ECS
         }
 
         //all adding should be preformed only for initial world
-        public bool TryAdd(ref Type[] comps, ref Type[] excludes, out int idx)
+        public bool TryAdd(ref Type[] comps, ref Type[] excludes, out int idx,
+            out BitArray compsMask, out BitArray excludesMask)
         {
             var dummy = new EcsFilter(EcsFilter.GetHashFromComponents(comps, excludes));
             //TODO: make proper define
@@ -85,7 +87,9 @@ namespace ECS
 #endif
             if (addNew)
             {
-                var newFilter = new EcsFilter(comps, excludes, new HashSet<int>());
+                compsMask = new BitArray(comps.Length);
+                excludesMask = excludes != null ? new BitArray(excludes.Length) : null;
+                var newFilter = new EcsFilter(comps, excludes, new HashSet<int>(), compsMask, excludesMask);
                 _set.Add(newFilter);
                 _list.Add(newFilter);
                 idx = _list.Count - 1;
@@ -113,6 +117,8 @@ namespace ECS
                 comps = dummy.Comps;
                 excludes = dummy.Excludes;
                 idx = _list.IndexOf(dummy);
+                compsMask = dummy.CompsMask;
+                excludesMask = dummy.ExcludesMask;
                 return false;
             }
         }

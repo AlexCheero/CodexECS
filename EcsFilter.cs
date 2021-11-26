@@ -90,12 +90,14 @@ namespace ECS
             _cachedHash = hash;
         }
 
-        public EcsFilter(Type[] comps, Type[] excludes, HashSet<int> filter)
+        public EcsFilter(Type[] comps, Type[] excludes, HashSet<int> filter,
+            BitArray compsMask, BitArray excludesMask)
         {
             Comps = comps;
             Excludes = excludes;
             FilteredEntities = filter;
-            CompsMask = ExcludesMask = null;
+            CompsMask = compsMask;
+            ExcludesMask = excludesMask;
             _cachedHash = GetHashFromComponents(Comps, Excludes);
         }
     }

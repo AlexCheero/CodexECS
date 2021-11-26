@@ -364,9 +364,8 @@ namespace ECS
             }
         }
 
-        private void RegisterComponentsAndInitMask(out BitArray mask, Type[] comps)
+        private void RegisterComponentsAndInitMask(BitArray mask, Type[] comps)
         {
-            mask = new BitArray(comps.Length);
             foreach (var comp in comps)
             {
                 if (!_registeredComponents.ContainsKey(comp))
@@ -382,26 +381,17 @@ namespace ECS
             out BitArray compsMask, out BitArray excludesMask)
         {
             int filterId;
-            if (_filtersCollection.TryAdd(ref comps, ref excludes, out filterId))
+            if (_filtersCollection.TryAdd(ref comps, ref excludes, out filterId, out compsMask, out excludesMask))
             {
-                var filter = _filtersCollection[filterId];
-                RegisterComponentsAndInitMask(out filter.CompsMask, comps);
+                RegisterComponentsAndInitMask(compsMask, comps);
                 if (excludes != null)
-                    RegisterComponentsAndInitMask(out filter.ExcludesMask, excludes);
-                compsMask = filter.CompsMask;
-                excludesMask = filter.ExcludesMask;
+                    RegisterComponentsAndInitMask(excludesMask, excludes);
+
+                var filter = _filtersCollection[filterId];
                 AddFilterToUpdateSets(filter.Comps, filterId, _compsUpdateSets);
                 if (filter.Excludes != null)
                     AddFilterToUpdateSets(filter.Excludes, filterId, _excludesUpdateSets);
             }
-            else
-            {
-                //TODO: seems like copypaste from above
-                var filter = _filtersCollection[filterId];
-                compsMask = filter.CompsMask;
-                excludesMask = filter.ExcludesMask;
-            }
-            
 
             return filterId;
         }
