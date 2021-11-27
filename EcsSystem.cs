@@ -11,6 +11,7 @@ namespace ECS
         protected Type[] Excludes;
         protected BitArray CompsMask;
         protected BitArray ExcludesMask;
+        //TODO: implement ability to use several filters in one system
         protected int FilteredSetId;
 
         public void RegisterInWorld(EcsWorld world)
