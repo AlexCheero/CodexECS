@@ -128,7 +128,10 @@ namespace ECS
         {
             var id = entity.ToId();
             if (id >= _tags.Length)
-                _tags.Length *= 2;
+            {
+                var doubledLength = _tags.Length > 0 ? _tags.Length * 2 : 2;
+                _tags.Length = id < doubledLength ? doubledLength : id + 1;
+            }
             _tags.Set(entity.ToId(), true);
         }
     }

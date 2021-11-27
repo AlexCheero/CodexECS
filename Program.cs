@@ -191,10 +191,20 @@ namespace ECS
 
         private void CreateEntites()
         {
-            EntityCreator.CreateEntities<C1>(_world, 1);
-            EntityCreator.CreateEntities<C1, C2>(_world, 1);
-            EntityCreator.CreateEntities<C1, C2, T1>(_world, 1);
-            EntityCreator.CreateEntities<C1, C2, T1, T2>(_world, 1);
+            var e1 = _world.Create();
+            e1.AddComponent<C1>(_world);
+            var e2 = _world.Create();
+            e2.AddComponent<C1>(_world);
+            e2.AddComponent<C2>(_world);
+            var e3 = _world.Create();
+            e3.AddComponent<C1>(_world);
+            e3.AddComponent<C2>(_world);
+            e3.AddTag<T1>(_world);
+            var e4 = _world.Create();
+            e4.AddComponent<C1>(_world);
+            e4.AddComponent<C2>(_world);
+            e4.AddTag<T1>(_world);
+            e4.AddTag<T2>(_world);
         }
 
         public Startup(bool run, bool copy, int iterNum)
