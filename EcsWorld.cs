@@ -222,7 +222,7 @@ namespace ECS
                 var filter = _filtersCollection[filterId];
                 //TODO: pass code duplicated in RemoveIdFromFilters. move to method
                 var pass = PassIncludeMask(filter.CompsMask, _masks[id]);
-                pass |= PassExcludeMask(filter.ExcludesMask, _masks[id]);
+                pass &= PassExcludeMask(filter.ExcludesMask, _masks[id]);
                 if (!pass)
                     continue;
                 filter.FilteredEntities.Add(id);
@@ -236,7 +236,7 @@ namespace ECS
                 var filter = _filtersCollection[filterId];
 
                 var pass = PassIncludeMask(filter.CompsMask, _masks[id]);
-                pass |= PassExcludeMask(filter.ExcludesMask, _masks[id]);
+                pass &= PassExcludeMask(filter.ExcludesMask, _masks[id]);
                 if (!pass)
                     continue;
 #if DEBUG
