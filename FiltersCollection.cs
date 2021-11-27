@@ -134,6 +134,21 @@ namespace ECS
 
         public void Copy(FiltersCollection other)
         {
+            //TODO: use SimpleVector for quick resize
+            #region list resize
+            int sz = other._list.Count;
+            int cur = _list.Count;
+            if (sz < cur)
+                _list.RemoveRange(sz, cur - sz);
+            else if (sz > cur)
+            {
+                if (sz > _list.Capacity)
+                    _list.Capacity = sz;
+                for (int i = 0; i < sz - cur; i++)
+                    _list.Add(default(EcsFilter));
+            }
+            #endregion
+
 #if DEBUG
             if (_list.Count != other._list.Count)
                 throw new EcsException("FiltersCollection lists should have same size");
@@ -146,7 +161,12 @@ namespace ECS
                 var otherFilter = other._list[i];
                 filterCopy.Comps = otherFilter.Comps;
                 filterCopy.Excludes = otherFilter.Excludes;
-                filterCopy.FilteredEntities.Clear();
+
+                if (filterCopy.FilteredEntities != null)
+                    filterCopy.FilteredEntities.Clear();
+                else
+                    filterCopy.FilteredEntities = new HashSet<int>();
+
                 foreach (var entity in otherFilter.FilteredEntities)
                     filterCopy.FilteredEntities.Add(entity);
                 _list[i] = filterCopy;
