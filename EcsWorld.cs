@@ -16,6 +16,20 @@ namespace ECS
 
     public class EcsWorld
     {
+        private SimpleVector<EntityType> _entites;
+        //TODO: should copy _recycleListHead on world copy
+        private EntityType _recycleListHead = EntityExtension.NullEntity;
+
+        private SimpleVector<BitArray> _masks;
+        private Dictionary<Type, int> _registeredComponents;
+
+        private Dictionary<Type, IComponentsPool> _componentsPools;
+
+        //update sets holds indices of filters by types
+        private UpdateSets _compsUpdateSets;
+        private UpdateSets _excludesUpdateSets;
+        private FiltersCollection _filtersCollection;
+
         public EcsWorld(int entitiesReserved = 32)
         {
             //TODO: ensure that _entities and masks are always have same length
@@ -69,11 +83,6 @@ namespace ECS
         }
 
 #region Entities methods
-        private SimpleVector<EntityType> _entites;
-        private EntityType _recycleListHead = EntityExtension.NullEntity;
-
-        private SimpleVector<BitArray> _masks;
-        private Dictionary<Type, int> _registeredComponents;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool IsEnitityInRange(int id) => id < _entites.Length;
@@ -159,7 +168,6 @@ namespace ECS
 #endregion
 
 #region Components methods
-        private Dictionary<Type, IComponentsPool> _componentsPools;
 
         public bool Have<T>(EntityType entity)
         {
@@ -340,10 +348,6 @@ namespace ECS
         }
         #endregion
         #region Filters methods
-        //update sets holds indices of filters by types
-        private UpdateSets _compsUpdateSets;
-        private UpdateSets _excludesUpdateSets;
-        private FiltersCollection _filtersCollection;
 
         private void AddFilterToUpdateSets(Type[] comps, int filterIdx
             , UpdateSets sets)
