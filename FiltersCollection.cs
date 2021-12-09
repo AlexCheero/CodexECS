@@ -67,10 +67,11 @@ namespace ECS
         //all prealloc should be performed only for world's copies
         public FiltersCollection(int prealloc = 0)
         {
-            _set = new HashSet<EcsFilter>(_filterComparer);
+            _set = new HashSet<EcsFilter>(prealloc, _filterComparer);
             _list = new List<EcsFilter>(prealloc);
-            for (int i = 0; i < prealloc; i++)
-                _list.Add(new EcsFilter { FilteredEntities = new HashSet<int>() });
+            //TODO: not sure if we need this code
+            //for (int i = 0; i < prealloc; i++)
+            //    _list.Add(new EcsFilter { FilteredEntities = new HashSet<int>() });
         }
 
         //all adding should be preformed only for initial world
@@ -89,7 +90,7 @@ namespace ECS
             {
                 compsMask = new BitArray(comps.Length);
                 excludesMask = excludes != null ? new BitArray(excludes.Length) : null;
-                var newFilter = new EcsFilter(comps, excludes, new HashSet<int>(), compsMask, excludesMask);
+                var newFilter = new EcsFilter(comps, excludes, new HashSet<int>(EcsCacheSettings.FilteredEntitiesSize), compsMask, excludesMask);
                 _set.Add(newFilter);
                 _list.Add(newFilter);
                 idx = _list.Count - 1;
@@ -116,7 +117,7 @@ namespace ECS
                 //TODO: probably should force GC after adding all filters to remove duplicates
                 comps = dummy.Comps;
                 excludes = dummy.Excludes;
-                idx = _list.IndexOf(dummy);
+                idx = _list.IndexOf(dummy);//TODO: this is not preformant at all
                 compsMask = dummy.CompsMask;
                 excludesMask = dummy.ExcludesMask;
                 return false;
@@ -165,7 +166,7 @@ namespace ECS
                 if (filterCopy.FilteredEntities != null)
                     filterCopy.FilteredEntities.Clear();
                 else
-                    filterCopy.FilteredEntities = new HashSet<int>();
+                    filterCopy.FilteredEntities = new HashSet<int>(EcsCacheSettings.FilteredEntitiesSize);
 
                 foreach (var entity in otherFilter.FilteredEntities)
                     filterCopy.FilteredEntities.Add(entity);

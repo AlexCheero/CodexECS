@@ -18,12 +18,12 @@ namespace ECS
         public int Length => _values.Length;
         public ref T this[int i] { get => ref _values[_sparse[i]]; }
 
-        public SparseSet()
+        public SparseSet(int initialCapacity = 0)
         {
             _sparse = new int[0];
-            _values = new SimpleVector<T>();
+            _values = new SimpleVector<T>(initialCapacity);
 #if DEBUG
-            _dense = new SimpleVector<int>();
+            _dense = new SimpleVector<int>(initialCapacity);
 #endif
         }
 

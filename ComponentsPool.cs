@@ -52,7 +52,7 @@ namespace ECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public IComponentsPool Dulicate()
         {
-            var newPool = new ComponentsPool<T>();
+            var newPool = new ComponentsPool<T>(Length);
             newPool.Copy(this);
             return newPool;
         }
@@ -64,9 +64,9 @@ namespace ECS
             get { return ref _components[entity.ToId()]; }
         }
 
-        public ComponentsPool()
+        public ComponentsPool(int initialCapacity = 0)
         {
-            _components = new SparseSet<T>();
+            _components = new SparseSet<T>(initialCapacity);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

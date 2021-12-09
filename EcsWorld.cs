@@ -9,6 +9,14 @@ using UpdateSets =
 //TODO: cover with tests
 namespace ECS
 {
+    //TODO: think about implementing dynamically counted initial size
+    public static class EcsCacheSettings
+    {
+        public static int UpdateSetSize = 4;
+        public static int PoolSize = 512;
+        public static int FilteredEntitiesSize = 128;
+    }
+
     class EcsException : Exception
     {
         public EcsException(string msg) : base(msg) { }
@@ -21,12 +29,13 @@ namespace ECS
 
         private SimpleVector<BitArray> _masks;
         //TODO: probably it would be better to implement meta classes with id for each component, as it is done in LeoEcs
+        //      maybe could use masks everywhere where Type[] needed?
         private Dictionary<Type, int> _registeredComponents;
 
         private Dictionary<Type, IComponentsPool> _componentsPools;
 
         //update sets holds indices of filters by types
-        private UpdateSets _compsUpdateSets;
+        private UpdateSets _compsUpdateSets;//TODO: rename all "comps" to includes for more consistency
         private UpdateSets _excludesUpdateSets;
         private FiltersCollection _filtersCollection;
 
@@ -271,7 +280,7 @@ namespace ECS
             _masks[id].Set(componentId, true);
 
             if (!_compsUpdateSets.ContainsKey(key))
-                _compsUpdateSets.Add(key, new HashSet<int>());
+                _compsUpdateSets.Add(key, new HashSet<int>(EcsCacheSettings.UpdateSetSize));
             AddIdToFlters(id, _compsUpdateSets[key]);
         }
 
@@ -291,7 +300,7 @@ namespace ECS
             _masks[id].Set(componentId, false);
 
             if (!_excludesUpdateSets.ContainsKey(key))
-                _excludesUpdateSets.Add(key, new HashSet<int>());
+                _excludesUpdateSets.Add(key, new HashSet<int>(EcsCacheSettings.UpdateSetSize));
             AddIdToFlters(id, _excludesUpdateSets[key]);
         }
 
@@ -304,7 +313,7 @@ namespace ECS
             UpdateFiltersOnAdd(key, id);
 
             if (!_componentsPools.ContainsKey(key))
-                _componentsPools.Add(key, new ComponentsPool<T>());
+                _componentsPools.Add(key, new ComponentsPool<T>(EcsCacheSettings.PoolSize));
             var pool = _componentsPools[key] as ComponentsPool<T>;
 #if DEBUG
             if (pool == null)
@@ -322,7 +331,7 @@ namespace ECS
             UpdateFiltersOnAdd(key, id);
 
             if (!_componentsPools.ContainsKey(key))
-                _componentsPools.Add(key, new TagsPool<T>());
+                _componentsPools.Add(key, new TagsPool<T>(EcsCacheSettings.PoolSize));
             var pool = _componentsPools[key] as TagsPool<T>;
 #if DEBUG
             if (pool == null)
@@ -358,7 +367,7 @@ namespace ECS
             foreach (var comp in comps)
             {
                 if (!sets.ContainsKey(comp))
-                    sets.Add(comp, new HashSet<int>());
+                    sets.Add(comp, new HashSet<int>(EcsCacheSettings.UpdateSetSize));
 
 #if DEBUG
                 if (sets[comp].Contains(filterIdx))
