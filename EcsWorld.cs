@@ -17,10 +17,10 @@ namespace ECS
     public class EcsWorld
     {
         private SimpleVector<EntityType> _entites;
-        //TODO: should copy _recycleListHead on world copy
         private EntityType _recycleListHead = EntityExtension.NullEntity;
 
         private SimpleVector<BitArray> _masks;
+        //TODO: probably it would be better to implement meta classes with id for each component, as it is done in LeoEcs
         private Dictionary<Type, int> _registeredComponents;
 
         private Dictionary<Type, IComponentsPool> _componentsPools;
@@ -59,6 +59,7 @@ namespace ECS
         public void Copy(in EcsWorld other)
         {
             _entites.Copy(other._entites);
+            _recycleListHead = other._recycleListHead;
             _masks.Copy(other._masks);//TODO: BitArrays will not copy properly here
             foreach (var key in _componentsPools.Keys)
             {
@@ -139,6 +140,7 @@ namespace ECS
 
             _filtersCollection.RemoveId(entity.ToId());
 
+            //TODO: recycle all components here, because when recycled, entity will have all its previous components
             ref var recycleListEnd = ref _recycleListHead;
             while (!recycleListEnd.IsNull())
                 recycleListEnd = ref GetRefById(recycleListEnd);
@@ -169,6 +171,7 @@ namespace ECS
 
 #region Components methods
 
+        //TODO: probably its better to use mask to check
         public bool Have<T>(EntityType entity)
         {
             var key = typeof(T);
