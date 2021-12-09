@@ -81,7 +81,7 @@ namespace ECS
         public int Length
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get => _tags.Length;
+            get => _tags.Length;//TODO: works wrong, maybe should rewrite TagsPool as light spars set again
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

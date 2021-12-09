@@ -2,6 +2,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+//TODO: maybe should move aliases to classes
 using EntityType = System.UInt32;
 using UpdateSets =
     System.Collections.Generic.Dictionary<System.Type, System.Collections.Generic.HashSet<int>>;
@@ -59,6 +60,7 @@ namespace ECS
             _masks = new SimpleVector<BitArray>(other._masks.Reserved);
             _componentsPools = new Dictionary<Type, IComponentsPool>();
 
+            //update sets should be same for every copy of the world
             _compsUpdateSets = other._compsUpdateSets;
             _excludesUpdateSets = other._excludesUpdateSets;
             _filtersCollection = new FiltersCollection(other._filtersCollection.Length);
@@ -86,8 +88,6 @@ namespace ECS
                 else
                     _componentsPools.Add(key, otherPool.Dulicate());
             }
-
-            //update sets should be same for every copy of the world
 
             _filtersCollection.Copy(other._filtersCollection);
         }
