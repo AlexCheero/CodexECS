@@ -27,9 +27,36 @@ namespace ECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Copy(in BitMask other)
+        {
+            _m1 = other._m1;
+            _length = other._length;
+            var chunksLength = _length / SizeOfPartInBits;
+            if (_mn == null || _mn.Length < _length)
+            {
+                var newChunksLength = 2;
+                while (newChunksLength < chunksLength)
+                    newChunksLength <<= 1;
+                newChunksLength--;
+                _mn = new MaskInternal[newChunksLength];
+            }
+
+            for (int i = 0; i < chunksLength; i++)
+                _mn[i] = other._mn[i];
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public BitMask Duplicate()
+        {
+            var copy = new BitMask();
+            copy.Copy(this);
+            return copy;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Set(int i)
         {
-            int chunkIdx = i / SizeOfPartInBits;
+            var chunkIdx = i / SizeOfPartInBits;
             ref var m = ref _m1;
             if (chunkIdx > 0)
             {
@@ -37,14 +64,14 @@ namespace ECS
                 //resize if needed
                 if (_mn == null || _mn.Length <= chunkIdx)
                 {
-                    var newLength = 2;
-                    while (newLength < chunkIdx + 1)
-                        newLength <<= 1;
-                    newLength--;
+                    var newChunksLength = 2;
+                    while (newChunksLength < chunkIdx + 1)
+                        newChunksLength <<= 1;
+                    newChunksLength--;
                     if (_mn == null)
-                        _mn = new MaskInternal[newLength];
+                        _mn = new MaskInternal[newChunksLength];
                     else
-                        Array.Resize(ref _mn, newLength);
+                        Array.Resize(ref _mn, newChunksLength);
                 }
                 m = ref _mn[chunkIdx];
             }
@@ -160,7 +187,8 @@ namespace ECS
                 return false;
             if (filter._mn != null && _mn != null)
             {
-                for (int i = 0; i < filter._mn.Length && i < _mn.Length; i++)
+                var chunksCount = filter.Length / SizeOfPartInBits;
+                for (int i = 0; i < chunksCount && i < _mn.Length; i++)
                 {
                     if ((filter._mn[i] & _mn[i]) != 0)
                         return false;
