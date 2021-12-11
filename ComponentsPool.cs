@@ -75,26 +75,26 @@ namespace ECS
 
     class TagsPool<T> : IComponentsPool
     {
-        private BitArray _tags;
+        private BitMask _tags;
 
 #region Interface implementation
         public int Length
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get => _tags.Length;//TODO: works wrong, maybe should rewrite TagsPool as light spars set again
+            get => _tags.Length;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Contains(int i) => i < _tags.Count && _tags.Get(i);
+        public bool Contains(int i) => _tags.Check(i);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Contains(EntityType entity) => Contains(entity.ToId());
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Remove(EntityType entity) => _tags.Set(entity.ToId(), false);
+        public void Remove(EntityType entity) => _tags.Unset(entity.ToId());
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Clear() => _tags.SetAll(false);
+        public void Clear() => _tags.Clear();
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Copy(in IComponentsPool other)
@@ -104,9 +104,7 @@ namespace ECS
             if (otherPool == null)
                 throw new EcsException("trying to copy from pool of different type");
 #endif
-            _tags.Length = otherPool._tags.Length;
-            _tags.SetAll(false);
-            _tags.Or(otherPool._tags);
+            _tags.Copy(otherPool._tags);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -120,19 +118,10 @@ namespace ECS
 
         public TagsPool(int initialCapacity = 0)
         {
-            _tags = new BitArray(initialCapacity);
+            _tags = new BitMask();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Add(EntityType entity)
-        {
-            var id = entity.ToId();
-            if (id >= _tags.Length)
-            {
-                var doubledLength = _tags.Length > 0 ? _tags.Length * 2 : 2;
-                _tags.Length = id < doubledLength ? doubledLength : id + 1;
-            }
-            _tags.Set(entity.ToId(), true);
-        }
+        public void Add(EntityType entity) => _tags.Set(entity.ToId());
     }
 }
