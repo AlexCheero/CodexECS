@@ -11,28 +11,31 @@ namespace ECS
         private const int SizeOfPartInBits = sizeof(MaskInternal) * 8;
         private MaskInternal _m1;
         private MaskInternal[] _mn;
-        private int _length;
 
         public int Length
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get => _length;
+            get;
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            private set;
         }
 
         public BitMask(MaskInternal m1 = 0, MaskInternal[] mn = null)
         {
             _m1 = m1;
             _mn = mn;
-            _length = 0;
+            Length = 0;
+
+            a = b = c = null;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Copy(in BitMask other)
         {
             _m1 = other._m1;
-            _length = other._length;
-            var chunksLength = _length / SizeOfPartInBits;
-            if (_mn == null || _mn.Length < _length)
+            Length = other.Length;
+            var chunksLength = Length / SizeOfPartInBits;
+            if (_mn == null || _mn.Length < Length)
             {
                 var newChunksLength = 2;
                 while (newChunksLength < chunksLength)
@@ -51,6 +54,13 @@ namespace ECS
             var copy = new BitMask();
             copy.Copy(this);
             return copy;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Set(params int[] positions)
+        {
+            for (int i = 0; i < positions.Length; i++)
+                Set(positions[i]);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -77,20 +87,23 @@ namespace ECS
             }
 
             int position = i % SizeOfPartInBits;
-            MaskInternal shift = 1;
-            m |= (MaskInternal)(shift << position);
+            MaskInternal shifted = 1;
+            m |= (MaskInternal)(shifted << position);
 
             //update length
             i++;
-            if (_length < i)
-                _length = i;
+            if (Length < i)
+                Length = i;
         }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private bool CheckChunkIdx(int idx) => idx > 0 && (_mn == null || _mn.Length <= idx - 1);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Unset(int i)
         {
             int chunkIdx = i / SizeOfPartInBits;
-            if (chunkIdx > 0 && (_mn == null || _mn.Length <= chunkIdx - 1))
+            if (CheckChunkIdx(chunkIdx))
                 return;
 
             ref var m = ref _m1;
@@ -98,11 +111,11 @@ namespace ECS
                 m = ref _mn[chunkIdx - 1];
 
             int position = i % SizeOfPartInBits;
-            MaskInternal shift = 1;
-            m &= (MaskInternal)~(shift << position);
+            MaskInternal shifted = 1;
+            m &= (MaskInternal)~(shifted << position);
 
             //update length
-            if (chunkIdx == (_length - 1) / SizeOfPartInBits)
+            if (chunkIdx == (Length - 1) / SizeOfPartInBits)
             {
                 int j = chunkIdx - 1;
                 var msb = 0;
@@ -129,7 +142,7 @@ namespace ECS
                 }
 
                 j++;
-                _length = j * SizeOfPartInBits + msb;
+                Length = j * SizeOfPartInBits + msb;
             }
         }
 
@@ -137,7 +150,7 @@ namespace ECS
         public bool Check(int i)
         {
             int chunkIdx = i / SizeOfPartInBits;
-            if (chunkIdx > 0 && (_mn == null || _mn.Length <= chunkIdx - 1))
+            if (CheckChunkIdx(chunkIdx))
                 return false;
 
             var m = _m1;
@@ -145,6 +158,36 @@ namespace ECS
                 m = _mn[chunkIdx - 1];
             int position = i % SizeOfPartInBits;
             return (m & (1 << position)) != 0;
+        }
+
+        string a;
+        string b;
+        string c;
+
+        public int GetNextSetBit(int fromPosition)
+        {
+            for (int i = fromPosition; i < Length; i++)
+            {
+                int chunkIdx = i / SizeOfPartInBits;
+                if (CheckChunkIdx(chunkIdx))
+                    return -1;
+
+                var m = _m1;
+                if (chunkIdx > 0)
+                    m = _mn[chunkIdx - 1];
+
+                for (int j = i % SizeOfPartInBits; j < SizeOfPartInBits; j++)
+                {
+                    a = Convert.ToString(m, 2).PadLeft(SizeOfPartInBits, '0');
+                    b = Convert.ToString((1 << j), 2).PadLeft(SizeOfPartInBits, '0');
+                    c = Convert.ToString((m & (1 << j)), 2).PadLeft(SizeOfPartInBits, '0');
+                    
+                    if ((m & (1 << j)) != 0)
+                        return fromPosition + j;
+                }
+            }
+
+            return -1;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
