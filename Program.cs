@@ -250,8 +250,18 @@ namespace ECS
     {
         static void Main(string[] args)
         {
-            var startup = new Startup(true, true, 1);
-            startup.FixedUpdate();
+            //var startup = new Startup(true, true, 1);
+            //startup.FixedUpdate();
+
+            var bm = new BitMask();
+            bm.Set(0, 5, 3, 7, 10, 11, 18, 23, 15);
+
+            var nextSetBit = bm.GetNextSetBit(0);
+            while (nextSetBit != -1)
+            {
+                Console.WriteLine(nextSetBit);
+                nextSetBit = bm.GetNextSetBit(nextSetBit + 1);
+            }
         }
     }
 }

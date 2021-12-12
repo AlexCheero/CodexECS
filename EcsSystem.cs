@@ -11,6 +11,9 @@ namespace ECS
         protected Type[] Excludes;
         protected BitArray CompsMask;
         protected BitArray ExcludesMask;
+
+        protected int Id<T>() => ComponentMeta<T>.Id;
+
         //TODO: implement ability to use several filters in one system
         //      maybe have to implement getting of entities dynamically, without caching
         protected int FilteredSetId;

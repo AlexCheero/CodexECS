@@ -25,6 +25,7 @@ namespace ECS
         public BitArray CompsMask;
         public BitArray ExcludesMask;
         //TODO: implement sortable groups
+        //TODO: lock filters on iteration
         public HashSet<int> FilteredEntities;
 
         private static TypeComparer _typeComparer;
