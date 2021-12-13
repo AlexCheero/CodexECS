@@ -1,5 +1,4 @@
-﻿//TODO: cover with tests
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 
 namespace ECS
 {
@@ -49,9 +48,9 @@ namespace ECS
             _cachedHash = hash;
         }
 
-        public EcsFilter(BitMask comps, BitMask excludes, HashSet<int> filter)
+        public EcsFilter(BitMask includes, BitMask excludes, HashSet<int> filter)
         {
-            Includes = comps;
+            Includes = includes;
             Excludes = excludes;
             FilteredEntities = filter;
             _cachedHash = GetHashFromMasks(Includes, Excludes);

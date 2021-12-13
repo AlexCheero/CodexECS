@@ -1,7 +1,4 @@
 ﻿using System;
-using System.Collections;
-//TODO: measure if standart containers really affects performanse and git rid of them or use them everywhere
-using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 
 namespace ECS
@@ -100,7 +97,6 @@ namespace ECS
                 Array.Resize(ref _sparse, other._sparse.Length);
             else if (_sparse.Length > other._sparse.Length)
             {
-                //TODO: make proper define
 #if UNITY
                 for (int i = other._sparse.Length; i < _sparse.Length; i++)
                     _sparse[i] = -1;

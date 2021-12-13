@@ -1,5 +1,4 @@
-﻿using System;
-
+﻿
 namespace ECS
 {
     #region Components

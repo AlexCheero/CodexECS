@@ -1,7 +1,6 @@
 ﻿using System.Runtime.CompilerServices;
 using EntityType = System.UInt32;
 
-//TODO: cover with tests
 namespace ECS
 {
     static class EntityExtension

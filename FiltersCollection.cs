@@ -1,8 +1,4 @@
-﻿//TODO: cover with tests
-using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
+﻿using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 
 namespace ECS
@@ -46,16 +42,12 @@ namespace ECS
         {
             _set = new HashSet<EcsFilter>(prealloc, _filterComparer);
             _list = new List<EcsFilter>(prealloc);
-            //TODO: not sure if we need this code
-            //for (int i = 0; i < prealloc; i++)
-            //    _list.Add(new EcsFilter { FilteredEntities = new HashSet<int>() });
         }
 
         //all adding should be preformed only for initial world
         public bool TryAdd(BitMask includes, BitMask excludes, out int idx)
         {
             var dummy = new EcsFilter(EcsFilter.GetHashFromMasks(includes, excludes));
-            //TODO: make proper define
 #if UNITY
             var addNew = !_set.Contains(dummy);
 #else
@@ -77,7 +69,6 @@ namespace ECS
             }
             else
             {
-                //TODO: make proper define
 #if UNITY
                 foreach (var filter in _set)
                 {

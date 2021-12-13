@@ -33,8 +33,8 @@ namespace ECS
         private Dictionary<int, IComponentsPool> _componentsPools;
 
         //update sets holds indices of filters by types
-        private UpdateSets _compsUpdateSets;//TODO: rename all "comps" to includes for more consistency
-        private UpdateSets _excludesUpdateSets;
+        private UpdateSets _includeUpdateSets;
+        private UpdateSets _excludeUpdateSets;
         private FiltersCollection _filtersCollection;
 
         public EcsWorld(int entitiesReserved = 32)
@@ -44,8 +44,8 @@ namespace ECS
             _masks = new SimpleVector<BitMask>(entitiesReserved);
             _componentsPools = new Dictionary<int, IComponentsPool>();
             
-            _compsUpdateSets = new UpdateSets();
-            _excludesUpdateSets = new UpdateSets();
+            _includeUpdateSets = new UpdateSets();
+            _excludeUpdateSets = new UpdateSets();
             _filtersCollection = new FiltersCollection();
         }
 
@@ -57,8 +57,8 @@ namespace ECS
             _componentsPools = new Dictionary<int, IComponentsPool>();
 
             //update sets should be same for every copy of the world
-            _compsUpdateSets = other._compsUpdateSets;
-            _excludesUpdateSets = other._excludesUpdateSets;
+            _includeUpdateSets = other._includeUpdateSets;
+            _excludeUpdateSets = other._excludeUpdateSets;
             _filtersCollection = new FiltersCollection(other._filtersCollection.Length);
         }
 
@@ -66,7 +66,7 @@ namespace ECS
         {
             _entites.Copy(other._entites);
             _recycleListHead = other._recycleListHead;
-            _masks.Copy(other._masks);//TODO: BitArrays will not copy properly here
+            _masks.Copy(other._masks);
             foreach (var key in _componentsPools.Keys)
             {
                 if (!other._componentsPools.ContainsKey(key))
@@ -221,28 +221,28 @@ namespace ECS
         private void UpdateFiltersOnAdd<T>(int id)
         {
             var componentId = ComponentMeta<T>.Id;
-            if (_excludesUpdateSets.ContainsKey(componentId))
-                RemoveIdFromFilters(id, _excludesUpdateSets[componentId]);
+            if (_excludeUpdateSets.ContainsKey(componentId))
+                RemoveIdFromFilters(id, _excludeUpdateSets[componentId]);
 
             _masks[id].Set(componentId);
 
-            if (!_compsUpdateSets.ContainsKey(componentId))
-                _compsUpdateSets.Add(componentId, new HashSet<int>(EcsCacheSettings.UpdateSetSize));
-            AddIdToFlters(id, _compsUpdateSets[componentId]);
+            if (!_includeUpdateSets.ContainsKey(componentId))
+                _includeUpdateSets.Add(componentId, new HashSet<int>(EcsCacheSettings.UpdateSetSize));
+            AddIdToFlters(id, _includeUpdateSets[componentId]);
         }
 
         private void UpdateFiltersOnRemove(int componentId, int id)
         {
-            RemoveIdFromFilters(id, _compsUpdateSets[componentId]);
+            RemoveIdFromFilters(id, _includeUpdateSets[componentId]);
 #if DEBUG
             if (_masks[id].Length <= componentId)
                 throw new EcsException("there was no component ever");
 #endif
             _masks[id].Unset(componentId);
 
-            if (!_excludesUpdateSets.ContainsKey(componentId))
-                _excludesUpdateSets.Add(componentId, new HashSet<int>(EcsCacheSettings.UpdateSetSize));
-            AddIdToFlters(id, _excludesUpdateSets[componentId]);
+            if (!_excludeUpdateSets.ContainsKey(componentId))
+                _excludeUpdateSets.Add(componentId, new HashSet<int>(EcsCacheSettings.UpdateSetSize));
+            AddIdToFlters(id, _excludeUpdateSets[componentId]);
         }
 
         public ref T AddComponent<T>(EntityType entity, T component = default)
@@ -324,8 +324,8 @@ namespace ECS
             if (_filtersCollection.TryAdd(includes, excludes, out filterId))
             {
                 var filter = _filtersCollection[filterId];
-                AddFilterToUpdateSets(filter.Includes, filterId, _compsUpdateSets);
-                AddFilterToUpdateSets(filter.Excludes, filterId, _excludesUpdateSets);
+                AddFilterToUpdateSets(filter.Includes, filterId, _includeUpdateSets);
+                AddFilterToUpdateSets(filter.Excludes, filterId, _excludeUpdateSets);
             }
 
             return filterId;

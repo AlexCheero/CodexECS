@@ -1,12 +1,9 @@
-﻿//TODO: cover with tests
-using System;
-using System.Collections;
-
+﻿
 namespace ECS
 {
     public abstract class EcsSystem
     {
-        //TODO: add check that Comps and Excludes doesn't intersects
+        //TODO: add check that Includes and Excludes doesn't intersects
         protected BitMask Includes;
         protected BitMask Excludes;
 
