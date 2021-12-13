@@ -69,7 +69,12 @@ namespace ECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Remove(int outerIdx)
         {
+            var innerIndex = _sparse[outerIdx];
             _sparse[outerIdx] = -1;
+            _values.Remove(innerIndex);
+#if DEBUG
+            _dense.Remove(innerIndex);
+#endif
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -81,6 +86,11 @@ namespace ECS
                 _sparse[i] = -1;
 #else
             Array.Fill(_sparse, -1);
+#endif
+
+            _values.Clear();
+#if DEBUG
+            _dense.Clear();
 #endif
         }
 

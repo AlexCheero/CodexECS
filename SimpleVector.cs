@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Runtime.CompilerServices;
 
 namespace ECS
 {
@@ -8,16 +9,30 @@ namespace ECS
         private T[] _elements;
         private int _end = 0;
 
-        public int Length => _end;
-        public int Reserved => _elements.Length;
+        public int Length
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get => _end;
+        }
 
-        public ref T this[int i] { get => ref _elements[i]; }
+        public int Reserved
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get => _elements.Length;
+        }
+
+        public ref T this[int i]
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get => ref _elements[i];
+        }
 
         public SimpleVector(int reserved = 0)
         {
             _elements = new T[reserved];
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Copy(in SimpleVector<T> other)
         {
             _end = other._end;
@@ -26,11 +41,21 @@ namespace ECS
             Array.Copy(other._elements, _elements, _end);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Remove(int idx)
+        {
+            _end--;
+            if (idx < _end)
+                _elements[idx] = _elements[_end];
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Clear()
         {
             _end = 0;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Add(T element)
         {
             if (_end >= _elements.Length)
