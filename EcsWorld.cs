@@ -175,21 +175,8 @@ namespace ECS
 
 #region Components methods
 
-        //TODO: probably its better to use mask to check
-        public bool Have<T>(EntityType entity)
-        {
-            var componentId = ComponentMeta<T>.Id;
-            if (!_componentsPools.ContainsKey(componentId))
-                return false;
-#if DEBUG
-            if (_componentsPools[componentId] as ComponentsPool<T> == null
-                && _componentsPools[componentId] as TagsPool<T> == null)
-            {
-                throw new EcsException("invalid pool");
-            }
-#endif
-            return _componentsPools[componentId].Contains(entity);
-        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool Have<T>(EntityType entity) => _masks[entity.ToId()].Check(ComponentMeta<T>.Id);
 
         private void AddIdToFlters(int id, HashSet<int> filterIds)
         {
