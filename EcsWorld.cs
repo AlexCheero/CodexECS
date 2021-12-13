@@ -1,10 +1,10 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 //TODO: maybe should move aliases to classes
 using EntityType = System.UInt32;
-//TODO: probably it is better to use sparse sets for update sets
+//TODO: probably it is better to use sparse sets for update sets,
+//      maybe even every Dictionary, that uses int as keys
 using UpdateSets = System.Collections.Generic.Dictionary<int, System.Collections.Generic.HashSet<int>>;
 
 //TODO: cover with tests
@@ -30,7 +30,7 @@ namespace ECS
 
         private SimpleVector<BitMask> _masks;
 
-        private Dictionary<Type, IComponentsPool> _componentsPools;
+        private Dictionary<int, IComponentsPool> _componentsPools;
 
         //update sets holds indices of filters by types
         private UpdateSets _compsUpdateSets;//TODO: rename all "comps" to includes for more consistency
@@ -42,7 +42,7 @@ namespace ECS
             //TODO: ensure that _entities and masks are always have same length
             _entites = new SimpleVector<EntityType>(entitiesReserved);
             _masks = new SimpleVector<BitMask>(entitiesReserved);
-            _componentsPools = new Dictionary<Type, IComponentsPool>();
+            _componentsPools = new Dictionary<int, IComponentsPool>();
             
             _compsUpdateSets = new UpdateSets();
             _excludesUpdateSets = new UpdateSets();
@@ -54,7 +54,7 @@ namespace ECS
         {
             _entites = new SimpleVector<EntityType>(other._entites.Reserved);
             _masks = new SimpleVector<BitMask>(other._masks.Reserved);
-            _componentsPools = new Dictionary<Type, IComponentsPool>();
+            _componentsPools = new Dictionary<int, IComponentsPool>();
 
             //update sets should be same for every copy of the world
             _compsUpdateSets = other._compsUpdateSets;
@@ -178,56 +178,17 @@ namespace ECS
         //TODO: probably its better to use mask to check
         public bool Have<T>(EntityType entity)
         {
-            var key = typeof(T);
-            if (!_componentsPools.ContainsKey(key))
+            var componentId = ComponentMeta<T>.Id;
+            if (!_componentsPools.ContainsKey(componentId))
                 return false;
 #if DEBUG
-            if (_componentsPools[key] as ComponentsPool<T> == null
-                && _componentsPools[key] as TagsPool<T> == null)
+            if (_componentsPools[componentId] as ComponentsPool<T> == null
+                && _componentsPools[componentId] as TagsPool<T> == null)
             {
                 throw new EcsException("invalid pool");
             }
 #endif
-            return _componentsPools[key].Contains(entity);
-        }
-
-        //TODO: implement custom bit array, to check masks without iterations
-        private bool PassIncludeMask(BitArray includeMask, BitArray entityMask)
-        {
-            for (int i = 0; i < includeMask.Length; i++)
-            {
-                if (includeMask[i])
-                {
-                    if (i >= entityMask.Length || !entityMask[i])
-                    {
-                        return false;
-                    }
-                }
-            }
-
-            return true;
-        }
-
-        private bool PassExcludeMask(BitArray excludeMask, BitArray entityMask)
-        {
-            if (excludeMask == null)
-                return true;
-
-            for (int i = 0; i < excludeMask.Length; i++)
-            {
-                if (i >= entityMask.Length)
-                    break;
-
-                if (excludeMask[i])
-                {
-                    if (entityMask[i])
-                    {
-                        return false;
-                    }
-                }
-            }
-
-            return true;
+            return _componentsPools[componentId].Contains(entity);
         }
 
         private void AddIdToFlters(int id, HashSet<int> filterIds)
@@ -235,7 +196,6 @@ namespace ECS
             foreach (var filterId in filterIds)
             {
                 var filter = _filtersCollection[filterId];
-                //TODO: pass code duplicated in RemoveIdFromFilters. move to method
 
                 var pass = _masks[id].InclusivePass(filter.Includes);
                 pass &= _masks[id].ExclusivePass(filter.Excludes);
@@ -294,15 +254,14 @@ namespace ECS
 
         public ref T AddComponent<T>(EntityType entity, T component = default)
         {
-            var key = typeof(T);
-
             int id = entity.ToId();
 
             UpdateFiltersOnAdd<T>(id);
 
-            if (!_componentsPools.ContainsKey(key))
-                _componentsPools.Add(key, new ComponentsPool<T>(EcsCacheSettings.PoolSize));
-            var pool = _componentsPools[key] as ComponentsPool<T>;
+            var componentId = ComponentMeta<T>.Id;
+            if (!_componentsPools.ContainsKey(componentId))
+                _componentsPools.Add(componentId, new ComponentsPool<T>(EcsCacheSettings.PoolSize));
+            var pool = _componentsPools[componentId] as ComponentsPool<T>;
 #if DEBUG
             if (pool == null)
                 throw new EcsException("invalid pool");
@@ -312,15 +271,14 @@ namespace ECS
 
         public void AddTag<T>(EntityType entity)
         {
-            var key = typeof(T);
-
             int id = entity.ToId();
 
             UpdateFiltersOnAdd<T>(id);
 
-            if (!_componentsPools.ContainsKey(key))
-                _componentsPools.Add(key, new TagsPool<T>(EcsCacheSettings.PoolSize));
-            var pool = _componentsPools[key] as TagsPool<T>;
+            var componentId = ComponentMeta<T>.Id;
+            if (!_componentsPools.ContainsKey(componentId))
+                _componentsPools.Add(componentId, new TagsPool<T>(EcsCacheSettings.PoolSize));
+            var pool = _componentsPools[componentId] as TagsPool<T>;
 #if DEBUG
             if (pool == null)
                 throw new EcsException("invalid pool");
@@ -331,20 +289,15 @@ namespace ECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ref T GetComponent<T>(EntityType entity)
         {
-            var key = typeof(T);
-            var pool = _componentsPools[key] as ComponentsPool<T>;
+            var pool = _componentsPools[ComponentMeta<T>.Id] as ComponentsPool<T>;
             return ref pool[entity];
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void RemoveComponent<T>(EntityType entity)
         {
-            var key = typeof(T);
-
-            int id = entity.ToId();
-
-            UpdateFiltersOnRemove<T>(id);
-
-            _componentsPools[key].Remove(entity);
+            UpdateFiltersOnRemove<T>(entity.ToId());
+            _componentsPools[ComponentMeta<T>.Id].Remove(entity);
         }
         #endregion
         #region Filters methods
