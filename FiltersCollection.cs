@@ -2,6 +2,8 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
 
 namespace ECS
 {
@@ -9,33 +11,8 @@ namespace ECS
     {
         class FilterEqComparer : IEqualityComparer<EcsFilter>
         {
-            //comps in this method should always be sorted
-            //and, if equals, their length should alway be equal, because it will throw in Filter's
-            //ctor, where the cache is calculated, if array contains duplicated elements
-            private bool ComponentsEquals(Type[] compsA, Type[] compsB)
-            {
-                if (compsA == null)
-                    return compsB == null;
-                if (compsB == null)
-                    return false;
-                if (compsA.Length != compsB.Length)
-                    return false;
-
-                for (int i = 0; i < compsA.Length; i++)
-                {
-                    if (compsA[i] != compsB[i])
-                        return false;
-                }
-
-                return true;
-            }
-
-            public bool Equals(EcsFilter x, EcsFilter y)
-            {
-                bool compsEq = ComponentsEquals(x.Comps, y.Comps);
-                bool excludesEq = ComponentsEquals(x.Excludes, y.Excludes);
-                return compsEq && excludesEq;
-            }
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public bool Equals(EcsFilter x, EcsFilter y) => x.Includes.Equals(y.Includes) && x.Excludes.Equals(y.Excludes);
 
             public int GetHashCode(EcsFilter filter) => filter.HashCode;
         }
@@ -75,9 +52,9 @@ namespace ECS
         }
 
         //all adding should be preformed only for initial world
-        public bool TryAdd(ref Type[] comps, ref Type[] excludes, out int idx)
+        public bool TryAdd(BitMask includes, BitMask excludes, out int idx)
         {
-            var dummy = new EcsFilter(EcsFilter.GetHashFromComponents(comps, excludes));
+            var dummy = new EcsFilter(EcsFilter.GetHashFromMasks(includes, excludes));
             //TODO: make proper define
 #if UNITY
             var addNew = !_set.Contains(dummy);
@@ -87,9 +64,7 @@ namespace ECS
 #endif
             if (addNew)
             {
-                var compsMask = new BitArray(comps.Length);
-                var excludesMask = excludes != null ? new BitArray(excludes.Length) : null;
-                var newFilter = new EcsFilter(comps, excludes, new HashSet<int>(EcsCacheSettings.FilteredEntitiesSize), compsMask, excludesMask);
+                var newFilter = new EcsFilter(includes, excludes, new HashSet<int>(EcsCacheSettings.FilteredEntitiesSize));
                 _set.Add(newFilter);
                 _list.Add(newFilter);
                 idx = _list.Count - 1;
@@ -114,8 +89,6 @@ namespace ECS
 #endif
 
                 //TODO: probably should force GC after adding all filters to remove duplicates
-                comps = dummy.Comps;
-                excludes = dummy.Excludes;
                 idx = _list.IndexOf(dummy);//TODO: this is not preformant at all
                 return false;
             }
@@ -157,8 +130,8 @@ namespace ECS
             {
                 var filterCopy = _list[i];
                 var otherFilter = other._list[i];
-                filterCopy.Comps = otherFilter.Comps;
-                filterCopy.Excludes = otherFilter.Excludes;
+                filterCopy.Includes.Copy(otherFilter.Includes);
+                filterCopy.Excludes.Copy(otherFilter.Excludes);
 
                 if (filterCopy.FilteredEntities != null)
                     filterCopy.FilteredEntities.Clear();

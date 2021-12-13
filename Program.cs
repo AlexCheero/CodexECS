@@ -153,7 +153,7 @@ namespace ECS
     {
         public System1()
         {
-            Comps = new Type[] { typeof(C1), typeof(C2) };
+            Includes.Set(Id<C1>(), Id<C2>());
         }
 
         protected override void Iterate(EcsWorld world, int id)
@@ -167,8 +167,8 @@ namespace ECS
     {
         public System2()
         {
-            Comps = new Type[] { typeof(C1), typeof(C2) };
-            Excludes = new Type[] { typeof(T2) };
+            Includes.Set(Id<C1>(), Id<C2>());
+            Excludes.Set(Id<T2>());
         }
 
         protected override void Iterate(EcsWorld world, int id)

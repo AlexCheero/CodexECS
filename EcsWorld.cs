@@ -4,8 +4,8 @@ using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 //TODO: maybe should move aliases to classes
 using EntityType = System.UInt32;
-using UpdateSets =
-    System.Collections.Generic.Dictionary<System.Type, System.Collections.Generic.HashSet<int>>;
+//TODO: probably it is better to use sparse sets for update sets
+using UpdateSets = System.Collections.Generic.Dictionary<int, System.Collections.Generic.HashSet<int>>;
 
 //TODO: cover with tests
 namespace ECS
@@ -28,10 +28,7 @@ namespace ECS
         private SimpleVector<EntityType> _entites;
         private EntityType _recycleListHead = EntityExtension.NullEntity;
 
-        private SimpleVector<BitArray> _masks;
-        //TODO: probably it would be better to implement meta classes with id for each component, as it is done in LeoEcs
-        //      maybe could use masks everywhere where Type[] needed?
-        private Dictionary<Type, int> _registeredComponents;
+        private SimpleVector<BitMask> _masks;
 
         private Dictionary<Type, IComponentsPool> _componentsPools;
 
@@ -44,27 +41,25 @@ namespace ECS
         {
             //TODO: ensure that _entities and masks are always have same length
             _entites = new SimpleVector<EntityType>(entitiesReserved);
-            _masks = new SimpleVector<BitArray>(entitiesReserved);
+            _masks = new SimpleVector<BitMask>(entitiesReserved);
             _componentsPools = new Dictionary<Type, IComponentsPool>();
             
             _compsUpdateSets = new UpdateSets();
             _excludesUpdateSets = new UpdateSets();
             _filtersCollection = new FiltersCollection();
-            _registeredComponents = new Dictionary<Type, int>();
         }
 
         //prealloc ctor
         public EcsWorld(EcsWorld other)
         {
             _entites = new SimpleVector<EntityType>(other._entites.Reserved);
-            _masks = new SimpleVector<BitArray>(other._masks.Reserved);
+            _masks = new SimpleVector<BitMask>(other._masks.Reserved);
             _componentsPools = new Dictionary<Type, IComponentsPool>();
 
             //update sets should be same for every copy of the world
             _compsUpdateSets = other._compsUpdateSets;
             _excludesUpdateSets = other._excludesUpdateSets;
             _filtersCollection = new FiltersCollection(other._filtersCollection.Length);
-            _registeredComponents = other._registeredComponents;
         }
 
         public void Copy(in EcsWorld other)
@@ -173,7 +168,7 @@ namespace ECS
 #endif
 
             _entites.Add(lastEntity);
-            _masks.Add(new BitArray(_registeredComponents.Count));
+            _masks.Add(new BitMask());//TODO: precache with _registeredComponents.Count
             return _entites[_entites.Length - 1];
         }
 #endregion
@@ -241,8 +236,9 @@ namespace ECS
             {
                 var filter = _filtersCollection[filterId];
                 //TODO: pass code duplicated in RemoveIdFromFilters. move to method
-                var pass = PassIncludeMask(filter.CompsMask, _masks[id]);
-                pass &= PassExcludeMask(filter.ExcludesMask, _masks[id]);
+
+                var pass = _masks[id].InclusivePass(filter.Includes);
+                pass &= _masks[id].ExclusivePass(filter.Excludes);
                 if (!pass)
                     continue;
                 filter.FilteredEntities.Add(id);
@@ -255,8 +251,9 @@ namespace ECS
             {
                 var filter = _filtersCollection[filterId];
 
-                var pass = PassIncludeMask(filter.CompsMask, _masks[id]);
-                pass &= PassExcludeMask(filter.ExcludesMask, _masks[id]);
+                var pass = _masks[id].InclusivePass(filter.Includes);
+                pass &= _masks[id].ExclusivePass(filter.Excludes);
+
                 if (!pass)
                     continue;
 #if DEBUG
@@ -267,41 +264,32 @@ namespace ECS
             }
         }
 
-        private void UpdateFiltersOnAdd(Type key, int id)
+        private void UpdateFiltersOnAdd<T>(int id)
         {
-            if (!_registeredComponents.ContainsKey(key))
-                _registeredComponents.Add(key, _registeredComponents.Count);
-            if (_excludesUpdateSets.ContainsKey(key))
-                RemoveIdFromFilters(id, _excludesUpdateSets[key]);
+            var componentId = ComponentMeta<T>.Id;
+            if (_excludesUpdateSets.ContainsKey(componentId))
+                RemoveIdFromFilters(id, _excludesUpdateSets[componentId]);
 
-            var componentId = _registeredComponents[key];
-            if (_masks[id].Length <= componentId)
-                _masks[id].Length = componentId + 1;
-            _masks[id].Set(componentId, true);
+            _masks[id].Set(componentId);
 
-            if (!_compsUpdateSets.ContainsKey(key))
-                _compsUpdateSets.Add(key, new HashSet<int>(EcsCacheSettings.UpdateSetSize));
-            AddIdToFlters(id, _compsUpdateSets[key]);
+            if (!_compsUpdateSets.ContainsKey(componentId))
+                _compsUpdateSets.Add(componentId, new HashSet<int>(EcsCacheSettings.UpdateSetSize));
+            AddIdToFlters(id, _compsUpdateSets[componentId]);
         }
 
-        private void UpdateFiltersOnRemove(Type key, int id)
+        private void UpdateFiltersOnRemove<T>(int id)
         {
-#if DEBUG
-            if (!_registeredComponents.ContainsKey(key))
-                throw new EcsException("component should be registered before removing it");
-#endif
-            RemoveIdFromFilters(id, _compsUpdateSets[key]);
-
-            var componentId = _registeredComponents[key];
+            var componentId = ComponentMeta<T>.Id;
+            RemoveIdFromFilters(id, _compsUpdateSets[componentId]);
 #if DEBUG
             if (_masks[id].Length <= componentId)
                 throw new EcsException("there was no component ever");
 #endif
-            _masks[id].Set(componentId, false);
+            _masks[id].Unset(componentId);
 
-            if (!_excludesUpdateSets.ContainsKey(key))
-                _excludesUpdateSets.Add(key, new HashSet<int>(EcsCacheSettings.UpdateSetSize));
-            AddIdToFlters(id, _excludesUpdateSets[key]);
+            if (!_excludesUpdateSets.ContainsKey(componentId))
+                _excludesUpdateSets.Add(componentId, new HashSet<int>(EcsCacheSettings.UpdateSetSize));
+            AddIdToFlters(id, _excludesUpdateSets[componentId]);
         }
 
         public ref T AddComponent<T>(EntityType entity, T component = default)
@@ -310,7 +298,7 @@ namespace ECS
 
             int id = entity.ToId();
 
-            UpdateFiltersOnAdd(key, id);
+            UpdateFiltersOnAdd<T>(id);
 
             if (!_componentsPools.ContainsKey(key))
                 _componentsPools.Add(key, new ComponentsPool<T>(EcsCacheSettings.PoolSize));
@@ -328,7 +316,7 @@ namespace ECS
 
             int id = entity.ToId();
 
-            UpdateFiltersOnAdd(key, id);
+            UpdateFiltersOnAdd<T>(id);
 
             if (!_componentsPools.ContainsKey(key))
                 _componentsPools.Add(key, new TagsPool<T>(EcsCacheSettings.PoolSize));
@@ -354,56 +342,41 @@ namespace ECS
 
             int id = entity.ToId();
 
-            UpdateFiltersOnRemove(key, id);
+            UpdateFiltersOnRemove<T>(id);
 
             _componentsPools[key].Remove(entity);
         }
         #endregion
         #region Filters methods
 
-        private void AddFilterToUpdateSets(Type[] comps, int filterIdx
+        private void AddFilterToUpdateSets(BitMask components, int filterIdx
             , UpdateSets sets)
         {
-            foreach (var comp in comps)
+            var nextSetBit = components.GetNextSetBit(0);
+            while (nextSetBit != -1)
             {
-                if (!sets.ContainsKey(comp))
-                    sets.Add(comp, new HashSet<int>(EcsCacheSettings.UpdateSetSize));
+                if (!sets.ContainsKey(nextSetBit))
+                    sets.Add(nextSetBit, new HashSet<int>(EcsCacheSettings.UpdateSetSize));
 
 #if DEBUG
-                if (sets[comp].Contains(filterIdx))
+                if (sets[nextSetBit].Contains(filterIdx))
                     throw new EcsException("set already contains this filter!");
 #endif
 
-                sets[comp].Add(filterIdx);
+                sets[nextSetBit].Add(filterIdx);
+
+                nextSetBit = components.GetNextSetBit(nextSetBit + 1);
             }
         }
 
-        private void RegisterComponentsAndInitMask(BitArray mask, Type[] comps)
-        {
-            foreach (var comp in comps)
-            {
-                if (!_registeredComponents.ContainsKey(comp))
-                    _registeredComponents.Add(comp, _registeredComponents.Count);
-                var componentId = _registeredComponents[comp];
-                if (mask.Length <= componentId)
-                    mask.Length = componentId + 1;
-                mask.Set(componentId, true);
-            }
-        }
-
-        public int RegisterFilter(ref Type[] comps, ref Type[] excludes)
+        public int RegisterFilter(BitMask includes, BitMask excludes)
         {
             int filterId;
-            if (_filtersCollection.TryAdd(ref comps, ref excludes, out filterId))
+            if (_filtersCollection.TryAdd(includes, excludes, out filterId))
             {
-                RegisterComponentsAndInitMask(_filtersCollection[filterId].CompsMask, comps);
-                if (excludes != null)
-                    RegisterComponentsAndInitMask(_filtersCollection[filterId].ExcludesMask, excludes);
-
                 var filter = _filtersCollection[filterId];
-                AddFilterToUpdateSets(filter.Comps, filterId, _compsUpdateSets);
-                if (filter.Excludes != null)
-                    AddFilterToUpdateSets(filter.Excludes, filterId, _excludesUpdateSets);
+                AddFilterToUpdateSets(filter.Includes, filterId, _compsUpdateSets);
+                AddFilterToUpdateSets(filter.Excludes, filterId, _excludesUpdateSets);
             }
 
             return filterId;
