@@ -141,10 +141,16 @@ namespace ECS
             if (entity.IsNull())
                 throw new EcsException("trying to delete null entity");
 #endif
+            var mask = _masks[entity.ToId()];
+            var nextSetBit = mask.GetNextSetBit(0);
+            while (nextSetBit != -1)
+            {
+                RemoveComponent(entity, nextSetBit);
+                nextSetBit = mask.GetNextSetBit(nextSetBit + 1);
+            }
 
             _filtersCollection.RemoveId(entity.ToId());
 
-            //TODO: recycle all components here, because when recycled, entity will have all its previous components
             ref var recycleListEnd = ref _recycleListHead;
             while (!recycleListEnd.IsNull())
                 recycleListEnd = ref GetRefById(recycleListEnd);
@@ -174,6 +180,7 @@ namespace ECS
 #endregion
 
 #region Components methods
+        //TODO: add reactive callbacks
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Have<T>(EntityType entity) => _masks[entity.ToId()].Check(ComponentMeta<T>.Id);
@@ -224,9 +231,8 @@ namespace ECS
             AddIdToFlters(id, _compsUpdateSets[componentId]);
         }
 
-        private void UpdateFiltersOnRemove<T>(int id)
+        private void UpdateFiltersOnRemove(int componentId, int id)
         {
-            var componentId = ComponentMeta<T>.Id;
             RemoveIdFromFilters(id, _compsUpdateSets[componentId]);
 #if DEBUG
             if (_masks[id].Length <= componentId)
@@ -281,10 +287,13 @@ namespace ECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void RemoveComponent<T>(EntityType entity)
+        public void RemoveComponent<T>(EntityType entity) => RemoveComponent(entity, ComponentMeta<T>.Id);
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void RemoveComponent(EntityType entity, int componentId)
         {
-            UpdateFiltersOnRemove<T>(entity.ToId());
-            _componentsPools[ComponentMeta<T>.Id].Remove(entity);
+            UpdateFiltersOnRemove(componentId, entity.ToId());
+            _componentsPools[componentId].Remove(entity);
         }
         #endregion
         #region Filters methods

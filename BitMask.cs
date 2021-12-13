@@ -157,6 +157,14 @@ namespace ECS
             return (m & (1 << position)) != 0;
         }
 
+        /* usage:
+         * var nextSetBit = mask.GetNextSetBit(0);
+         * while (nextSetBit != -1)
+         * {
+         *     your code here
+         *     nextSetBit = mask.GetNextSetBit(nextSetBit + 1);
+         * }
+         */
         public int GetNextSetBit(int fromPosition)
         {
             for (int i = fromPosition; i < Length; i++)
