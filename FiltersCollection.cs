@@ -75,8 +75,7 @@ namespace ECS
         }
 
         //all adding should be preformed only for initial world
-        public bool TryAdd(ref Type[] comps, ref Type[] excludes, out int idx,
-            out BitArray compsMask, out BitArray excludesMask)
+        public bool TryAdd(ref Type[] comps, ref Type[] excludes, out int idx)
         {
             var dummy = new EcsFilter(EcsFilter.GetHashFromComponents(comps, excludes));
             //TODO: make proper define
@@ -88,8 +87,8 @@ namespace ECS
 #endif
             if (addNew)
             {
-                compsMask = new BitArray(comps.Length);
-                excludesMask = excludes != null ? new BitArray(excludes.Length) : null;
+                var compsMask = new BitArray(comps.Length);
+                var excludesMask = excludes != null ? new BitArray(excludes.Length) : null;
                 var newFilter = new EcsFilter(comps, excludes, new HashSet<int>(EcsCacheSettings.FilteredEntitiesSize), compsMask, excludesMask);
                 _set.Add(newFilter);
                 _list.Add(newFilter);
@@ -118,8 +117,6 @@ namespace ECS
                 comps = dummy.Comps;
                 excludes = dummy.Excludes;
                 idx = _list.IndexOf(dummy);//TODO: this is not preformant at all
-                compsMask = dummy.CompsMask;
-                excludesMask = dummy.ExcludesMask;
                 return false;
             }
         }

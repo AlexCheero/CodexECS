@@ -9,8 +9,6 @@ namespace ECS
         //TODO: add check that Comps and Excludes doesn't intersects
         protected Type[] Comps;
         protected Type[] Excludes;
-        protected BitArray CompsMask;
-        protected BitArray ExcludesMask;
 
         protected int Id<T>() => ComponentMeta<T>.Id;
 
@@ -20,7 +18,7 @@ namespace ECS
 
         public void RegisterInWorld(EcsWorld world)
         {
-            FilteredSetId = world.RegisterFilter(ref Comps, ref Excludes, out CompsMask, out ExcludesMask);
+            FilteredSetId = world.RegisterFilter(ref Comps, ref Excludes);
         }
 
         protected abstract void Iterate(EcsWorld world, int id);

@@ -391,15 +391,14 @@ namespace ECS
             }
         }
 
-        public int RegisterFilter(ref Type[] comps, ref Type[] excludes,
-            out BitArray compsMask, out BitArray excludesMask)
+        public int RegisterFilter(ref Type[] comps, ref Type[] excludes)
         {
             int filterId;
-            if (_filtersCollection.TryAdd(ref comps, ref excludes, out filterId, out compsMask, out excludesMask))
+            if (_filtersCollection.TryAdd(ref comps, ref excludes, out filterId))
             {
-                RegisterComponentsAndInitMask(compsMask, comps);
+                RegisterComponentsAndInitMask(_filtersCollection[filterId].CompsMask, comps);
                 if (excludes != null)
-                    RegisterComponentsAndInitMask(excludesMask, excludes);
+                    RegisterComponentsAndInitMask(_filtersCollection[filterId].ExcludesMask, excludes);
 
                 var filter = _filtersCollection[filterId];
                 AddFilterToUpdateSets(filter.Comps, filterId, _compsUpdateSets);
