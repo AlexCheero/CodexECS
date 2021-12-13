@@ -25,8 +25,6 @@ namespace ECS
             _m1 = m1;
             _mn = mn;
             Length = 0;
-
-            a = b = c = null;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -77,7 +75,6 @@ namespace ECS
                     var newChunksLength = 2;
                     while (newChunksLength < chunkIdx + 1)
                         newChunksLength <<= 1;
-                    newChunksLength--;
                     if (_mn == null)
                         _mn = new MaskInternal[newChunksLength];
                     else
@@ -160,10 +157,6 @@ namespace ECS
             return (m & (1 << position)) != 0;
         }
 
-        string a;
-        string b;
-        string c;
-
         public int GetNextSetBit(int fromPosition)
         {
             for (int i = fromPosition; i < Length; i++)
@@ -178,10 +171,6 @@ namespace ECS
 
                 for (int j = i % SizeOfPartInBits; j < SizeOfPartInBits; j++)
                 {
-                    a = Convert.ToString(m, 2).PadLeft(SizeOfPartInBits, '0');
-                    b = Convert.ToString((1 << j), 2).PadLeft(SizeOfPartInBits, '0');
-                    c = Convert.ToString((m & (1 << j)), 2).PadLeft(SizeOfPartInBits, '0');
-                    
                     if ((m & (1 << j)) != 0)
                         return j + (chunkIdx * SizeOfPartInBits);
                 }
@@ -234,6 +223,28 @@ namespace ECS
                 for (int i = 0; i < chunksCount && i < _mn.Length; i++)
                 {
                     if ((filter._mn[i] & _mn[i]) != 0)
+                        return false;
+                }
+            }
+
+            return true;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool Equals(in BitMask other)
+        {
+            if (Length != other.Length)
+                return false;
+
+            if (_m1 != other._m1)
+                return false;
+
+            if (_mn != null)
+            {
+                int length = (Length / SizeOfPartInBits) - 1;
+                for (int i = 0; i < length; i++)
+                {
+                    if (_mn[i] != other._mn[i])
                         return false;
                 }
             }
