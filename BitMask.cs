@@ -183,7 +183,7 @@ namespace ECS
                     c = Convert.ToString((m & (1 << j)), 2).PadLeft(SizeOfPartInBits, '0');
                     
                     if ((m & (1 << j)) != 0)
-                        return fromPosition + j;
+                        return j + (chunkIdx * SizeOfPartInBits);
                 }
             }
 
