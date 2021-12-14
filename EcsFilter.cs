@@ -21,7 +21,7 @@ namespace ECS
             }
         }
 
-        public static int GetHashFromMasks(BitMask includes, BitMask excludes)
+        public static int GetHashFromMasks(in BitMask includes, in BitMask excludes)
         {
             int hash = 17;
             var nextSetBit = includes.GetNextSetBit(0);
@@ -48,10 +48,12 @@ namespace ECS
             _cachedHash = hash;
         }
 
-        public EcsFilter(BitMask includes, BitMask excludes, HashSet<int> filter)
+        public EcsFilter(in BitMask includes, in BitMask excludes, HashSet<int> filter)
         {
-            Includes = includes;
-            Excludes = excludes;
+            Includes = default;
+            Includes.Copy(includes);
+            Excludes = default;
+            Excludes.Copy(excludes);
             FilteredEntities = filter;
             _cachedHash = GetHashFromMasks(Includes, Excludes);
         }

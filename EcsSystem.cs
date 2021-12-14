@@ -15,7 +15,7 @@ namespace ECS
 
         public void RegisterInWorld(EcsWorld world)
         {
-            FilteredSetId = world.RegisterFilter(Includes, Excludes);
+            FilteredSetId = world.RegisterFilter(in Includes, in Excludes);
         }
 
         protected abstract void Iterate(EcsWorld world, int id);

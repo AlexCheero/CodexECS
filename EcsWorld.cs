@@ -33,6 +33,7 @@ namespace ECS
         private Dictionary<int, IComponentsPool> _componentsPools;
 
         //update sets holds indices of filters by types
+        //TODO: fill this sets on registration, not on add/remove
         private UpdateSets _includeUpdateSets;
         private UpdateSets _excludeUpdateSets;
         private FiltersCollection _filtersCollection;
@@ -298,14 +299,14 @@ namespace ECS
         #endregion
         #region Filters methods
 
-        private void AddFilterToUpdateSets(BitMask components, int filterIdx
+        private void AddFilterToUpdateSets(in BitMask components, int filterIdx
             , UpdateSets sets)
         {
             var nextSetBit = components.GetNextSetBit(0);
             while (nextSetBit != -1)
             {
                 if (!sets.ContainsKey(nextSetBit))
-                    sets.Add(nextSetBit, new HashSet<int>(EcsCacheSettings.UpdateSetSize));
+                    sets.Add(nextSetBit, new HashSet<int>(EcsCacheSettings.UpdateSetSize));//TODO: unity have no this ctor. implement workaround
 
 #if DEBUG
                 if (sets[nextSetBit].Contains(filterIdx))
@@ -318,14 +319,14 @@ namespace ECS
             }
         }
 
-        public int RegisterFilter(BitMask includes, BitMask excludes)
+        public int RegisterFilter(in BitMask includes, in BitMask excludes)
         {
             int filterId;
-            if (_filtersCollection.TryAdd(includes, excludes, out filterId))
+            if (_filtersCollection.TryAdd(in includes, in excludes, out filterId))
             {
                 var filter = _filtersCollection[filterId];
-                AddFilterToUpdateSets(filter.Includes, filterId, _includeUpdateSets);
-                AddFilterToUpdateSets(filter.Excludes, filterId, _excludeUpdateSets);
+                AddFilterToUpdateSets(in filter.Includes, filterId, _includeUpdateSets);
+                AddFilterToUpdateSets(in filter.Excludes, filterId, _excludeUpdateSets);
             }
 
             return filterId;

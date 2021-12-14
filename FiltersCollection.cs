@@ -45,9 +45,9 @@ namespace ECS
         }
 
         //all adding should be preformed only for initial world
-        public bool TryAdd(BitMask includes, BitMask excludes, out int idx)
+        public bool TryAdd(in BitMask includes, in BitMask excludes, out int idx)
         {
-            var dummy = new EcsFilter(EcsFilter.GetHashFromMasks(includes, excludes));
+            var dummy = new EcsFilter(EcsFilter.GetHashFromMasks(in includes, in excludes));
 #if UNITY
             var addNew = !_set.Contains(dummy);
 #else
@@ -56,7 +56,7 @@ namespace ECS
 #endif
             if (addNew)
             {
-                var newFilter = new EcsFilter(includes, excludes, new HashSet<int>(EcsCacheSettings.FilteredEntitiesSize));
+                var newFilter = new EcsFilter(in includes, in excludes, new HashSet<int>(EcsCacheSettings.FilteredEntitiesSize));
                 _set.Add(newFilter);
                 _list.Add(newFilter);
                 idx = _list.Count - 1;
