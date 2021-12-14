@@ -33,17 +33,20 @@ namespace ECS
             _m1 = other._m1;
             Length = other.Length;
             var chunksLength = Length / SizeOfPartInBits;
-            if (_mn == null || _mn.Length < Length)
+            if (chunksLength > 1)
             {
-                var newChunksLength = 2;
-                while (newChunksLength < chunksLength)
-                    newChunksLength <<= 1;
-                newChunksLength--;
-                _mn = new MaskInternal[newChunksLength];
-            }
+                if (_mn == null || _mn.Length < Length)
+                {
+                    var newChunksLength = 2;
+                    while (newChunksLength < chunksLength)
+                        newChunksLength <<= 1;
+                    newChunksLength--;
+                    _mn = new MaskInternal[newChunksLength];
+                }
 
-            for (int i = 0; i < chunksLength; i++)
-                _mn[i] = other._mn[i];
+                for (int i = 0; i < chunksLength; i++)
+                    _mn[i] = other._mn[i];
+            }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -205,16 +208,16 @@ namespace ECS
                 return false;
             if ((filter._m1 & _m1) == 0)
                 return false;
-            if (filter._mn != null)
+
+            var chunksCount = filter.Length / SizeOfPartInBits;
+            for (int i = 0; i < chunksCount - 1; i++)
             {
-                if (_mn == null)
+                var filterChunk = filter._mn[i];
+                if (filterChunk == 0)
+                    continue;
+
+                if ((filterChunk & _mn[i]) == 0)
                     return false;
-                var chunksCount = filter.Length / SizeOfPartInBits;
-                for (int i = 0; i < chunksCount - 1; i++)
-                {
-                    if ((filter._mn[i] & _mn[i]) == 0)
-                        return false;
-                }
             }
 
             return true;
