@@ -202,11 +202,14 @@ namespace ECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private bool InclusivePass_Internal(MaskInternal value, MaskInternal filter) => (filter & (value ^ filter)) == 0;
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool InclusivePass(in BitMask filter)
         {
             if (filter.Length > Length)
                 return false;
-            if ((filter._m1 & _m1) == 0)
+            if (!InclusivePass_Internal(_m1, filter._m1))
                 return false;
 
             var chunksCount = filter.Length / SizeOfPartInBits;
@@ -216,7 +219,7 @@ namespace ECS
                 if (filterChunk == 0)
                     continue;
 
-                if ((filterChunk & _mn[i]) == 0)
+                if (!InclusivePass_Internal(_mn[i], filterChunk))
                     return false;
             }
 
@@ -274,6 +277,16 @@ namespace ECS
             sb.Append(". Length: " + Length);
 
             return sb.ToString();
+        }
+
+        public string ChunkToString(MaskInternal chunk) => Convert.ToString(chunk, 2).PadLeft(SizeOfPartInBits, '0');
+
+        public void SetBits(int[] bits)
+        {
+            int j = 0;
+            for (int i = bits.Length - 1; i >= 0; i--, j++)
+                if (bits[i] != 0)
+                    Set(j);
         }
 #endif
     }
