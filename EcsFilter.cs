@@ -8,7 +8,6 @@ namespace ECS
         public BitMask Includes;
         public BitMask Excludes;
         //TODO: implement sortable groups
-        //TODO: lock filters on iteration
         private HashSet<int> _filteredEntities;
         //TODO: maybe it is better to use simple arrays for delayed ops
         private HashSet<int> _addSet;
