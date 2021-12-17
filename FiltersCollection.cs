@@ -13,6 +13,7 @@ namespace ECS
             public int GetHashCode(EcsFilter filter) => filter.HashCode;
         }
 
+        private EcsWorld _world;
         private HashSet<EcsFilter> _set;
         private List<EcsFilter> _list;
 
@@ -38,10 +39,11 @@ namespace ECS
         }
 
         //all prealloc should be performed only for world's copies
-        public FiltersCollection(int prealloc = 0)
+        public FiltersCollection(EcsWorld world, int prealloc = 0)
         {
             _set = new HashSet<EcsFilter>(prealloc, _filterComparer);
             _list = new List<EcsFilter>(prealloc);
+            _world = world;
         }
 
         //all adding should be preformed only for initial world
@@ -56,7 +58,7 @@ namespace ECS
 #endif
             if (addNew)
             {
-                var newFilter = new EcsFilter(in includes, in excludes, new HashSet<int>(EcsCacheSettings.FilteredEntitiesSize));
+                var newFilter = new EcsFilter(_world, in includes, in excludes);
                 _set.Add(newFilter);
                 _list.Add(newFilter);
                 idx = _list.Count - 1;
@@ -88,10 +90,7 @@ namespace ECS
         public void RemoveId(int id)
         {
             foreach (var filter in _set)
-            {
-                if (filter.FilteredEntities.Contains(id))
-                    filter.FilteredEntities.Remove(id);
-            }
+                filter.Remove(id);
         }
 
         public void Copy(FiltersCollection other)
@@ -119,20 +118,12 @@ namespace ECS
             _set.Clear();
             for (int i = 0; i < other._list.Count; i++)
             {
-                var filterCopy = _list[i];
+                var filter = _list[i];
                 var otherFilter = other._list[i];
-                filterCopy.Includes.Copy(otherFilter.Includes);
-                filterCopy.Excludes.Copy(otherFilter.Excludes);
-
-                if (filterCopy.FilteredEntities != null)
-                    filterCopy.FilteredEntities.Clear();
-                else
-                    filterCopy.FilteredEntities = new HashSet<int>(EcsCacheSettings.FilteredEntitiesSize);
-
-                foreach (var entity in otherFilter.FilteredEntities)
-                    filterCopy.FilteredEntities.Add(entity);
-                _list[i] = filterCopy;
-                _set.Add(filterCopy);
+                filter.Copy(in otherFilter);
+                
+                _list[i] = filter;
+                _set.Add(filter);
             }
         }
     }

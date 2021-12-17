@@ -47,7 +47,7 @@ namespace ECS
             
             _includeUpdateSets = new UpdateSets();
             _excludeUpdateSets = new UpdateSets();
-            _filtersCollection = new FiltersCollection();
+            _filtersCollection = new FiltersCollection(this);
         }
 
         //prealloc ctor
@@ -60,7 +60,7 @@ namespace ECS
             //update sets should be same for every copy of the world
             _includeUpdateSets = other._includeUpdateSets;
             _excludeUpdateSets = other._excludeUpdateSets;
-            _filtersCollection = new FiltersCollection(other._filtersCollection.Length);
+            _filtersCollection = new FiltersCollection(this, other._filtersCollection.Length);
         }
 
         public void Copy(in EcsWorld other)
@@ -196,7 +196,7 @@ namespace ECS
                 pass &= _masks[id].ExclusivePass(filter.Excludes);
                 if (!pass)
                     continue;
-                filter.FilteredEntities.Add(id);
+                filter.Add(id);
             }
         }
 
@@ -212,10 +212,10 @@ namespace ECS
                 if (!pass)
                     continue;
 #if DEBUG
-                if (!filter.FilteredEntities.Contains(id))
+                if (!filter.Contains(id))
                     throw new EcsException("filter should contain this entity!");
 #endif
-                filter.FilteredEntities.Remove(id);
+                filter.Remove(id);
             }
         }
 
@@ -332,7 +332,7 @@ namespace ECS
             return filterId;
         }
 
-        public HashSet<int> GetFilteredEntitiesById(int id) => _filtersCollection[id].FilteredEntities;
+        public EcsFilter GetFilter(int id) => _filtersCollection[id];
 #endregion
     }
 }

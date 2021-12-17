@@ -155,7 +155,7 @@ namespace ECS
             Includes.Set(Id<C1>(), Id<C2>());
         }
 
-        protected override void Iterate(EcsWorld world, int id)
+        protected override void Iteration(EcsWorld world, int id)
         {
             var entity = world.GetById(id);
             entity.GetComponent<C1>(world).i++;
@@ -170,7 +170,7 @@ namespace ECS
             Excludes.Set(Id<T2>());
         }
 
-        protected override void Iterate(EcsWorld world, int id)
+        protected override void Iteration(EcsWorld world, int id)
         {
             var entity = world.GetById(id);
             entity.GetComponent<C2>(world).f *= 0.9999f;
