@@ -13,7 +13,6 @@ namespace ECS
             public int GetHashCode(EcsFilter filter) => filter.HashCode;
         }
 
-        private EcsWorld _world;
         private HashSet<EcsFilter> _set;
         private List<EcsFilter> _list;
 
@@ -39,11 +38,10 @@ namespace ECS
         }
 
         //all prealloc should be performed only for world's copies
-        public FiltersCollection(EcsWorld world, int prealloc = 0)
+        public FiltersCollection(int prealloc = 0)
         {
             _set = new HashSet<EcsFilter>(prealloc, _filterComparer);
             _list = new List<EcsFilter>(prealloc);
-            _world = world;
         }
 
         //all adding should be preformed only for initial world

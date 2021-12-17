@@ -47,7 +47,7 @@ namespace ECS
             
             _includeUpdateSets = new UpdateSets();
             _excludeUpdateSets = new UpdateSets();
-            _filtersCollection = new FiltersCollection(this);
+            _filtersCollection = new FiltersCollection();
         }
 
         //prealloc ctor
@@ -60,7 +60,7 @@ namespace ECS
             //update sets should be same for every copy of the world
             _includeUpdateSets = other._includeUpdateSets;
             _excludeUpdateSets = other._excludeUpdateSets;
-            _filtersCollection = new FiltersCollection(this, other._filtersCollection.Length);
+            _filtersCollection = new FiltersCollection(other._filtersCollection.Length);
         }
 
         public void Copy(in EcsWorld other)
