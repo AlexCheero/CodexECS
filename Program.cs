@@ -177,6 +177,20 @@ namespace ECS
         }
     }
 
+    public class System3 : EcsSystem
+    {
+        public System3()
+        {
+            Includes.Set(Id<C1>());
+        }
+
+        protected override void Iteration(EcsWorld world, int id)
+        {
+            var entity = world.GetById(id);
+            entity.RemoveComponent<C1>(world);
+        }
+    }
+
     public class Startup
     {
         public bool _shouldRun = false;
@@ -215,12 +229,16 @@ namespace ECS
             _world = new EcsWorld();
             _worldCopy = new EcsWorld();
 
-            _systems = new EcsSystem[] { new System1(), new System2() };
+            //_systems = new EcsSystem[] { new System1(), new System2() };
+            _systems = new EcsSystem[] { new System3() };
 
             for (int i = 0; i < _systems.Length; i++)
                 _systems[i].RegisterInWorld(_world);
 
-            CreateEntites();
+            //CreateEntites();
+
+            for (int i = 0; i < 100; i++)
+                _world.Create().AddComponent<C1>(_world);
         }
 
         ulong ctr;

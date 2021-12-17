@@ -58,7 +58,7 @@ namespace ECS
 #endif
             if (addNew)
             {
-                var newFilter = new EcsFilter(_world, in includes, in excludes);
+                var newFilter = new EcsFilter(in includes, in excludes);
                 _set.Add(newFilter);
                 _list.Add(newFilter);
                 idx = _list.Count - 1;

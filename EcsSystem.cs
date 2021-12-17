@@ -21,6 +21,13 @@ namespace ECS
         protected abstract void Iteration(EcsWorld world, int id);
 
         //TODO: add check that system is registered before Ticking
-        public virtual void Tick(EcsWorld world) => world.GetFilter(FilteredSetId).Iterate(Iteration);
+        public virtual void Tick(EcsWorld world)
+        {
+            world.GetFilter(FilteredSetId).Iterate((entities) =>
+            {
+                foreach (var id in entities)
+                    Iteration(world, id);//TODO: maybe should pass entity = _world.GetById(id) instead of id
+            });
+        }
     }
 }
