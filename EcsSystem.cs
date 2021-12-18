@@ -15,7 +15,7 @@ namespace ECS
 
         public void RegisterInWorld(EcsWorld world)
         {
-            //TODO: implement lazy system registration
+            //TODO: implement lazy system registration. (do smth with the fact that entities should be created after registration)
             FilteredSetId = world.RegisterFilter(in Includes, in Excludes);
         }
 
