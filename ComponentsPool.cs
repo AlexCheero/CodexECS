@@ -11,7 +11,7 @@ namespace ECS
         public void Remove(EntityType entity);
         public void Clear();
         public void Copy(in IComponentsPool other);
-        public IComponentsPool Dulicate();
+        public IComponentsPool Duplicate();
     }
 
     class ComponentsPool<T> : IComponentsPool
@@ -49,7 +49,7 @@ namespace ECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public IComponentsPool Dulicate()
+        public IComponentsPool Duplicate()
         {
             var newPool = new ComponentsPool<T>(Length);
             newPool.Copy(this);
@@ -107,7 +107,7 @@ namespace ECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public IComponentsPool Dulicate()
+        public IComponentsPool Duplicate()
         {
             var newPool = new TagsPool<T>(Length);
             newPool.Copy(this);

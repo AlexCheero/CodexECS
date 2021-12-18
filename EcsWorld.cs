@@ -82,7 +82,7 @@ namespace ECS
                 if (_componentsPools.ContainsKey(key))
                     _componentsPools[key].Copy(otherPool);
                 else
-                    _componentsPools.Add(key, otherPool.Dulicate());
+                    _componentsPools.Add(key, otherPool.Duplicate());
             }
 
             _filtersCollection.Copy(other._filtersCollection);
@@ -196,6 +196,7 @@ namespace ECS
                 pass &= _masks[id].ExclusivePass(filter.Excludes);
                 if (!pass)
                     continue;
+                //could try to add same id several times due to delayed set modification operations
                 filter.Add(id);
             }
         }
@@ -211,10 +212,7 @@ namespace ECS
 
                 if (!pass)
                     continue;
-#if DEBUG
-                if (!filter.Contains(id))
-                    throw new EcsException("filter should contain this entity!");
-#endif
+                //could try to remove same id several times due to delayed set modification operations
                 filter.Remove(id);
             }
         }
