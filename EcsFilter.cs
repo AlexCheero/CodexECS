@@ -100,8 +100,10 @@ namespace ECS
             {
                 foreach (var id in _addSet)
                     _filteredEntities.Add(id);
+                _addSet.Clear();
                 foreach (var id in _removeSet)
                     _filteredEntities.Remove(id);
+                _removeSet.Clear();
             }
         }
 
