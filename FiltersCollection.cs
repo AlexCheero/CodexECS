@@ -40,7 +40,11 @@ namespace ECS
         //all prealloc should be performed only for world's copies
         public FiltersCollection(int prealloc = 0)
         {
+#if UNITY
+            _set = new HashSet<EcsFilter>(_filterComparer);
+#else
             _set = new HashSet<EcsFilter>(prealloc, _filterComparer);
+#endif
             _list = new List<EcsFilter>(prealloc);
         }
 
@@ -94,7 +98,7 @@ namespace ECS
         public void Copy(FiltersCollection other)
         {
             //TODO: use SimpleVector for quick resize
-            #region list resize
+#region list resize
             int sz = other._list.Count;
             int cur = _list.Count;
             if (sz < cur)
@@ -106,7 +110,7 @@ namespace ECS
                 for (int i = 0; i < sz - cur; i++)
                     _list.Add(default(EcsFilter));
             }
-            #endregion
+#endregion
 
 #if DEBUG
             if (_list.Count != other._list.Count)

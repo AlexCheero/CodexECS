@@ -66,7 +66,11 @@ namespace ECS
             Includes.Copy(includes);
             Excludes = default;
             Excludes.Copy(excludes);
+#if UNITY
+            _filteredEntities = new HashSet<int>();
+#else
             _filteredEntities = new HashSet<int>(EcsCacheSettings.FilteredEntitiesSize);
+#endif
             _addSet = new HashSet<int>();
             _removeSet = new HashSet<int>();
             _cachedHash = GetHashFromMasks(Includes, Excludes);
@@ -130,7 +134,13 @@ namespace ECS
             if (_filteredEntities != null)
                 _filteredEntities.Clear();
             else
+            {
+#if UNITY
+                _filteredEntities = new HashSet<int>();
+#else
                 _filteredEntities = new HashSet<int>(EcsCacheSettings.FilteredEntitiesSize);
+#endif
+            }
             foreach (var entity in other._filteredEntities)
                 _filteredEntities.Add(entity);
 

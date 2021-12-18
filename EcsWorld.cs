@@ -228,7 +228,13 @@ namespace ECS
             _masks[id].Set(componentId);
 
             if (!_includeUpdateSets.ContainsKey(componentId))
+            {
+#if UNITY
+                _includeUpdateSets.Add(componentId, new HashSet<int>());
+#else
                 _includeUpdateSets.Add(componentId, new HashSet<int>(EcsCacheSettings.UpdateSetSize));
+#endif
+            }
             AddIdToFlters(id, _includeUpdateSets[componentId]);
         }
 
@@ -242,7 +248,13 @@ namespace ECS
             _masks[id].Unset(componentId);
 
             if (!_excludeUpdateSets.ContainsKey(componentId))
+            {
+#if UNITY
+                _excludeUpdateSets.Add(componentId, new HashSet<int>());
+#else
                 _excludeUpdateSets.Add(componentId, new HashSet<int>(EcsCacheSettings.UpdateSetSize));
+#endif
+            }
             AddIdToFlters(id, _excludeUpdateSets[componentId]);
         }
 
@@ -296,8 +308,8 @@ namespace ECS
             UpdateFiltersOnRemove(componentId, entity.ToId());
             _componentsPools[componentId].Remove(entity);
         }
-        #endregion
-        #region Filters methods
+#endregion
+#region Filters methods
 
         private void AddFilterToUpdateSets(in BitMask components, int filterIdx
             , UpdateSets sets)
@@ -306,7 +318,13 @@ namespace ECS
             while (nextSetBit != -1)
             {
                 if (!sets.ContainsKey(nextSetBit))
-                    sets.Add(nextSetBit, new HashSet<int>(EcsCacheSettings.UpdateSetSize));//TODO: unity have no this ctor. implement workaround
+                {
+#if UNITY
+                    sets.Add(nextSetBit, new HashSet<int>());
+#else
+                    sets.Add(nextSetBit, new HashSet<int>(EcsCacheSettings.UpdateSetSize));
+#endif
+                }
 
 #if DEBUG
                 if (sets[nextSetBit].Contains(filterIdx))
