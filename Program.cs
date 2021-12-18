@@ -157,11 +157,11 @@ namespace ECS
 
         public override void Tick(EcsWorld world)
         {
-            world.GetFilter(FilteredSetId).Iterate((entities) =>
+            world.GetFilter(FilteredSetId).Iterate((entities, count) =>
             {
-                foreach (var id in entities)
+                for (int i = 0; i < count; i++)
                 {
-                    var entity = world.GetById(id);
+                    var entity = world.GetById(entities[i]);
                     entity.GetComponent<C1>(world).i++;
                 }
             });
@@ -178,11 +178,11 @@ namespace ECS
 
         public override void Tick(EcsWorld world)
         {
-            world.GetFilter(FilteredSetId).Iterate((entities) =>
+            world.GetFilter(FilteredSetId).Iterate((entities, count) =>
             {
-                foreach (var id in entities)
+                for (int i = 0; i < count; i++)
                 {
-                    var entity = world.GetById(id);
+                    var entity = world.GetById(entities[i]);
                     entity.GetComponent<C2>(world).f *= 0.9999f;
                 }
             });

@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 
 namespace ECS
@@ -9,11 +10,12 @@ namespace ECS
         public BitMask Excludes;
         //TODO: implement sortable groups
         private HashSet<int> _filteredEntities;
+        private int[] _entitiesArray;//TODO: hack for iteration speedup, rewrite
         //TODO: maybe it is better to use simple arrays for delayed ops
         private HashSet<int> _addSet;
         private HashSet<int> _removeSet;
 
-        public delegate void IteartionDelegate(HashSet<int> entities);
+        public delegate void IteartionDelegate(int[] entities, int count);
 
         private class BoxedInt { public int Value = 0; }
         private BoxedInt _lockCount;
@@ -55,6 +57,7 @@ namespace ECS
             _filteredEntities = _addSet = _removeSet = null;
             _cachedHash = hash;
             _lockCount = null;
+            _entitiesArray = null;
         }
 
         public EcsFilter(in BitMask includes, in BitMask excludes)
@@ -68,12 +71,21 @@ namespace ECS
             _removeSet = new HashSet<int>();
             _cachedHash = GetHashFromMasks(Includes, Excludes);
             _lockCount = new BoxedInt();
+            _entitiesArray = new int[EcsCacheSettings.FilteredEntitiesSize];
         }
 
         public void Iterate(IteartionDelegate iteartionDelegate)
         {
             _lockCount.Value++;
-            iteartionDelegate(_filteredEntities);
+            if (_entitiesArray.Length < _filteredEntities.Count)
+            {
+                var newCapacity = 2;
+                while (newCapacity < _filteredEntities.Count)
+                    newCapacity <<= 1;
+                Array.Resize(ref _entitiesArray, newCapacity);
+            }
+            _filteredEntities.CopyTo(_entitiesArray);
+            iteartionDelegate(_entitiesArray, _filteredEntities.Count);
             _lockCount.Value--;
 #if DEBUG
             if (_lockCount.Value < 0)
