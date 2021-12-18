@@ -15,19 +15,11 @@ namespace ECS
 
         public void RegisterInWorld(EcsWorld world)
         {
+            //TODO: implement lazy system registration
             FilteredSetId = world.RegisterFilter(in Includes, in Excludes);
         }
 
-        protected abstract void Iteration(EcsWorld world, int id);
-
         //TODO: add check that system is registered before Ticking
-        public virtual void Tick(EcsWorld world)
-        {
-            world.GetFilter(FilteredSetId).Iterate((entities) =>
-            {
-                foreach (var id in entities)
-                    Iteration(world, id);//TODO: maybe should pass entity = _world.GetById(id) instead of id
-            });
-        }
+        public abstract void Tick(EcsWorld world);
     }
 }

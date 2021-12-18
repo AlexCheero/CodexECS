@@ -155,10 +155,16 @@ namespace ECS
             Includes.Set(Id<C1>(), Id<C2>());
         }
 
-        protected override void Iteration(EcsWorld world, int id)
+        public override void Tick(EcsWorld world)
         {
-            var entity = world.GetById(id);
-            entity.GetComponent<C1>(world).i++;
+            world.GetFilter(FilteredSetId).Iterate((entities) =>
+            {
+                foreach (var id in entities)
+                {
+                    var entity = world.GetById(id);
+                    entity.GetComponent<C1>(world).i++;
+                }
+            });
         }
     }
 
@@ -170,24 +176,16 @@ namespace ECS
             Excludes.Set(Id<T2>());
         }
 
-        protected override void Iteration(EcsWorld world, int id)
+        public override void Tick(EcsWorld world)
         {
-            var entity = world.GetById(id);
-            entity.GetComponent<C2>(world).f *= 0.9999f;
-        }
-    }
-
-    public class System3 : EcsSystem
-    {
-        public System3()
-        {
-            Includes.Set(Id<C1>());
-        }
-
-        protected override void Iteration(EcsWorld world, int id)
-        {
-            var entity = world.GetById(id);
-            entity.RemoveComponent<C1>(world);
+            world.GetFilter(FilteredSetId).Iterate((entities) =>
+            {
+                foreach (var id in entities)
+                {
+                    var entity = world.GetById(id);
+                    entity.GetComponent<C2>(world).f *= 0.9999f;
+                }
+            });
         }
     }
 
@@ -229,16 +227,12 @@ namespace ECS
             _world = new EcsWorld();
             _worldCopy = new EcsWorld();
 
-            //_systems = new EcsSystem[] { new System1(), new System2() };
-            _systems = new EcsSystem[] { new System3() };
+            _systems = new EcsSystem[] { new System1(), new System2() };
 
             for (int i = 0; i < _systems.Length; i++)
                 _systems[i].RegisterInWorld(_world);
 
-            //CreateEntites();
-
-            for (int i = 0; i < 100; i++)
-                _world.Create().AddComponent<C1>(_world);
+            CreateEntites();
         }
 
         ulong ctr;
