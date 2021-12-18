@@ -3,11 +3,8 @@ namespace ECS
 {
     #region Components
     public struct C1 { public int i; }
-
     public struct C2 { public float f; }
-
-    public struct T1 { }
-    public struct T2 { }
+    public struct T3 { }
     #endregion
 
     public static class EntityCreator
@@ -153,6 +150,7 @@ namespace ECS
         public System1()
         {
             Includes.Set(Id<C1>(), Id<C2>());
+            Excludes.Set(Id<T3>());
         }
 
         public override void Tick(EcsWorld world)
@@ -162,7 +160,22 @@ namespace ECS
                 for (int i = 0; i < count; i++)
                 {
                     var entity = world.GetById(entities[i]);
-                    entity.GetComponent<C1>(world).i++;
+
+                    ref var c1 = ref entity.GetComponent<C1>(world);
+                    c1.i += 3;
+                    c1.i -= 3;
+                    c1.i /= 3;
+                    c1.i *= 3;
+                    var rem = c1.i % 5;
+
+                    ref var c2 = ref entity.GetComponent<C2>(world);
+                    c2.f += 3;
+                    c2.f -= 3;
+                    c2.f /= 3;
+                    c2.f *= 3;
+                    var rem2 = c2.f % 5;
+
+                    entity.AddTag<T3>(world);
                 }
             });
         }
@@ -172,8 +185,7 @@ namespace ECS
     {
         public System2()
         {
-            Includes.Set(Id<C1>(), Id<C2>());
-            Excludes.Set(Id<T2>());
+            Includes.Set(Id<C1>(), Id<C2>(), Id<T3>());
         }
 
         public override void Tick(EcsWorld world)
@@ -183,7 +195,22 @@ namespace ECS
                 for (int i = 0; i < count; i++)
                 {
                     var entity = world.GetById(entities[i]);
-                    entity.GetComponent<C2>(world).f *= 0.9999f;
+
+                    ref var c1 = ref entity.GetComponent<C1>(world);
+                    c1.i += 3;
+                    c1.i -= 3;
+                    c1.i /= 3;
+                    c1.i *= 3;
+                    var rem = c1.i % 5;
+
+                    ref var c2 = ref entity.GetComponent<C2>(world);
+                    c2.f += 3;
+                    c2.f -= 3;
+                    c2.f /= 3;
+                    c2.f *= 3;
+                    var rem2 = c2.f % 5;
+
+                    entity.RemoveComponent<T3>(world);
                 }
             });
         }
@@ -202,20 +229,9 @@ namespace ECS
 
         private void CreateEntites()
         {
-            var e1 = _world.Create();
-            e1.AddComponent<C1>(_world);
-            var e2 = _world.Create();
-            e2.AddComponent<C1>(_world);
-            e2.AddComponent<C2>(_world);
-            var e3 = _world.Create();
-            e3.AddComponent<C1>(_world);
-            e3.AddComponent<C2>(_world);
-            e3.AddTag<T1>(_world);
-            var e4 = _world.Create();
-            e4.AddComponent<C1>(_world);
-            e4.AddComponent<C2>(_world);
-            e4.AddTag<T1>(_world);
-            e4.AddTag<T2>(_world);
+            var e = _world.Create();
+            e.AddComponent<C1>(_world);
+            e.AddComponent<C2>(_world);
         }
 
         public Startup(bool run, bool copy, int iterNum)
@@ -262,7 +278,9 @@ namespace ECS
         static void Main(string[] args)
         {
             var startup = new Startup(true, true, 1);
-            startup.FixedUpdate();
+            var numIters = 100;
+            for (int i = 0; i < numIters; i++)
+                startup.FixedUpdate();
         }
     }
 }
