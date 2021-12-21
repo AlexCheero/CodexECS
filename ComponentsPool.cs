@@ -1,4 +1,5 @@
-﻿using System.Runtime.CompilerServices;
+﻿using System;
+using System.Runtime.CompilerServices;
 
 namespace ECS
 {
@@ -14,26 +15,59 @@ namespace ECS
 
     class ComponentsPool<T> : IComponentsPool
     {
-        private SparseSet<T> _components;
+        private int[] _sparse;
+        private SimpleVector<T> _values;
 
-#region Interface implementation
+        #region Interface implementation
         public int Length
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get => _components.Length;
+            get => _values.Length;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Contains(int id) => _components.Contains(id);
+        public bool Contains(int id) => id < _sparse.Length && _sparse[id] > -1;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Remove(int id) => _components.Remove(id);
+        public void Remove(int id)
+        {
+            var innerIndex = _sparse[id];
+            _sparse[id] = -1;
+            _values.Remove(innerIndex);
+        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Clear() => _components.Clear();
+        public void Clear()
+        {
+#if UNITY
+            for (int i = 0; i < _sparse.Length; i++)
+                _sparse[i] = -1;
+#else
+            Array.Fill(_sparse, -1);
+#endif
+
+            _values.Clear();
+        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Copy(in IComponentsPool other) => _components.Copy(((ComponentsPool<T>)other)._components);
+        public void Copy(in IComponentsPool other)
+        {
+            var otherPool = (ComponentsPool<T>)other;
+            if (_sparse.Length < otherPool._sparse.Length)
+                Array.Resize(ref _sparse, otherPool._sparse.Length);
+            else if (_sparse.Length > otherPool._sparse.Length)
+            {
+#if UNITY
+                for (int i = otherPool._sparse.Length; i < _sparse.Length; i++)
+                    _sparse[i] = -1;
+#else
+                Array.Fill(_sparse, -1, otherPool._sparse.Length, _sparse.Length - otherPool._sparse.Length);
+#endif
+            }
+            Array.Copy(otherPool._sparse, _sparse, otherPool._sparse.Length);
+
+            _values.Copy(otherPool._values);
+        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public IComponentsPool Duplicate()
@@ -47,16 +81,41 @@ namespace ECS
         public ref T this[int id]
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get { return ref _components[id]; }
+            get => ref _values[_sparse[id]];
         }
 
         public ComponentsPool(int initialCapacity = 0)
         {
-            _components = new SparseSet<T>(initialCapacity);
+            _sparse = new int[initialCapacity];
+            for (int i = 0; i < initialCapacity; i++)
+                _sparse[i] = -1;
+            _values = new SimpleVector<T>(initialCapacity);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ref T Add(int id, T value) => ref _components.Add(id, value);
+        public ref T Add(int id, T value)
+        {
+            if (id >= _sparse.Length)
+            {
+                var oldLength = _sparse.Length;
+                var newLength = oldLength > 0 ? oldLength * 2 : 2;
+                while (id >= newLength)
+                    newLength *= 2;
+                Array.Resize(ref _sparse, newLength);
+                for (int i = oldLength; i < _sparse.Length; i++)
+                    _sparse[i] = -1;
+            }
+
+#if DEBUG
+            if (_sparse[id] > -1)
+                throw new EcsException("sparse set already have element at this index");
+#endif
+
+            _sparse[id] = _values.Length;
+            _values.Add(value);
+
+            return ref _values[_sparse[id]];
+        }
     }
 
     class TagsPool<T> : IComponentsPool
