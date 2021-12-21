@@ -1,12 +1,19 @@
 ﻿using System.Runtime.CompilerServices;
-using EntityType = System.UInt32;
+using EntityType = System.Int32;
 
 namespace ECS
 {
+    public struct Entity
+    {
+        public EntityType Val;
+
+        public Entity(EntityType entity) => Val = entity;
+    }
+
     static class EntityExtension
     {
         public const int BitSizeHalved = sizeof(EntityType) * 4;
-        public const EntityType NullEntity = (1 << BitSizeHalved) - 1;
+        public static readonly Entity NullEntity = new Entity((1 << BitSizeHalved) - 1);
 
 #if DEBUG
         static EntityExtension()
@@ -17,48 +24,48 @@ namespace ECS
 #endif
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static EntityType GetId(this EntityType entity)
+        public static EntityType GetId(this in Entity entity)
         {
-            var id = entity << BitSizeHalved;
+            var id = entity.Val << BitSizeHalved;
             id >>= BitSizeHalved;
             return id;
         }
 
-        public static void SetId(this ref EntityType entity, EntityType id)
+        public static void SetId(this ref Entity entity, in EntityType id)
         {
 #if DEBUG
-            if (id.GetId() >= NullEntity)
+            if (id >= NullEntity.Val)
                 throw new EcsException("set overflow id");
 #endif
-            entity = id.GetId() | entity.GetVersion();
+            entity.Val = id | entity.GetVersion();
         }
 
-        public static void SetNullId(this ref EntityType entity)
+        public static void SetNullId(this ref Entity entity)
         {
-            entity = NullEntity.GetId() | entity.GetVersion();
+            entity.Val = NullEntity.GetId() | entity.GetVersion();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static bool IsNull(this in EntityType entity)
+        public static bool IsNull(this in Entity entity)
         {
             return entity.GetId() == NullEntity.GetId();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static EntityType GetVersion(this EntityType entity)
+        public static EntityType GetVersion(this in Entity entity)
         {
-            return entity >> BitSizeHalved;
+            return entity.Val >> BitSizeHalved;
         }
 
-        public static void IncrementVersion(this ref EntityType entity)
+        public static void IncrementVersion(this ref Entity entity)
         {
             EntityType version = entity.GetVersion();
             version++;
             version <<= BitSizeHalved;
-            entity = entity.GetId() | version;
+            entity.Val = entity.GetId() | version;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static int ToId(this EntityType entity) => (int)entity.GetId();
+        public static int ToId(this Entity entity) => entity.GetId();
     }
 }

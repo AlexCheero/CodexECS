@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 //TODO: maybe should move aliases to classes
-using EntityType = System.UInt32;
 //TODO: probably it is better to use sparse sets for update sets,
 //      maybe even every Dictionary, that uses int as keys
 using UpdateSets = System.Collections.Generic.Dictionary<int, System.Collections.Generic.HashSet<int>>;
@@ -25,8 +24,8 @@ namespace ECS
 
     public class EcsWorld
     {
-        private SimpleVector<EntityType> _entites;
-        private EntityType _recycleListHead = EntityExtension.NullEntity;
+        private SimpleVector<Entity> _entites;
+        private Entity _recycleListHead = EntityExtension.NullEntity;
 
         private SimpleVector<BitMask> _masks;
 
@@ -41,7 +40,7 @@ namespace ECS
         public EcsWorld(int entitiesReserved = 32)
         {
             //TODO: ensure that _entities and masks are always have same length
-            _entites = new SimpleVector<EntityType>(entitiesReserved);
+            _entites = new SimpleVector<Entity>(entitiesReserved);
             _masks = new SimpleVector<BitMask>(entitiesReserved);
             _componentsPools = new Dictionary<int, IComponentsPool>();
             
@@ -53,7 +52,7 @@ namespace ECS
         //prealloc ctor
         public EcsWorld(EcsWorld other)
         {
-            _entites = new SimpleVector<EntityType>(other._entites.Reserved);
+            _entites = new SimpleVector<Entity>(other._entites.Reserved);
             _masks = new SimpleVector<BitMask>(other._masks.Reserved);
             _componentsPools = new Dictionary<int, IComponentsPool>();
 
@@ -94,10 +93,10 @@ namespace ECS
         private bool IsEnitityInRange(int id) => id < _entites.Length;
         
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool IsEnitityInRange(EntityType entity) => IsEnitityInRange(entity.GetId());
+        private bool IsEnitityInRange(Entity entity) => IsEnitityInRange(entity.GetId());
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private ref EntityType GetRefById(int id)
+        private ref Entity GetRefById(int id)
         {
 #if DEBUG
             if (id == EntityExtension.NullEntity.GetId() || !IsEnitityInRange(id))
@@ -107,16 +106,16 @@ namespace ECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private ref EntityType GetRefById(EntityType other) => ref GetRefById(other.ToId());
+        private ref Entity GetRefById(Entity other) => ref GetRefById(other.ToId());
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public EntityType GetById(int id) => GetRefById(id);
+        public Entity GetById(int id) => GetRefById(id);
 
         public bool IsDead(int id) => GetRefById(id).GetId() != id;
 
-        public bool IsDead(EntityType entity) => IsDead(entity.ToId());
+        public bool IsDead(Entity entity) => IsDead(entity.ToId());
 
-        private ref EntityType GetRecycled()
+        private ref Entity GetRecycled()
         {
             ref var curr = ref _recycleListHead;
             ref var next = ref GetRefById(curr);
@@ -126,13 +125,13 @@ namespace ECS
                 next = ref GetRefById(next);
             }
 
-            next.SetId(curr);
+            next.SetId(curr.ToId());
             next.IncrementVersion();
             curr.SetNullId();
             return ref next;
         }
 
-        public void Delete(EntityType entity)
+        public void Delete(Entity entity)
         {
 #if DEBUG
             if (IsDead(entity))
@@ -146,7 +145,7 @@ namespace ECS
             var nextSetBit = mask.GetNextSetBit(0);
             while (nextSetBit != -1)
             {
-                RemoveComponent(entity, nextSetBit);
+                RemoveComponent(entity.ToId(), nextSetBit);
                 nextSetBit = mask.GetNextSetBit(nextSetBit + 1);
             }
 
@@ -155,18 +154,18 @@ namespace ECS
             ref var recycleListEnd = ref _recycleListHead;
             while (!recycleListEnd.IsNull())
                 recycleListEnd = ref GetRefById(recycleListEnd);
-            recycleListEnd.SetId(entity);
+            recycleListEnd.SetId(entity.ToId());
             GetRefById(entity).SetNullId();
         }
 
-        public EntityType Create()
+        public Entity Create()
         {
             if (!_recycleListHead.IsNull())
                 return GetRecycled();
 
-            var lastEntity = (EntityType)_entites.Length;
+            var lastEntity = new Entity(_entites.Length);
 #if DEBUG
-            if (lastEntity == EntityExtension.NullEntity)
+            if (lastEntity.Val == EntityExtension.NullEntity.Val)
                 throw new EcsException("entity limit reached");
             if (_entites.Length < 0)
                 throw new EcsException("entities vector length overflow");
@@ -256,7 +255,7 @@ namespace ECS
             AddIdToFlters(id, _excludeUpdateSets[componentId]);
         }
 
-        public ref T AddComponent<T>(EntityType entity, T component = default)
+        public ref T AddComponent<T>(Entity entity, T component = default)
         {
             int id = entity.ToId();
 
@@ -273,7 +272,7 @@ namespace ECS
             return ref pool.Add(entity, component);
         }
 
-        public void AddTag<T>(EntityType entity)
+        public void AddTag<T>(Entity entity)
         {
             int id = entity.ToId();
 
@@ -298,13 +297,13 @@ namespace ECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void RemoveComponent<T>(EntityType entity) => RemoveComponent(entity, ComponentMeta<T>.Id);
+        public void RemoveComponent<T>(int id) => RemoveComponent(id, ComponentMeta<T>.Id);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void RemoveComponent(EntityType entity, int componentId)
+        private void RemoveComponent(int id, int componentId)
         {
-            UpdateFiltersOnRemove(componentId, entity.ToId());
-            _componentsPools[componentId].Remove(entity);
+            UpdateFiltersOnRemove(componentId, id);
+            _componentsPools[componentId].Remove(id);
         }
 #endregion
 #region Filters methods

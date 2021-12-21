@@ -1,14 +1,12 @@
 ﻿using System.Runtime.CompilerServices;
-using EntityType = System.UInt32;
 
 namespace ECS
 {
     interface IComponentsPool
     {
         public int Length { get; }
-        public bool Contains(int i);
-        public bool Contains(EntityType entity);
-        public void Remove(EntityType entity);
+        public bool Contains(int id);
+        public void Remove(int id);
         public void Clear();
         public void Copy(in IComponentsPool other);
         public IComponentsPool Duplicate();
@@ -26,13 +24,10 @@ namespace ECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Contains(int i) => _components.Contains(i);
+        public bool Contains(int id) => _components.Contains(id);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Contains(EntityType entity) => _components.Contains(entity.ToId());
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Remove(EntityType entity) => _components.Remove(entity.ToId());
+        public void Remove(int id) => _components.Remove(id);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Clear() => _components.Clear();
@@ -61,7 +56,7 @@ namespace ECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ref T Add(EntityType entity, T value) => ref _components.Add(entity.ToId(), value);
+        public ref T Add(Entity entity, T value) => ref _components.Add(entity.ToId(), value);
     }
 
     class TagsPool<T> : IComponentsPool
@@ -79,10 +74,7 @@ namespace ECS
         public bool Contains(int i) => _tags.Check(i);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Contains(EntityType entity) => Contains(entity.ToId());
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Remove(EntityType entity) => _tags.Unset(entity.ToId());
+        public void Remove(int id) => _tags.Unset(id);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Clear() => _tags.Clear();
@@ -105,6 +97,6 @@ namespace ECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Add(EntityType entity) => _tags.Set(entity.ToId());
+        public void Add(Entity entity) => _tags.Set(entity.ToId());
     }
 }
