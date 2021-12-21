@@ -30,6 +30,7 @@ namespace ECS
 
         private SimpleVector<BitMask> _masks;
 
+        //TODO: turning it into array slows copying. try use sparse set
         private IComponentsPool[] _componentsPools;
 
         //update sets holds indices of filters by types
