@@ -38,15 +38,7 @@ namespace ECS
         public void Clear() => _components.Clear();
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Copy(in IComponentsPool other)
-        {
-            var otherPool = other as ComponentsPool<T>;
-#if DEBUG
-            if (otherPool == null)
-                throw new EcsException("trying to copy from pool of different type");
-#endif
-            _components.Copy(otherPool._components);
-        }
+        public void Copy(in IComponentsPool other) => _components.Copy(((ComponentsPool<T>)other)._components);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public IComponentsPool Duplicate()
@@ -57,10 +49,10 @@ namespace ECS
         }
 #endregion
 
-        public ref T this[EntityType entity]
+        public ref T this[int id]
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get { return ref _components[entity.ToId()]; }
+            get { return ref _components[id]; }
         }
 
         public ComponentsPool(int initialCapacity = 0)
@@ -96,15 +88,7 @@ namespace ECS
         public void Clear() => _tags.Clear();
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Copy(in IComponentsPool other)
-        {
-            var otherPool = other as TagsPool<T>;
-#if DEBUG
-            if (otherPool == null)
-                throw new EcsException("trying to copy from pool of different type");
-#endif
-            _tags.Copy(otherPool._tags);
-        }
+        public void Copy(in IComponentsPool other) => _tags.Copy(((TagsPool<T>)other)._tags);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public IComponentsPool Duplicate()

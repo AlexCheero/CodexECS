@@ -184,7 +184,7 @@ namespace ECS
         //TODO: add reactive callbacks
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Have<T>(EntityType entity) => _masks[entity.ToId()].Check(ComponentMeta<T>.Id);
+        public bool Have<T>(int id) => _masks[id].Check(ComponentMeta<T>.Id);
 
         private void AddIdToFlters(int id, HashSet<int> filterIds)
         {
@@ -265,7 +265,7 @@ namespace ECS
             var componentId = ComponentMeta<T>.Id;
             if (!_componentsPools.ContainsKey(componentId))
                 _componentsPools.Add(componentId, new ComponentsPool<T>(EcsCacheSettings.PoolSize));
-            var pool = _componentsPools[componentId] as ComponentsPool<T>;
+            var pool = (ComponentsPool<T>)_componentsPools[componentId];
 #if DEBUG
             if (pool == null)
                 throw new EcsException("invalid pool");
@@ -282,7 +282,7 @@ namespace ECS
             var componentId = ComponentMeta<T>.Id;
             if (!_componentsPools.ContainsKey(componentId))
                 _componentsPools.Add(componentId, new TagsPool<T>(EcsCacheSettings.PoolSize));
-            var pool = _componentsPools[componentId] as TagsPool<T>;
+            var pool = (TagsPool<T>)_componentsPools[componentId];
 #if DEBUG
             if (pool == null)
                 throw new EcsException("invalid pool");
@@ -291,10 +291,10 @@ namespace ECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ref T GetComponent<T>(EntityType entity)
+        public ref T GetComponent<T>(int id)
         {
-            var pool = _componentsPools[ComponentMeta<T>.Id] as ComponentsPool<T>;
-            return ref pool[entity];
+            var pool = (ComponentsPool<T>)_componentsPools[ComponentMeta<T>.Id];
+            return ref pool[id];
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

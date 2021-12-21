@@ -14,133 +14,7 @@ namespace ECS
             for (int i = 0; i < count; i++)
             {
                 var entity = world.Create();
-                entity.AddComponent<T1>(world);
-            }
-        }
-
-        public static void CreateEntities<T1, T2>(EcsWorld world, int count)
-        {
-            for (int i = 0; i < count; i++)
-            {
-                var entity = world.Create();
-                entity.AddComponent<T1>(world);
-                entity.AddComponent<T2>(world);
-            }
-        }
-
-        public static void CreateEntities<T1, T2, T3>(EcsWorld world, int count)
-        {
-            for (int i = 0; i < count; i++)
-            {
-                var entity = world.Create();
-                entity.AddComponent<T1>(world);
-                entity.AddComponent<T2>(world);
-                entity.AddComponent<T3>(world);
-            }
-        }
-
-        public static void CreateEntities<T1, T2, T3, T4>(EcsWorld world, int count)
-        {
-            for (int i = 0; i < count; i++)
-            {
-                var entity = world.Create();
-                entity.AddComponent<T1>(world);
-                entity.AddComponent<T2>(world);
-                entity.AddComponent<T3>(world);
-                entity.AddComponent<T4>(world);
-            }
-        }
-
-        public static void CreateEntities<T1, T2, T3, T4, T5>(EcsWorld world, int count)
-        {
-            for (int i = 0; i < count; i++)
-            {
-                var entity = world.Create();
-                entity.AddComponent<T1>(world);
-                entity.AddComponent<T2>(world);
-                entity.AddComponent<T3>(world);
-                entity.AddComponent<T4>(world);
-                entity.AddComponent<T5>(world);
-            }
-        }
-
-        public static void CreateEntities<T1, T2, T3, T4, T5, T6>(EcsWorld world, int count)
-        {
-            for (int i = 0; i < count; i++)
-            {
-                var entity = world.Create();
-                entity.AddComponent<T1>(world);
-                entity.AddComponent<T2>(world);
-                entity.AddComponent<T3>(world);
-                entity.AddComponent<T4>(world);
-                entity.AddComponent<T5>(world);
-                entity.AddComponent<T6>(world);
-            }
-        }
-
-        public static void CreateEntities<T1, T2, T3, T4, T5, T6, T7>(EcsWorld world, int count)
-        {
-            for (int i = 0; i < count; i++)
-            {
-                var entity = world.Create();
-                entity.AddComponent<T1>(world);
-                entity.AddComponent<T2>(world);
-                entity.AddComponent<T3>(world);
-                entity.AddComponent<T4>(world);
-                entity.AddComponent<T5>(world);
-                entity.AddComponent<T6>(world);
-                entity.AddComponent<T7>(world);
-            }
-        }
-
-        public static void CreateEntities<T1, T2, T3, T4, T5, T6, T7, T8>(EcsWorld world, int count)
-        {
-            for (int i = 0; i < count; i++)
-            {
-                var entity = world.Create();
-                entity.AddComponent<T1>(world);
-                entity.AddComponent<T2>(world);
-                entity.AddComponent<T3>(world);
-                entity.AddComponent<T4>(world);
-                entity.AddComponent<T5>(world);
-                entity.AddComponent<T6>(world);
-                entity.AddComponent<T7>(world);
-                entity.AddComponent<T8>(world);
-            }
-        }
-
-        public static void CreateEntities<T1, T2, T3, T4, T5, T6, T7, T8, T9>(EcsWorld world, int count)
-        {
-            for (int i = 0; i < count; i++)
-            {
-                var entity = world.Create();
-                entity.AddComponent<T1>(world);
-                entity.AddComponent<T2>(world);
-                entity.AddComponent<T3>(world);
-                entity.AddComponent<T4>(world);
-                entity.AddComponent<T5>(world);
-                entity.AddComponent<T6>(world);
-                entity.AddComponent<T7>(world);
-                entity.AddComponent<T8>(world);
-                entity.AddComponent<T9>(world);
-            }
-        }
-
-        public static void CreateEntities<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10>(EcsWorld world, int count)
-        {
-            for (int i = 0; i < count; i++)
-            {
-                var entity = world.Create();
-                entity.AddComponent<T1>(world);
-                entity.AddComponent<T2>(world);
-                entity.AddComponent<T3>(world);
-                entity.AddComponent<T4>(world);
-                entity.AddComponent<T5>(world);
-                entity.AddComponent<T6>(world);
-                entity.AddComponent<T7>(world);
-                entity.AddComponent<T8>(world);
-                entity.AddComponent<T9>(world);
-                entity.AddComponent<T10>(world);
+                world.AddComponent<T1>(entity);
             }
         }
     }
@@ -159,23 +33,22 @@ namespace ECS
             {
                 for (int i = 0; i < count; i++)
                 {
-                    var entity = world.GetById(entities[i]);
-
-                    ref var c1 = ref entity.GetComponent<C1>(world);
+                    ref var c1 = ref world.GetComponent<C1>(entities[i]);
                     c1.i += 3;
                     c1.i -= 3;
                     c1.i /= 3;
                     c1.i *= 3;
                     var rem = c1.i % 5;
 
-                    ref var c2 = ref entity.GetComponent<C2>(world);
+                    ref var c2 = ref world.GetComponent<C2>(entities[i]);
                     c2.f += 3;
                     c2.f -= 3;
                     c2.f /= 3;
                     c2.f *= 3;
                     var rem2 = c2.f % 5;
 
-                    entity.AddTag<T3>(world);
+                    var entity = world.GetById(entities[i]);
+                    world.AddTag<T3>(entity);
                 }
             });
         }
@@ -194,23 +67,22 @@ namespace ECS
             {
                 for (int i = 0; i < count; i++)
                 {
-                    var entity = world.GetById(entities[i]);
-
-                    ref var c1 = ref entity.GetComponent<C1>(world);
+                    ref var c1 = ref world.GetComponent<C1>(entities[i]);
                     c1.i += 3;
                     c1.i -= 3;
                     c1.i /= 3;
                     c1.i *= 3;
                     var rem = c1.i % 5;
 
-                    ref var c2 = ref entity.GetComponent<C2>(world);
+                    ref var c2 = ref world.GetComponent<C2>(entities[i]);
                     c2.f += 3;
                     c2.f -= 3;
                     c2.f /= 3;
                     c2.f *= 3;
                     var rem2 = c2.f % 5;
 
-                    entity.RemoveComponent<T3>(world);
+                    var entity = world.GetById(entities[i]);
+                    world.RemoveComponent<T3>(entity);
                 }
             });
         }
@@ -230,8 +102,8 @@ namespace ECS
         private void CreateEntites()
         {
             var e = _world.Create();
-            e.AddComponent<C1>(_world);
-            e.AddComponent<C2>(_world);
+            _world.AddComponent<C1>(e);
+            _world.AddComponent<C2>(e);
         }
 
         public Startup(bool run, bool copy, int iterNum)

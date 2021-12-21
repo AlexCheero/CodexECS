@@ -60,30 +60,5 @@ namespace ECS
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static int ToId(this EntityType entity) => (int)entity.GetId();
-
-        //TODO: check versions of all entities that uses these methods
-#region World methods forwarded
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static ref T AddComponent<T>(this EntityType entity, EcsWorld world, T component = default)
-            => ref world.AddComponent<T>(entity);
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void AddTag<T>(this EntityType entity, EcsWorld world) => world.AddTag<T>(entity);
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static bool IsDead(this EntityType entity, EcsWorld world) => world.IsDead(entity);
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static bool Have<T>(this EntityType entity, EcsWorld world)
-            => world.Have<T>(entity);
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static ref T GetComponent<T>(this EntityType entity, EcsWorld world)
-            => ref world.GetComponent<T>(entity);
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void RemoveComponent<T>(this EntityType entity, EcsWorld world)
-            => world.RemoveComponent<T>(entity);
-#endregion
     }
 }
