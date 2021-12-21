@@ -15,6 +15,7 @@ namespace ECS
         public static int UpdateSetSize = 4;
         public static int PoolSize = 512;
         public static int FilteredEntitiesSize = 128;
+        public static int PoolsCount = 16;
     }
 
     class EcsException : Exception
@@ -29,7 +30,7 @@ namespace ECS
 
         private SimpleVector<BitMask> _masks;
 
-        private Dictionary<int, IComponentsPool> _componentsPools;
+        private IComponentsPool[] _componentsPools;
 
         //update sets holds indices of filters by types
         //TODO: fill this sets on registration, not on add/remove
@@ -42,7 +43,7 @@ namespace ECS
             //TODO: ensure that _entities and masks are always have same length
             _entites = new SimpleVector<Entity>(entitiesReserved);
             _masks = new SimpleVector<BitMask>(entitiesReserved);
-            _componentsPools = new Dictionary<int, IComponentsPool>();
+            _componentsPools = new IComponentsPool[EcsCacheSettings.PoolsCount];
             
             _includeUpdateSets = new UpdateSets();
             _excludeUpdateSets = new UpdateSets();
@@ -54,7 +55,7 @@ namespace ECS
         {
             _entites = new SimpleVector<Entity>(other._entites.Reserved);
             _masks = new SimpleVector<BitMask>(other._masks.Reserved);
-            _componentsPools = new Dictionary<int, IComponentsPool>();
+            _componentsPools = new IComponentsPool[other._componentsPools.Length];
 
             //update sets should be same for every copy of the world
             _includeUpdateSets = other._includeUpdateSets;
@@ -67,21 +68,23 @@ namespace ECS
             _entites.Copy(other._entites);
             _recycleListHead = other._recycleListHead;
             _masks.Copy(other._masks);
-            foreach (var key in _componentsPools.Keys)
+            if (_componentsPools.Length < other._componentsPools.Length)
+                Array.Resize(ref _componentsPools, other._componentsPools.Length);
+#if DEBUG
+            else if (other._componentsPools.Length < _componentsPools.Length)
+                throw new EcsException("source pools length should be greater or equal than target");
+#endif
+            for (int i = 0; i < _componentsPools.Length; i++)
             {
-                if (!other._componentsPools.ContainsKey(key))
-                {
-                    _componentsPools[key].Clear();
-                }
-            }
-
-            foreach (var key in other._componentsPools.Keys)
-            {
-                var otherPool = other._componentsPools[key];
-                if (_componentsPools.ContainsKey(key))
-                    _componentsPools[key].Copy(otherPool);
+                var otherPool = other._componentsPools[i];
+#if DEBUG
+                if (_componentsPools[i] != null && otherPool == null)
+                    throw new EcsException("all pools should be inited on start");
+#endif
+                if (_componentsPools[i] == null)
+                    _componentsPools[i] = otherPool == null ? null : otherPool.Duplicate();
                 else
-                    _componentsPools.Add(key, otherPool.Duplicate());
+                    _componentsPools[i].Copy(other._componentsPools[i]);
             }
 
             _filtersCollection.Copy(other._filtersCollection);
@@ -257,8 +260,10 @@ namespace ECS
             UpdateFiltersOnAdd<T>(id);
 
             var componentId = ComponentMeta<T>.Id;
-            if (!_componentsPools.ContainsKey(componentId))
-                _componentsPools.Add(componentId, new ComponentsPool<T>(EcsCacheSettings.PoolSize));
+            if (_componentsPools.Length <= componentId)
+                Array.Resize(ref _componentsPools, _componentsPools.Length << 1);
+            if (_componentsPools[componentId] == null)
+                _componentsPools[componentId] = new ComponentsPool<T>(EcsCacheSettings.PoolSize);
             var pool = (ComponentsPool<T>)_componentsPools[componentId];
 #if DEBUG
             if (pool == null)
@@ -272,8 +277,10 @@ namespace ECS
             UpdateFiltersOnAdd<T>(id);
 
             var componentId = ComponentMeta<T>.Id;
-            if (!_componentsPools.ContainsKey(componentId))
-                _componentsPools.Add(componentId, new TagsPool<T>(EcsCacheSettings.PoolSize));
+            if (_componentsPools.Length <= componentId)
+                Array.Resize(ref _componentsPools, _componentsPools.Length << 1);
+            if (_componentsPools[componentId] == null)
+                _componentsPools[componentId] = new TagsPool<T>(EcsCacheSettings.PoolSize);
             var pool = (TagsPool<T>)_componentsPools[componentId];
 #if DEBUG
             if (pool == null)
