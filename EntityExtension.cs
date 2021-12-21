@@ -51,6 +51,7 @@ namespace ECS
             return entity.GetId() == NullEntity.GetId();
         }
 
+        //TODO: use smaller part for version
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static EntityType GetVersion(this in Entity entity)
         {

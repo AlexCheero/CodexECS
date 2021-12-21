@@ -56,7 +56,7 @@ namespace ECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ref T Add(Entity entity, T value) => ref _components.Add(entity.ToId(), value);
+        public ref T Add(int id, T value) => ref _components.Add(id, value);
     }
 
     class TagsPool<T> : IComponentsPool
@@ -97,6 +97,6 @@ namespace ECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Add(Entity entity) => _tags.Set(entity.ToId());
+        public void Add(int id) => _tags.Set(id);
     }
 }

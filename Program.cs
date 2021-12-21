@@ -47,8 +47,7 @@ namespace ECS
                     c2.f *= 3;
                     var rem2 = c2.f % 5;
 
-                    var entity = world.GetById(entities[i]);
-                    world.AddTag<T3>(entity);
+                    world.AddTag<T3>(entities[i]);
                 }
             });
         }

@@ -93,9 +93,6 @@ namespace ECS
         private bool IsEnitityInRange(int id) => id < _entites.Length;
         
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool IsEnitityInRange(Entity entity) => IsEnitityInRange(entity.GetId());
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private ref Entity GetRefById(int id)
         {
 #if DEBUG
@@ -111,11 +108,10 @@ namespace ECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Entity GetById(int id) => GetRefById(id);
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool IsDead(int id) => GetRefById(id).GetId() != id;
 
-        public bool IsDead(Entity entity) => IsDead(entity.ToId());
-
-        private ref Entity GetRecycled()
+        private int GetRecycledId()
         {
             ref var curr = ref _recycleListHead;
             ref var next = ref GetRefById(curr);
@@ -128,40 +124,41 @@ namespace ECS
             next.SetId(curr.ToId());
             next.IncrementVersion();
             curr.SetNullId();
-            return ref next;
+            return next.ToId();
         }
 
-        public void Delete(Entity entity)
+        public void Delete(int id)
         {
+            ref Entity entity = ref GetRefById(id);
 #if DEBUG
-            if (IsDead(entity))
+            if (IsDead(id))
                 throw new EcsException("trying to delete already dead entity");
-            if (!IsEnitityInRange(entity))
+            if (!IsEnitityInRange(id))
                 throw new EcsException("trying to delete wrong entity");
             if (entity.IsNull())
                 throw new EcsException("trying to delete null entity");
 #endif
-            var mask = _masks[entity.ToId()];
+            var mask = _masks[id];
             var nextSetBit = mask.GetNextSetBit(0);
             while (nextSetBit != -1)
             {
-                RemoveComponent(entity.ToId(), nextSetBit);
+                RemoveComponent(id, nextSetBit);
                 nextSetBit = mask.GetNextSetBit(nextSetBit + 1);
             }
 
-            _filtersCollection.RemoveId(entity.ToId());
+            _filtersCollection.RemoveId(id);
 
             ref var recycleListEnd = ref _recycleListHead;
             while (!recycleListEnd.IsNull())
                 recycleListEnd = ref GetRefById(recycleListEnd);
-            recycleListEnd.SetId(entity.ToId());
-            GetRefById(entity).SetNullId();
+            recycleListEnd.SetId(id);
+            entity.SetNullId();
         }
 
-        public Entity Create()
+        public int Create()
         {
             if (!_recycleListHead.IsNull())
-                return GetRecycled();
+                return GetRecycledId();
 
             var lastEntity = new Entity(_entites.Length);
 #if DEBUG
@@ -175,7 +172,7 @@ namespace ECS
 
             _entites.Add(lastEntity);
             _masks.Add(new BitMask());//TODO: precache with _registeredComponents.Count
-            return _entites[_entites.Length - 1];
+            return _entites.Length - 1;
         }
 #endregion
 
@@ -255,10 +252,8 @@ namespace ECS
             AddIdToFlters(id, _excludeUpdateSets[componentId]);
         }
 
-        public ref T AddComponent<T>(Entity entity, T component = default)
+        public ref T AddComponent<T>(int id, T component = default)
         {
-            int id = entity.ToId();
-
             UpdateFiltersOnAdd<T>(id);
 
             var componentId = ComponentMeta<T>.Id;
@@ -269,13 +264,11 @@ namespace ECS
             if (pool == null)
                 throw new EcsException("invalid pool");
 #endif
-            return ref pool.Add(entity, component);
+            return ref pool.Add(id, component);
         }
 
-        public void AddTag<T>(Entity entity)
+        public void AddTag<T>(int id)
         {
-            int id = entity.ToId();
-
             UpdateFiltersOnAdd<T>(id);
 
             var componentId = ComponentMeta<T>.Id;
@@ -286,7 +279,7 @@ namespace ECS
             if (pool == null)
                 throw new EcsException("invalid pool");
 #endif
-            pool.Add(entity);
+            pool.Add(id);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
