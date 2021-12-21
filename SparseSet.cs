@@ -7,21 +7,26 @@ namespace ECS
     {
         private int[] _sparse;
         private SimpleVector<T> _values;
+        
+        public SimpleVector<int> Dense;
 
-#if DEBUG
-        private SimpleVector<int> _dense;
-#endif
+        public int Length
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get => _values.Length;
+        }
 
-        public int Length => _values.Length;
-        public ref T this[int i] { get => ref _values[_sparse[i]]; }
+        public ref T this[int i]
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get => ref _values[_sparse[i]];
+        }
 
         public SparseSet(int initialCapacity = 0)
         {
             _sparse = new int[0];
             _values = new SimpleVector<T>(initialCapacity);
-#if DEBUG
-            _dense = new SimpleVector<int>(initialCapacity);
-#endif
+            Dense = new SimpleVector<int>(initialCapacity);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -50,13 +55,12 @@ namespace ECS
 
             _sparse[outerIdx] = _values.Length;
             _values.Add(value);
+            Dense.Add(outerIdx);
 
 #if DEBUG
-            _dense.Add(outerIdx);
-
-            if (_values.Length != _dense.Length)
+            if (_values.Length != Dense.Length)
                 throw new EcsException("_values.Length != _dense.Length");
-            if (_dense[_sparse[outerIdx]] != outerIdx)
+            if (Dense[_sparse[outerIdx]] != outerIdx)
                 throw new EcsException("wrong sparse set idices");
 #endif
 
@@ -69,9 +73,7 @@ namespace ECS
             var innerIndex = _sparse[outerIdx];
             _sparse[outerIdx] = -1;
             _values.Remove(innerIndex);
-#if DEBUG
-            _dense.Remove(innerIndex);
-#endif
+            Dense.Remove(innerIndex);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -86,9 +88,7 @@ namespace ECS
 #endif
 
             _values.Clear();
-#if DEBUG
-            _dense.Clear();
-#endif
+            Dense.Clear();
         }
 
         public void Copy(in SparseSet<T> other)
@@ -107,10 +107,7 @@ namespace ECS
             Array.Copy(other._sparse, _sparse, other._sparse.Length);
 
             _values.Copy(other._values);
-
-#if DEBUG
-            _dense.Copy(other._dense);
-#endif
+            Dense.Copy(other.Dense);
         }
     }
 }
