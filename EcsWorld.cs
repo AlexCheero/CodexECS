@@ -75,7 +75,7 @@ namespace ECS
 #endif
 
             var length = other._componentsPools.Length;
-            var dense = other._componentsPools.Dense;
+            var dense = other._componentsPools._dense;
             for (int i = 0; i < length; i++)
             {
                 var idx = dense[i];
@@ -288,7 +288,7 @@ namespace ECS
         public ref T GetComponent<T>(int id)
         {
             var pool = (ComponentsPool<T>)_componentsPools[ComponentMeta<T>.Id];
-            return ref pool[id];
+            return ref pool._values[pool._sparse[id]];
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

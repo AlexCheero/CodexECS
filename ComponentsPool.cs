@@ -15,8 +15,9 @@ namespace ECS
 
     class ComponentsPool<T> : IComponentsPool
     {
-        private int[] _sparse;
-        private SimpleVector<T> _values;
+        //made public only for unrolling indexer for speeding up
+        public int[] _sparse;
+        public SimpleVector<T> _values;
 
         #region Interface implementation
         public int Length
@@ -78,11 +79,11 @@ namespace ECS
         }
 #endregion
 
-        public ref T this[int id]
-        {
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get => ref _values[_sparse[id]];
-        }
+        //public ref T this[int id]
+        //{
+        //    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        //    get => ref _values[_sparse[id]];
+        //}
 
         public ComponentsPool(int initialCapacity = 0)
         {

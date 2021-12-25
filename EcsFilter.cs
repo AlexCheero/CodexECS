@@ -123,11 +123,6 @@ namespace ECS
                 _filteredEntities.Remove(id);
         }
 
-        public bool Contains(int id)
-        {
-            return _filteredEntities.Contains(id) && !_removeSet.Contains(id);
-        }
-
         public void Copy(in EcsFilter other)
         {
             Includes.Copy(other.Includes);

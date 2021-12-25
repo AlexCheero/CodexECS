@@ -7,8 +7,9 @@ namespace ECS
     {
         private int[] _sparse;
         private SimpleVector<T> _values;
-        
-        public SimpleVector<int> Dense;
+
+        //don't chage outside of SparseSet. made public only for manual unrolling
+        public SimpleVector<int> _dense;
 
         public int Length
         {
@@ -24,9 +25,11 @@ namespace ECS
 
         public SparseSet(int initialCapacity = 0)
         {
-            _sparse = new int[0];
+            _sparse = new int[initialCapacity];
+            for (int i = 0; i < initialCapacity; i++)
+                _sparse[i] = -1;
             _values = new SimpleVector<T>(initialCapacity);
-            Dense = new SimpleVector<int>(initialCapacity);
+            _dense = new SimpleVector<int>(initialCapacity);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -40,9 +43,9 @@ namespace ECS
             if (outerIdx >= _sparse.Length)
             {
                 var oldLength = _sparse.Length;
-                var newLength = oldLength > 0 ? oldLength * 2 : 2;
-                while (outerIdx >= newLength)
-                    newLength *= 2;
+                var newLength = oldLength > 0 ? oldLength << 1 : 2;
+                while (outerIdx >= newLength)//TODO: probably can get rid of loop here
+                    newLength <<= 1;
                 Array.Resize(ref _sparse, newLength);
                 for (int i = oldLength; i < _sparse.Length; i++)
                     _sparse[i] = -1;
@@ -55,12 +58,12 @@ namespace ECS
 
             _sparse[outerIdx] = _values.Length;
             _values.Add(value);
-            Dense.Add(outerIdx);
+            _dense.Add(outerIdx);
 
 #if DEBUG
-            if (_values.Length != Dense.Length)
+            if (_values.Length != _dense.Length)
                 throw new EcsException("_values.Length != _dense.Length");
-            if (Dense[_sparse[outerIdx]] != outerIdx)
+            if (_dense[_sparse[outerIdx]] != outerIdx)
                 throw new EcsException("wrong sparse set idices");
 #endif
 
@@ -73,7 +76,7 @@ namespace ECS
             var innerIndex = _sparse[outerIdx];
             _sparse[outerIdx] = -1;
             _values.Remove(innerIndex);
-            Dense.Remove(innerIndex);
+            _dense.Remove(innerIndex);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -88,7 +91,7 @@ namespace ECS
 #endif
 
             _values.Clear();
-            Dense.Clear();
+            _dense.Clear();
         }
 
         public void Copy(in SparseSet<T> other)
@@ -107,7 +110,7 @@ namespace ECS
             Array.Copy(other._sparse, _sparse, other._sparse.Length);
 
             _values.Copy(other._values);
-            Dense.Copy(other.Dense);
+            _dense.Copy(other._dense);
         }
     }
 }
