@@ -9,8 +9,6 @@ namespace ECS
 
         protected int Id<T>() => ComponentMeta<T>.Id;
 
-        //TODO: implement ability to use several filters in one system
-        //      maybe have to implement getting of entities dynamically, without caching
         protected int FilteredSetId;
 
         public void RegisterInWorld(EcsWorld world)

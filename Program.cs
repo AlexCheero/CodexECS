@@ -132,7 +132,6 @@ namespace ECS
 
             if (_shouldCopy)
             {
-                //TODO: probably should copy to different varible every iteration
                 for (int i = 0; i < _copyIterationsNum; i++)
                     _worldCopy.Copy(_world);
             }

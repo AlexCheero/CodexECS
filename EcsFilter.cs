@@ -11,7 +11,6 @@ namespace ECS
         //TODO: implement sortable groups
         private Dictionary<int, int> _filteredEntities;
         private SimpleVector<int> _entitiesVector;
-        //TODO: maybe it is better to use simple arrays for delayed ops
         private HashSet<int> _addSet;
         private HashSet<int> _removeSet;
 

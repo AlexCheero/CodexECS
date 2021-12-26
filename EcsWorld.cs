@@ -1,10 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
-//TODO: maybe should move aliases to classes
-//TODO: probably it is better to use sparse sets for update sets,
-//      maybe even every Dictionary, that uses int as keys
-using UpdateSets = System.Collections.Generic.Dictionary<int, System.Collections.Generic.HashSet<int>>;
 
 //TODO: cover with tests
 namespace ECS
@@ -34,8 +30,8 @@ namespace ECS
 
         //update sets holds indices of filters by types
         //TODO: fill this sets on registration, not on add/remove
-        private UpdateSets _includeUpdateSets;
-        private UpdateSets _excludeUpdateSets;
+        private Dictionary<int, HashSet<int>> _includeUpdateSets;
+        private Dictionary<int, HashSet<int>> _excludeUpdateSets;
         private FiltersCollection _filtersCollection;
 
         public EcsWorld(int entitiesReserved = 32)
@@ -45,8 +41,8 @@ namespace ECS
             _masks = new SimpleVector<BitMask>(entitiesReserved);
             _componentsPools = new SparseSet<IComponentsPool>(EcsCacheSettings.PoolsCount);
             
-            _includeUpdateSets = new UpdateSets();
-            _excludeUpdateSets = new UpdateSets();
+            _includeUpdateSets = new Dictionary<int, HashSet<int>>();
+            _excludeUpdateSets = new Dictionary<int, HashSet<int>>();
             _filtersCollection = new FiltersCollection();
         }
 
@@ -304,7 +300,7 @@ namespace ECS
 #region Filters methods
 
         private void AddFilterToUpdateSets(in BitMask components, int filterIdx
-            , UpdateSets sets)
+            , Dictionary<int, HashSet<int>> sets)
         {
             var nextSetBit = components.GetNextSetBit(0);
             while (nextSetBit != -1)
