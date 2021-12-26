@@ -9,8 +9,8 @@ namespace ECS
         public BitMask Includes;
         public BitMask Excludes;
         //TODO: implement sortable groups
-        private HashSet<int> _filteredEntities;
-        private int[] _entitiesArray;//TODO: hack for iteration speedup, rewrite
+        private Dictionary<int, int> _filteredEntities;
+        private SimpleVector<int> _entitiesVector;
         //TODO: maybe it is better to use simple arrays for delayed ops
         private HashSet<int> _addSet;
         private HashSet<int> _removeSet;
@@ -54,10 +54,11 @@ namespace ECS
         public EcsFilter(int hash)//dummy ctor
         {
             Includes = Excludes = default;
-            _filteredEntities = _addSet = _removeSet = null;
+            _filteredEntities = null;
+            _addSet = _removeSet = null;
             _cachedHash = hash;
             _lockCount = null;
-            _entitiesArray = null;
+            _entitiesVector = null;
         }
 
         public EcsFilter(in BitMask includes, in BitMask excludes)
@@ -66,30 +67,18 @@ namespace ECS
             Includes.Copy(includes);
             Excludes = default;
             Excludes.Copy(excludes);
-#if UNITY
-            _filteredEntities = new HashSet<int>();
-#else
-            _filteredEntities = new HashSet<int>(EcsCacheSettings.FilteredEntitiesSize);
-#endif
+            _filteredEntities = new Dictionary<int, int>(EcsCacheSettings.FilteredEntitiesSize);
             _addSet = new HashSet<int>();
             _removeSet = new HashSet<int>();
             _cachedHash = GetHashFromMasks(Includes, Excludes);
             _lockCount = new BoxedInt();
-            _entitiesArray = new int[EcsCacheSettings.FilteredEntitiesSize];
+            _entitiesVector = new SimpleVector<int>(EcsCacheSettings.FilteredEntitiesSize);
         }
 
         public void Iterate(IteartionDelegate iteartionDelegate)
         {
             _lockCount.Value++;
-            if (_entitiesArray.Length < _filteredEntities.Count)
-            {
-                var newCapacity = 2;
-                while (newCapacity < _filteredEntities.Count)
-                    newCapacity <<= 1;
-                Array.Resize(ref _entitiesArray, newCapacity);
-            }
-            _filteredEntities.CopyTo(_entitiesArray);
-            iteartionDelegate(_entitiesArray, _filteredEntities.Count);
+            iteartionDelegate(_entitiesVector._elements, _entitiesVector._end);
             _lockCount.Value--;
 #if DEBUG
             if (_lockCount.Value < 0)
@@ -99,10 +88,29 @@ namespace ECS
             if (_lockCount.Value == 0)
             {
                 foreach (var id in _addSet)
-                    _filteredEntities.Add(id);
+                {
+                    if (!_filteredEntities.ContainsKey(id))
+                    {
+                        _entitiesVector.Add(id);
+                        _filteredEntities.Add(id, _entitiesVector._end - 1);
+                    }
+                }
                 _addSet.Clear();
                 foreach (var id in _removeSet)
-                    _filteredEntities.Remove(id);
+                {
+                    if (_filteredEntities.TryGetValue(id, out int idx))
+                    {
+                        _entitiesVector.Remove(idx);
+                        var end = _entitiesVector._end;
+                        if (idx < end)
+                        {
+                            _filteredEntities[idx] = _filteredEntities[end];
+                            _filteredEntities.Remove(end);
+                        }
+                        else
+                            _filteredEntities.Remove(id);
+                    }
+                }
                 _removeSet.Clear();
             }
         }
@@ -111,16 +119,29 @@ namespace ECS
         {
             if (_lockCount.Value > 0)
                 _addSet.Add(id);
-            else
-                _filteredEntities.Add(id);
+            else if (!_filteredEntities.ContainsKey(id))
+            {
+                _entitiesVector.Add(id);
+                _filteredEntities.Add(id, _entitiesVector._end - 1);
+            }
         }
 
         public void Remove(int id)
         {
             if (_lockCount.Value > 0)
                 _removeSet.Add(id);
-            else
-                _filteredEntities.Remove(id);
+            else if (_filteredEntities.TryGetValue(id, out int idx))
+            {
+                _entitiesVector.Remove(idx);
+                var end = _entitiesVector._end;
+                if (idx < end)
+                {
+                    _filteredEntities[idx] = _filteredEntities[end];
+                    _filteredEntities.Remove(end);
+                }
+                else
+                    _filteredEntities.Remove(id);
+            }
         }
 
         public void Copy(in EcsFilter other)
@@ -131,15 +152,9 @@ namespace ECS
             if (_filteredEntities != null)
                 _filteredEntities.Clear();
             else
-            {
-#if UNITY
-                _filteredEntities = new HashSet<int>();
-#else
-                _filteredEntities = new HashSet<int>(EcsCacheSettings.FilteredEntitiesSize);
-#endif
-            }
+                _filteredEntities = new Dictionary<int, int>(EcsCacheSettings.FilteredEntitiesSize);
             foreach (var entity in other._filteredEntities)
-                _filteredEntities.Add(entity);
+                _filteredEntities.Add(entity.Key, entity.Value);
 
             _lockCount = other._lockCount;
         }

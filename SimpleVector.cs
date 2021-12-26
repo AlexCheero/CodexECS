@@ -6,8 +6,8 @@ namespace ECS
     //TODO: rename to simple list to match c# style
     class SimpleVector<T>
     {
-        private T[] _elements;
-        private int _end = 0;
+        public T[] _elements;
+        public int _end = 0;
 
         public int Length
         {

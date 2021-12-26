@@ -13,6 +13,8 @@ namespace ECS
             public int GetHashCode(EcsFilter filter) => filter.HashCode;
         }
 
+        //TODO: try to use Dictionary kinda like it done in EcsFilter. (move both masks to struct and use it as key)
+        //      for alternative to TryGetValue and IndexOf method
         private HashSet<EcsFilter> _set;
         private List<EcsFilter> _list;
 
