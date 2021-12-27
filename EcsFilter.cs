@@ -1,6 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Runtime.CompilerServices;
+﻿using System.Collections.Generic;
 
 namespace ECS
 {
@@ -15,6 +13,9 @@ namespace ECS
         private HashSet<int> _removeSet;
 
         public delegate void IteartionDelegate(int[] entities, int count);
+
+        public int Length => _entitiesVector.Length;
+        public int this[int i] => _entitiesVector[i];
 
         private class BoxedInt { public int Value = 0; }
         private BoxedInt _lockCount;
@@ -50,28 +51,18 @@ namespace ECS
             return hash;
         }
 
-        public EcsFilter(int hash)//dummy ctor
-        {
-            Includes = Excludes = default;
-            _filteredEntities = null;
-            _addSet = _removeSet = null;
-            _cachedHash = hash;
-            _lockCount = null;
-            _entitiesVector = null;
-        }
-
-        public EcsFilter(in BitMask includes, in BitMask excludes)
+        public EcsFilter(in BitMask includes, in BitMask excludes, bool dummy = false)
         {
             Includes = default;
             Includes.Copy(includes);
             Excludes = default;
             Excludes.Copy(excludes);
-            _filteredEntities = new Dictionary<int, int>(EcsCacheSettings.FilteredEntitiesSize);
-            _addSet = new HashSet<int>();
-            _removeSet = new HashSet<int>();
+            _filteredEntities = dummy ? null : new Dictionary<int, int>(EcsCacheSettings.FilteredEntitiesSize);
+            _addSet = dummy ? null : new HashSet<int>();
+            _removeSet = dummy ? null : new HashSet<int>();
             _cachedHash = GetHashFromMasks(Includes, Excludes);
-            _lockCount = new BoxedInt();
-            _entitiesVector = new SimpleVector<int>(EcsCacheSettings.FilteredEntitiesSize);
+            _lockCount = dummy ? null : new BoxedInt();
+            _entitiesVector = dummy ? null : new SimpleVector<int>(EcsCacheSettings.FilteredEntitiesSize);
         }
 
         public void Iterate(IteartionDelegate iteartionDelegate)

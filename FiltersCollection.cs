@@ -53,7 +53,7 @@ namespace ECS
         //all adding should be preformed only for initial world
         public bool TryAdd(in BitMask includes, in BitMask excludes, out int idx)
         {
-            var dummy = new EcsFilter(EcsFilter.GetHashFromMasks(in includes, in excludes));
+            var dummy = new EcsFilter(in includes, in excludes, true);
 #if UNITY
             var addNew = !_set.Contains(dummy);
 #else

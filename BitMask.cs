@@ -27,6 +27,14 @@ namespace ECS
             Length = 0;
         }
 
+        public BitMask(params int[] positions)
+        {
+            _m1 = 0;
+            _mn = null;
+            Length = 0;
+            Set(positions);
+        }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Copy(in BitMask other)
         {

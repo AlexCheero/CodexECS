@@ -325,6 +325,12 @@ namespace ECS
             }
         }
 
+        public int RegisterFilter(in BitMask includes)
+        {
+            BitMask defaultExcludes = default;
+            return RegisterFilter(in includes, in defaultExcludes);
+        }
+
         public int RegisterFilter(in BitMask includes, in BitMask excludes)
         {
             int filterId;
