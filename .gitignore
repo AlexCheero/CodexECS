@@ -388,3 +388,4 @@ FodyWeavers.xsd
 *.sln.iml
 /ECS.csproj
 /ECS.sln
+/Program.cs
