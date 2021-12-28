@@ -126,8 +126,9 @@ namespace ECS
                 var end = _entitiesVector._end;
                 if (idx < end)
                 {
-                    _filteredEntities[idx] = _filteredEntities[end];
-                    _filteredEntities.Remove(end);
+                    var endIdx = _entitiesVector[end];
+                    _filteredEntities[idx] = _filteredEntities[endIdx];
+                    _filteredEntities.Remove(endIdx);
                 }
                 else
                     _filteredEntities.Remove(id);

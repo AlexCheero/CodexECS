@@ -109,6 +109,9 @@ namespace ECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool IsDead(int id) => GetRefById(id).GetId() != id;
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool IsNull(int id) => GetById(id).IsNull();
+
         private int GetRecycledId()
         {
             ref var curr = ref _recycleListHead;
@@ -285,6 +288,15 @@ namespace ECS
         {
             var pool = (ComponentsPool<T>)_componentsPools[ComponentMeta<T>.Id];
             return ref pool._values[pool._sparse[id]];
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ref T GetOrAddComponent<T>(int id)
+        {
+            if (Have<T>(id))
+                return ref GetComponent<T>(id);
+            else
+                return ref AddComponent<T>(id);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
