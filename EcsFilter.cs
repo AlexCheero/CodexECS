@@ -90,12 +90,12 @@ namespace ECS
                 {
                     if (_filteredEntities.TryGetValue(id, out int idx))
                     {
+                        var lastEntity = _entitiesVector._elements[_entitiesVector._end - 1];
                         _entitiesVector.Remove(idx);
-                        var end = _entitiesVector._end;
-                        if (idx < end)
+                        if (idx < _entitiesVector._end)
                         {
-                            _filteredEntities[idx] = _filteredEntities[end];
-                            _filteredEntities.Remove(end);
+                            _filteredEntities[id] = _filteredEntities[lastEntity];
+                            _filteredEntities.Remove(lastEntity);
                         }
                         else
                             _filteredEntities.Remove(id);
@@ -122,13 +122,12 @@ namespace ECS
                 _removeSet.Add(id);
             else if (_filteredEntities.TryGetValue(id, out int idx))
             {
+                var lastEntity = _entitiesVector._elements[_entitiesVector._end - 1];
                 _entitiesVector.Remove(idx);
-                var end = _entitiesVector._end;
-                if (idx < end)
+                if (idx < _entitiesVector._end)
                 {
-                    var endIdx = _entitiesVector[end];
-                    _filteredEntities[idx] = _filteredEntities[endIdx];
-                    _filteredEntities.Remove(endIdx);
+                    _filteredEntities[idx] = _filteredEntities[lastEntity];
+                    _filteredEntities.Remove(lastEntity);
                 }
                 else
                     _filteredEntities.Remove(id);
