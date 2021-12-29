@@ -78,10 +78,11 @@ namespace ECS
 
             if (length < _componentsPools.Length)
             {
-                for (int i = length; i < _componentsPools.Length; i++)
+                for (int i = 0; i < _componentsPools.Length; i++)
                 {
                     var compId = _componentsPools._dense[i];
-                    _componentsPools[compId].Clear();
+                    if (!other._componentsPools.Contains(compId))
+                        _componentsPools[compId].Clear();
                 }
             }
 
