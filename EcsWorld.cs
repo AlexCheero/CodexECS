@@ -29,7 +29,6 @@ namespace ECS
         private SparseSet<IComponentsPool> _componentsPools;
 
         //update sets holds indices of filters by types
-        //TODO: fill this sets on registration, not on add/remove
         private Dictionary<int, HashSet<int>> _includeUpdateSets;
         private Dictionary<int, HashSet<int>> _excludeUpdateSets;
         private FiltersCollection _filtersCollection;
@@ -65,21 +64,25 @@ namespace ECS
             _recycleListHead = other._recycleListHead;
             _masks.Copy(other._masks);
 
-#if DEBUG
-            if (other._componentsPools.Length < _componentsPools.Length)
-                throw new EcsException("source pools count should be greater or equal than destination");
-#endif
-
             var length = other._componentsPools.Length;
             var dense = other._componentsPools._dense;
             for (int i = 0; i < length; i++)
             {
-                var idx = dense[i];
-                var otherPool = other._componentsPools[idx];
-                if (_componentsPools.Contains(idx))
-                    _componentsPools[idx].Copy(otherPool);
+                var compId = dense[i];
+                var otherPool = other._componentsPools[compId];
+                if (_componentsPools.Contains(compId))
+                    _componentsPools[compId].Copy(otherPool);
                 else
-                    _componentsPools.Add(idx, otherPool.Duplicate());
+                    _componentsPools.Add(compId, otherPool.Duplicate());
+            }
+
+            if (length < _componentsPools.Length)
+            {
+                for (int i = length; i < _componentsPools.Length; i++)
+                {
+                    var compId = _componentsPools._dense[i];
+                    _componentsPools[compId].Clear();
+                }
             }
 
             _filtersCollection.Copy(other._filtersCollection);

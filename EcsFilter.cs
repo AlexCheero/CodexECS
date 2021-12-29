@@ -146,6 +146,10 @@ namespace ECS
                 _filteredEntities = new Dictionary<int, int>(EcsCacheSettings.FilteredEntitiesSize);
             foreach (var entity in other._filteredEntities)
                 _filteredEntities.Add(entity.Key, entity.Value);
+            
+            if (_entitiesVector == null)
+                _entitiesVector = new SimpleVector<int>(other._entitiesVector._elements.Length);
+            _entitiesVector.Copy(other._entitiesVector);
 
             _lockCount = other._lockCount;
         }
