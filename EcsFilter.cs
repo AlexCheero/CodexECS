@@ -94,8 +94,8 @@ namespace ECS
                         _entitiesVector.Remove(idx);
                         if (idx < _entitiesVector._end)
                         {
-                            _filteredEntities[id] = _filteredEntities[lastEntity];
-                            _filteredEntities.Remove(lastEntity);
+                            _filteredEntities[lastEntity] = _filteredEntities[id];
+                            _filteredEntities.Remove(id);
                         }
                         else
                             _filteredEntities.Remove(id);
@@ -126,8 +126,8 @@ namespace ECS
                 _entitiesVector.Remove(idx);
                 if (idx < _entitiesVector._end)
                 {
-                    _filteredEntities[idx] = _filteredEntities[lastEntity];
-                    _filteredEntities.Remove(lastEntity);
+                    _filteredEntities[lastEntity] = _filteredEntities[id];
+                    _filteredEntities.Remove(id);
                 }
                 else
                     _filteredEntities.Remove(id);
