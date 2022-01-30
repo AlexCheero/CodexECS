@@ -48,7 +48,6 @@ namespace ECS
                     var newChunksLength = 2;
                     while (newChunksLength < chunksLength)
                         newChunksLength <<= 1;
-                    newChunksLength--;
                     _mn = new MaskInternal[newChunksLength];
                 }
 
