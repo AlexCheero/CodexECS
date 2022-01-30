@@ -290,6 +290,10 @@ namespace ECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ref T GetComponent<T>(int id)
         {
+#if DEBUG
+            if (!Have<T>(id))
+                throw new EcsException("entity have no " + typeof(T));
+#endif
             var pool = (ComponentsPool<T>)_componentsPools[ComponentMeta<T>.Id];
             return ref pool._values[pool._sparse[id]];
         }
