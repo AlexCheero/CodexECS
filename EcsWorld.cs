@@ -116,6 +116,15 @@ namespace ECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool IsNull(int id) => GetById(id).IsNull();
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool Equals(int entity1, int entity2)
+        {
+            if (entity1 == entity2)
+                return GetById(entity1).GetVersion() == GetById(entity2).GetVersion();
+            else
+                return false;
+        }
+
         private int GetRecycledId()
         {
             ref var curr = ref _recycleListHead;
