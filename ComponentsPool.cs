@@ -149,12 +149,10 @@ namespace ECS
 #endif
 
             _sparse[id] = _values.Length;
-
+            _values.Add(value);
             if (_dense.Length < _values._elements.Length)
                 Array.Resize(ref _dense, _values._elements.Length);
-            _dense[_values.Length] = id;
-
-            _values.Add(value);
+            _dense[_sparse[id]] = id;
 
 #if DEBUG
             CheckArrays();
