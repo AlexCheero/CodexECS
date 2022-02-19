@@ -17,7 +17,21 @@ namespace ECS
     {
         //made public only for unrolling indexer for speeding up
         public int[] _sparse;
+        private int[] _dense;
         public SimpleVector<T> _values;
+
+#if DEBUG
+        private void CheckArrays()
+        {
+            for (int i = 0; i < _values.Length; i++)
+            {
+                var outer = _dense[i];
+                var inner = _sparse[outer];
+                if (inner != i)
+                    throw new EcsException("indices mismatch 2");
+            }
+        }
+#endif
 
         #region Interface implementation
         public int Length
@@ -35,6 +49,18 @@ namespace ECS
             var innerIndex = _sparse[id];
             _sparse[id] = -1;
             _values.Remove(innerIndex);
+            if (innerIndex < _values.Length)
+            {
+                var lastId = _dense[_values.Length];
+                _sparse[lastId] = innerIndex;
+                _dense[innerIndex] = _dense[_values.Length];
+                //_sparse[id] = _dense[innerIndex];
+                //_values[innerIndex] = _values[_values.Length];
+            }
+
+#if DEBUG
+            CheckArrays();
+#endif
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -54,6 +80,7 @@ namespace ECS
         public void Copy(in IComponentsPool other)
         {
             var otherPool = (ComponentsPool<T>)other;
+
             if (_sparse.Length < otherPool._sparse.Length)
                 Array.Resize(ref _sparse, otherPool._sparse.Length);
             else if (_sparse.Length > otherPool._sparse.Length)
@@ -67,7 +94,15 @@ namespace ECS
             }
             Array.Copy(otherPool._sparse, _sparse, otherPool._sparse.Length);
 
+            if (_dense.Length < otherPool._dense.Length)
+                Array.Resize(ref _dense, otherPool._dense.Length);
+            Array.Copy(otherPool._dense, _dense, otherPool._dense.Length);
+
             _values.Copy(otherPool._values);
+
+#if DEBUG
+            CheckArrays();
+#endif
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -88,6 +123,7 @@ namespace ECS
         public ComponentsPool(int initialCapacity = 0)
         {
             _sparse = new int[initialCapacity];
+            _dense = new int[initialCapacity];
             for (int i = 0; i < initialCapacity; i++)
                 _sparse[i] = -1;
             _values = new SimpleVector<T>(initialCapacity);
@@ -113,7 +149,16 @@ namespace ECS
 #endif
 
             _sparse[id] = _values.Length;
+
+            if (_dense.Length < _values._elements.Length)
+                Array.Resize(ref _dense, _values._elements.Length);
+            _dense[_values.Length] = id;
+
             _values.Add(value);
+
+#if DEBUG
+            CheckArrays();
+#endif
 
             return ref _values[_sparse[id]];
         }
