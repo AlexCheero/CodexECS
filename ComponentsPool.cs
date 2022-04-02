@@ -1,6 +1,10 @@
 ﻿using System;
 using System.Runtime.CompilerServices;
 
+#if DEBUG
+using System.Text;
+#endif
+
 namespace ECS
 {
     interface IComponentsPool
@@ -11,6 +15,10 @@ namespace ECS
         public void Clear();
         public void Copy(in IComponentsPool other);
         public IComponentsPool Duplicate();
+
+#if DEBUG
+        public string DebugString(int id);
+#endif
     }
 
     class ComponentsPool<T> : IComponentsPool
@@ -160,6 +168,21 @@ namespace ECS
 
             return ref _values[_sparse[id]];
         }
+
+#if DEBUG
+        public string DebugString(int id)
+        {
+            StringBuilder sb = new StringBuilder();
+            sb.Append(typeof(T).ToString() + ". ");
+
+            var props = _values[_sparse[id]].GetType().GetFields();
+            foreach (var p in props)
+                sb.Append(p.Name + ": " + p.GetValue(_values[_sparse[id]]) + ", ");
+            sb.Remove(sb.Length - 2, 2);//remove last comma
+
+            return sb.ToString();
+        }
+#endif
     }
 
     class TagsPool<T> : IComponentsPool
@@ -201,5 +224,12 @@ namespace ECS
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Add(int id) => _tags.Set(id);
+
+#if DEBUG
+        public string DebugString(int id)
+        {
+            return typeof(T).ToString();
+        }
+#endif
     }
 }

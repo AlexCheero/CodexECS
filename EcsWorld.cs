@@ -2,6 +2,10 @@
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 
+#if DEBUG
+using System.Text;
+#endif
+
 //TODO: cover with tests
 namespace ECS
 {
@@ -306,6 +310,36 @@ namespace ECS
             var pool = (ComponentsPool<T>)_componentsPools[ComponentMeta<T>.Id];
             return ref pool._values[pool._sparse[id]];
         }
+
+#if DEBUG
+        private string DebugString(int id, int componentId) => _componentsPools[componentId].DebugString(id);
+
+        public void DebugEntity(int id, StringBuilder sb)
+        {
+            var mask = _masks[id];
+            var nextSetBit = mask.GetNextSetBit(0);
+            while (nextSetBit != -1)
+            {
+                sb.Append("\n\t" + DebugString(id, nextSetBit));
+                nextSetBit = mask.GetNextSetBit(nextSetBit + 1);
+            }
+        }
+
+        public void DebugAll(StringBuilder sb)
+        {
+            for (int i = 0; i < _entites.Length; i++)
+            {
+                var entity = _entites[i];
+                var id = entity.ToId();
+                if (!IsDead(id))
+                {
+                    sb.Append(id + ":");
+                    DebugEntity(id, sb);
+                    sb.Append('\n');
+                }
+            }    
+        }
+#endif
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ref T GetOrAddComponent<T>(int id)
