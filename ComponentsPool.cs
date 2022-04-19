@@ -1,5 +1,8 @@
 ﻿using System;
+using System.IO;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+using System.Runtime.Serialization.Formatters.Binary;
 
 #if DEBUG
 using System.Text;
@@ -7,6 +10,97 @@ using System.Text;
 
 namespace ECS
 {
+    static class BinarySerializer
+    {
+        public static void SerializeInt(int i, byte[] outBytes, ref int startIndex)
+        {
+            outBytes[startIndex++] = (byte) i;
+            outBytes[startIndex++] = (byte)(i >> 8);
+            outBytes[startIndex++] = (byte)(i >> 16);
+            outBytes[startIndex++] = (byte)(i >> 24);
+        }
+
+        public static int DeserializeInt(byte[] bytes, ref int startIndex)
+        {
+            int i = bytes[startIndex];
+            i |= bytes[startIndex++] << 8;
+            i |= bytes[startIndex++] << 16;
+            i |= bytes[startIndex++] << 24;
+            return i;
+        }
+
+        public static void SerializeIntegerArray(int[] arr, byte[] outBytes, ref int startIndex)
+        {
+            var count = arr.Length * 4;
+            Buffer.BlockCopy(arr, 0, outBytes, startIndex, count);
+            startIndex += count;
+        }
+
+        public static int[] DeserializeIntegerArray(byte[] bytes, ref int startIndex, int sizeOfArr)
+        {
+            var size = bytes.Length / sizeof(int);
+            var arr = new int[sizeOfArr];
+            for (var i = 0; i < sizeOfArr; i++, startIndex += sizeof(int))
+                arr[i] = BitConverter.ToInt32(bytes, startIndex);
+
+            return arr;
+        }
+
+        //struct shouldn't contain reference types to be serialized properly
+        public static void SerializeStruct<T>(T str, byte[] outBytes, ref int startIndex)
+        {
+#if DEBUG
+            if (!typeof(T).IsValueType)
+                throw new EcsException("T must be the value type");
+#endif
+
+            int size = Marshal.SizeOf(str);
+
+            IntPtr ptr = Marshal.AllocHGlobal(size);
+            Marshal.StructureToPtr(str, ptr, true);
+            Marshal.Copy(ptr, outBytes, startIndex, size);
+            startIndex += size;
+            Marshal.FreeHGlobal(ptr);
+        }
+
+        //TODO: make consistent (startIndex as ref)
+        public static T DeserializeStruct<T>(byte[] bytes, int startIndex, int sizeOfInstance)
+        {
+#if DEBUG
+            if (!typeof(T).IsValueType)
+                throw new EcsException("T must be the value type");
+#endif
+
+            T str = default;
+            IntPtr ptr = Marshal.AllocHGlobal(sizeOfInstance);
+
+            Marshal.Copy(bytes, startIndex, ptr, sizeOfInstance);
+
+            str = (T)Marshal.PtrToStructure(ptr, str.GetType());
+            Marshal.FreeHGlobal(ptr);
+
+            return str;
+        }
+
+        /*
+         * TODO: serialize without extra allocations
+        private static BinaryFormatter binaryFormatter;
+
+        public static void SerializeClass(object obj, byte[] outBytes)
+        {
+            if (obj == null)
+                return;
+            if (binaryFormatter == null)
+                binaryFormatter = new BinaryFormatter();
+            using (MemoryStream ms = new MemoryStream())
+            {
+                binaryFormatter.Serialize(ms, obj);
+                //return ms.ToArray();
+            }
+        }
+        */
+    }
+
     interface IComponentsPool
     {
         public int Length { get; }
@@ -15,6 +109,10 @@ namespace ECS
         public void Clear();
         public void Copy(in IComponentsPool other);
         public IComponentsPool Duplicate();
+
+        public void Serialize(byte[] outBytes, ref int startIndex);
+        public void Deserialize(byte[] bytes, ref int startIndex);
+        public int ByteLength();
 
 #if DEBUG
         public string DebugString(int id);
@@ -120,7 +218,65 @@ namespace ECS
             newPool.Copy(this);
             return newPool;
         }
-#endregion
+
+        public void Serialize(byte[] outBytes, ref int startIndex)
+        {
+            BinarySerializer.SerializeInt(_sparse.Length, outBytes, ref startIndex);
+            BinarySerializer.SerializeInt(_values.Length, outBytes, ref startIndex);
+
+            BinarySerializer.SerializeIntegerArray(_sparse, outBytes, ref startIndex);
+            BinarySerializer.SerializeIntegerArray(_dense, outBytes, ref startIndex);
+
+            if (typeof(T).IsValueType)
+            {
+                for (int i = 0; i < _values.Length; i++)
+                    BinarySerializer.SerializeStruct(_values[i], outBytes, ref startIndex);
+            }
+            else
+            {
+                //Serialize ref type components
+                throw new NotImplementedException();
+            }
+        }
+
+        public void Deserialize(byte[] bytes, ref int startIndex)
+        {
+            var sparseLength = BinarySerializer.DeserializeInt(bytes, ref startIndex);
+            var valuesLength = BinarySerializer.DeserializeInt(bytes, ref startIndex);
+
+            _sparse = BinarySerializer.DeserializeIntegerArray(bytes, ref startIndex, sparseLength);
+            _dense = BinarySerializer.DeserializeIntegerArray(bytes, ref startIndex, valuesLength);
+
+            if (typeof(T).IsValueType)
+            {
+                var sizeOfInstance = Marshal.SizeOf(default(T));
+#if DEBUG
+                if (valuesLength % sizeOfInstance != 0)
+                    throw new EcsException("deserialization size mismatch");
+#endif
+                _values = new SimpleVector<T>(valuesLength);
+                for (int i = 0; i < valuesLength; i++, startIndex += sizeOfInstance)
+                    _values[i] = BinarySerializer.DeserializeStruct<T>(bytes, startIndex, sizeOfInstance);
+            }
+            else
+            {
+                //Deserialize ref type components
+                throw new NotImplementedException();
+            }
+        }
+
+        public int ByteLength()
+        {
+            if (typeof(T).IsValueType)
+            {
+                return 8 + (_sparse.Length * 4) + (_dense.Length * 4) + (Marshal.SizeOf(default(T)) * _values.Length);
+            }
+            else
+            {
+                throw new NotImplementedException();
+            }
+        }
+        #endregion
 
         //public ref T this[int id]
         //{
@@ -128,7 +284,12 @@ namespace ECS
         //    get => ref _values[_sparse[id]];
         //}
 
-        public ComponentsPool(int initialCapacity = 0)
+        private ComponentsPool() { }
+
+        //factory method for deserialization
+        public static ComponentsPool<T> CreateUninitialized() => new ComponentsPool<T>();
+
+        public ComponentsPool(int initialCapacity)
         {
             _sparse = new int[initialCapacity];
             _dense = new int[initialCapacity];
@@ -215,7 +376,19 @@ namespace ECS
             newPool.Copy(this);
             return newPool;
         }
-#endregion
+
+        public void Serialize(byte[] outBytes, ref int startIndex)
+        {
+            _tags.Serialize(outBytes, ref startIndex);
+        }
+
+        public void Deserialize(byte[] bytes, ref int startIndex)
+        {
+            _tags.Deserialize(bytes, ref startIndex);
+        }
+
+        public int ByteLength() => _tags.ByteLength();
+        #endregion
 
         public TagsPool(int initialCapacity = 0)
         {

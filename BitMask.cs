@@ -8,7 +8,7 @@ namespace ECS
 
     public struct BitMask
     {
-        private const int SizeOfPartInBits = sizeof(MaskInternal) * 8;
+        public const int SizeOfPartInBits = sizeof(MaskInternal) * 8;
         private MaskInternal _m1;
         private MaskInternal[] _mn;
 
@@ -272,6 +272,55 @@ namespace ECS
 
             return true;
         }
+
+        public void Serialize(byte[] outBytes, ref int startIndex)
+        {
+            for (int i = 0; i < sizeof(int); i++)
+                outBytes[startIndex++] = (byte)(Length >> (8 * i));
+
+            for (int i = 0; i < sizeof(MaskInternal); i++)
+                outBytes[startIndex++] = (byte)(_m1 >> (8 * i));
+
+            if (_mn == null || _mn.Length == 0)
+            {
+                for (int j = 0; j < sizeof(MaskInternal); j++)
+                    outBytes[startIndex++] = (byte)(_mn[0] >> (8 * j));
+
+                var chunksLength = Length / SizeOfPartInBits;
+                for (int i = 1; i < chunksLength; i++)
+                {
+                    for (int j = 0; j < sizeof(MaskInternal); j++)
+                    {
+                        outBytes[startIndex++] = (byte)(_mn[i] >> (8 * j));
+                    }
+                }
+            }
+        }
+
+        public void Deserialize(byte[] bytes, ref int startIndex)
+        {
+            Length = bytes[startIndex++];
+            for (int i = 1; i < sizeof(int); i++, startIndex++)
+                Length |= bytes[startIndex] << 8 * i;
+
+            _m1 = bytes[startIndex++];
+            for (int i = 1; i < sizeof(MaskInternal); i++, startIndex++)
+                _m1 |= (MaskInternal)bytes[startIndex] << 8 * i;
+
+            if (Length > 1)
+            {
+                var chunksLength = Length / SizeOfPartInBits;
+                _mn = new MaskInternal[chunksLength - 1];
+                for (int i = 1; i < chunksLength; i++)
+                {
+                    _mn[i] = bytes[startIndex++];
+                    for (int j = 1; j < sizeof(MaskInternal); j++, startIndex++)
+                        _mn[i] |= (MaskInternal)bytes[startIndex] << 8 * j;
+                }
+            }
+        }
+
+        public int ByteLength() => Length * 8;
 
 #if DEBUG
         public override string ToString()

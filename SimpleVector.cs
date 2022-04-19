@@ -38,7 +38,7 @@ namespace ECS
             _end = other._end;
             if (_elements.Length < _end)
                 Array.Resize(ref _elements, other._elements.Length);
-            Array.Copy(other._elements, _elements, _end);
+            Array.Copy(other._elements, _elements, _end);//TODO: try to use Buffer.BlockCopy instead
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
