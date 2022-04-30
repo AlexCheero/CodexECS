@@ -5,8 +5,9 @@ namespace ECS
 {
     class SparseSet<T>
     {
-        private int[] _sparse;
-        private SimpleVector<T> _values;
+        //don't chage outside of SparseSet. made public for serialization hack =)
+        public int[] _sparse;
+        public SimpleVector<T> _values;
 
         //don't chage outside of SparseSet. made public only for manual unrolling
         public SimpleVector<int> _dense;

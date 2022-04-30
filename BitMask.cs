@@ -320,7 +320,7 @@ namespace ECS
             }
         }
 
-        public int ByteLength() => Length * 8;
+        public int ByteLength => Length * 8;
 
 #if DEBUG
         public override string ToString()

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using EntityType = System.Int32;
 
 #if DEBUG
 using System.Text;
@@ -25,8 +26,8 @@ namespace ECS
 
     public class EcsWorld
     {
-        private SimpleVector<Entity> _entites;
-        private Entity _recycleListHead = EntityExtension.NullEntity;
+        private SimpleVector<EntityType> _entites;
+        private EntityType _recycleListHead = EntityExtension.NullEntity;
 
         private SimpleVector<BitMask> _masks;
 
@@ -40,7 +41,7 @@ namespace ECS
         public EcsWorld(int entitiesReserved = 32)
         {
             //TODO: ensure that _entities and masks are always have same length
-            _entites = new SimpleVector<Entity>(entitiesReserved);
+            _entites = new SimpleVector<EntityType>(entitiesReserved);
             _masks = new SimpleVector<BitMask>(entitiesReserved);
             _componentsPools = new SparseSet<IComponentsPool>(EcsCacheSettings.PoolsCount);
             
@@ -52,7 +53,7 @@ namespace ECS
         //prealloc ctor
         public EcsWorld(EcsWorld other)
         {
-            _entites = new SimpleVector<Entity>(other._entites.Reserved);
+            _entites = new SimpleVector<EntityType>(other._entites.Reserved);
             _masks = new SimpleVector<BitMask>(other._masks.Reserved);
             _componentsPools = new SparseSet<IComponentsPool>(other._componentsPools.Length);
 
@@ -93,13 +94,42 @@ namespace ECS
             _filtersCollection.Copy(other._filtersCollection);
         }
 
+        public byte[] Serialize()
+        {
+            int size = 2 * sizeof(int);/*_entites.Length and _entites._elements.Length*/
+            size += sizeof(EntityType) * _entites.Length;
+            size += sizeof(EntityType);/*_recycleListHead*/
+            size += 2 * sizeof(int);/*_masks.Length and _masks._elements.Length*/
+            for (int i = 0; i < _masks.Length; i++)
+                size += _masks[i].ByteLength;
+            size += sizeof(int) + _componentsPools._sparse.Length * sizeof(int);
+            size += 2 * sizeof(int);/*_componentsPools._values.Length and _componentsPools._values._elements.Length*/
+            for (int i = 0; i < _componentsPools._values.Length; i++)
+                size += _componentsPools._values[i].ByteLength();
+            size += 2 * sizeof(int);/*_componentsPools._dense.Length and _componentsPools._dense._elements.Length*/
+            size += sizeof(EntityType) * _componentsPools._dense.Length;
+            size += sizeof(int) + sizeof(int) * _includeUpdateSets.Count;
+            foreach (var pair in _includeUpdateSets)
+            {
+                size += sizeof(int);
+            }
+            //size += sizeof(int) + sizeof(int) * _includeUpdateSets.Count;
+            //size += sizeof(int) + sizeof(int) * _excludeUpdateSets.Count;
+            return null;
+        }
+
+        public void Deserialize(byte[] bytes)
+        {
+
+        }
+
 #region Entities methods
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool IsEnitityInRange(int id) => id < _entites.Length;
         
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private ref Entity GetRefById(int id)
+        private ref EntityType GetRefById(int id)
         {
 #if DEBUG
             if (id == EntityExtension.NullEntity.GetId() || !IsEnitityInRange(id))
@@ -109,10 +139,7 @@ namespace ECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private ref Entity GetRefById(Entity other) => ref GetRefById(other.ToId());
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public Entity GetById(int id) => GetRefById(id);
+        public EntityType GetById(int id) => GetRefById(id);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool IsDead(int id) => GetRefById(id).GetId() != id;
@@ -147,7 +174,7 @@ namespace ECS
 
         public void Delete(int id)
         {
-            ref Entity entity = ref GetRefById(id);
+            ref EntityType entity = ref GetRefById(id);
 #if DEBUG
             if (IsDead(id))
                 throw new EcsException("trying to delete already dead entity");
@@ -178,9 +205,9 @@ namespace ECS
             if (!_recycleListHead.IsNull())
                 return GetRecycledId();
 
-            var lastEntity = new Entity(_entites.Length);
+            var lastEntity = _entites.Length;
 #if DEBUG
-            if (lastEntity.Val == EntityExtension.NullEntity.Val)
+            if (lastEntity == EntityExtension.NullEntity)
                 throw new EcsException("entity limit reached");
             if (_entites.Length < 0)
                 throw new EcsException("entities vector length overflow");
