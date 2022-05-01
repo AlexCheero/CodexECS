@@ -94,28 +94,103 @@ namespace ECS
             _filtersCollection.Copy(other._filtersCollection);
         }
 
-        public byte[] Serialize()
+        private int ByteLength()
         {
+            #region entites and recycle list
             int size = 2 * sizeof(int);/*_entites.Length and _entites._elements.Length*/
             size += sizeof(EntityType) * _entites.Length;
             size += sizeof(EntityType);/*_recycleListHead*/
+            #endregion
+
+            #region masks
             size += 2 * sizeof(int);/*_masks.Length and _masks._elements.Length*/
             for (int i = 0; i < _masks.Length; i++)
                 size += _masks[i].ByteLength;
+            #endregion
+
+            #region components pools
             size += sizeof(int) + _componentsPools._sparse.Length * sizeof(int);
             size += 2 * sizeof(int);/*_componentsPools._values.Length and _componentsPools._values._elements.Length*/
             for (int i = 0; i < _componentsPools._values.Length; i++)
                 size += _componentsPools._values[i].ByteLength();
             size += 2 * sizeof(int);/*_componentsPools._dense.Length and _componentsPools._dense._elements.Length*/
-            size += sizeof(EntityType) * _componentsPools._dense.Length;
+            size += sizeof(int) * _componentsPools._dense.Length;
+            #endregion
+
+            #region update sets
             size += sizeof(int) + sizeof(int) * _includeUpdateSets.Count;
             foreach (var pair in _includeUpdateSets)
+                size += sizeof(int) + sizeof(int) * pair.Value.Count; /*pair.Value.Count + values in set*/
+
+            size += sizeof(int) + sizeof(int) * _excludeUpdateSets.Count;
+            foreach (var pair in _excludeUpdateSets)
+                size += sizeof(int) + sizeof(int) * pair.Value.Count; /*pair.Value.Count + values in set*/
+            #endregion
+
+            size += _filtersCollection.ByteLength();
+
+            return size;
+        }
+
+        public byte[] Serialize()
+        {
+            var bytes = new byte[ByteLength()];
+
+            int startIndex = 0;
+
+            #region entites and recycle list
+            BinarySerializer.SerializeInt(_entites.Length, bytes, ref startIndex);
+            BinarySerializer.SerializeInt(_entites._elements.Length, bytes, ref startIndex);
+            for (int i = 0; i < _entites.Length; i++)
+                BinarySerializer.SerializeInt(_entites[i], bytes, ref startIndex);
+            BinarySerializer.SerializeInt(_recycleListHead, bytes, ref startIndex);
+            #endregion
+
+            #region masks
+            BinarySerializer.SerializeInt(_masks.Length, bytes, ref startIndex);
+            BinarySerializer.SerializeInt(_masks._elements.Length, bytes, ref startIndex);
+            for (int i = 0; i < _masks.Length; i++)
+                _masks[i].Serialize(bytes, ref startIndex);
+            #endregion
+
+            #region components pools
+            BinarySerializer.SerializeInt(_componentsPools._sparse.Length, bytes, ref startIndex);
+            BinarySerializer.SerializeIntegerArray(_componentsPools._sparse, bytes, ref startIndex);
+            BinarySerializer.SerializeInt(_componentsPools._values.Length, bytes, ref startIndex);
+            BinarySerializer.SerializeInt(_componentsPools._values._elements.Length, bytes, ref startIndex);
+            for (int i = 0; i < _componentsPools._values.Length; i++)
+                _componentsPools._values[i].Serialize(bytes, ref startIndex);
+            BinarySerializer.SerializeInt(_componentsPools._dense.Length, bytes, ref startIndex);
+            BinarySerializer.SerializeInt(_componentsPools._dense._elements.Length, bytes, ref startIndex);
+            for (int i = 0; i < _componentsPools._dense.Length; i++)
+                BinarySerializer.SerializeInt(_componentsPools._dense[i], bytes, ref startIndex);
+            #endregion
+
+            #region update sets
+            BinarySerializer.SerializeInt(_includeUpdateSets.Count, bytes, ref startIndex);
+            foreach (var key in _includeUpdateSets.Keys)
+                BinarySerializer.SerializeInt(key, bytes, ref startIndex);
+            foreach (var set in _includeUpdateSets.Values)
             {
-                size += sizeof(int);
+                BinarySerializer.SerializeInt(set.Count, bytes, ref startIndex);
+                foreach (var idx in set)
+                    BinarySerializer.SerializeInt(idx, bytes, ref startIndex);
             }
-            //size += sizeof(int) + sizeof(int) * _includeUpdateSets.Count;
-            //size += sizeof(int) + sizeof(int) * _excludeUpdateSets.Count;
-            return null;
+
+            BinarySerializer.SerializeInt(_excludeUpdateSets.Count, bytes, ref startIndex);
+            foreach (var key in _excludeUpdateSets.Keys)
+                BinarySerializer.SerializeInt(key, bytes, ref startIndex);
+            foreach (var set in _excludeUpdateSets.Values)
+            {
+                BinarySerializer.SerializeInt(set.Count, bytes, ref startIndex);
+                foreach (var idx in set)
+                    BinarySerializer.SerializeInt(idx, bytes, ref startIndex);
+            }
+            #endregion
+
+            _filtersCollection.Serialize(bytes, ref startIndex);
+
+            return bytes;
         }
 
         public void Deserialize(byte[] bytes)

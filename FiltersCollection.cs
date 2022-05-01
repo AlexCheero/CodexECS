@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 
 namespace ECS
@@ -129,6 +130,25 @@ namespace ECS
                 _list[i] = filter;
                 _set.Add(filter);
             }
+        }
+
+        public int ByteLength()
+        {
+            int length = sizeof(int);
+            foreach (var filter in _set)
+                length += filter.ByteLength();
+
+            return length;
+        }
+
+        public void Serialize(byte[] outBytes, ref int startIndex)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void Deserialize(byte[] bytes, ref int startIndex)
+        {
+            throw new NotImplementedException();
         }
     }
 }

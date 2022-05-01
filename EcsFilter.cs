@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 
 namespace ECS
 {
@@ -152,6 +153,21 @@ namespace ECS
             _entitiesVector.Copy(other._entitiesVector);
 
             _lockCount = other._lockCount;
+        }
+
+        public int ByteLength()
+        {
+            throw new NotImplementedException();
+        }
+
+        public void Serialize(byte[] outBytes, ref int startIndex)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void Deserialize(byte[] bytes, ref int startIndex)
+        {
+            throw new NotImplementedException();
         }
     }
 }
