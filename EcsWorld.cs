@@ -195,7 +195,78 @@ namespace ECS
 
         public void Deserialize(byte[] bytes)
         {
+            int startIndex = 0;
 
+            #region entites and recycle list
+            _entites._end = BinarySerializer.DeserializeInt(bytes, ref startIndex);
+            var entitesElementsLength = BinarySerializer.DeserializeInt(bytes, ref startIndex);
+            _entites._elements = new EntityType[entitesElementsLength];
+            for (int i = 0; i < _entites.Length; i++)
+                _entites[i] = BinarySerializer.DeserializeInt(bytes, ref startIndex);
+            _recycleListHead = BinarySerializer.DeserializeInt(bytes, ref startIndex);
+            #endregion
+
+            #region masks
+            _masks._end = BinarySerializer.DeserializeInt(bytes, ref startIndex);
+            var masksElementsLength = BinarySerializer.DeserializeInt(bytes, ref startIndex);
+            _masks._elements = new BitMask[masksElementsLength];
+            for (int i = 0; i < _masks.Length; i++)
+                _masks[i].Deserialize(bytes, ref startIndex);
+            #endregion
+
+            #region components pools
+            var poolsSparseLength = BinarySerializer.DeserializeInt(bytes, ref startIndex);
+            _componentsPools._sparse = BinarySerializer.DeserializeIntegerArray(bytes, ref startIndex, poolsSparseLength);
+            _componentsPools._values._end = BinarySerializer.DeserializeInt(bytes, ref startIndex);
+            var poolsValuesElementsLength = BinarySerializer.DeserializeInt(bytes, ref startIndex);
+            _componentsPools._values._elements = new IComponentsPool[poolsValuesElementsLength];
+            for (int i = 0; i < _componentsPools._values.Length; i++)
+            {
+                IComponentsPool pool;
+                if (true/*if components pool*/)
+                    pool = ComponentsPool<int/*determine real type*/>.CreateUninitialized();
+                else //if tags pool
+                    pool = new TagsPool<int/*determine real type*/>();
+                pool.Deserialize(bytes, ref startIndex);
+                _componentsPools._values[i] = pool;
+            }
+
+            _componentsPools._dense._end = BinarySerializer.DeserializeInt(bytes, ref startIndex);
+            var poolsDenseElementsLength = BinarySerializer.DeserializeInt(bytes, ref startIndex);
+            _componentsPools._dense._elements = new int[poolsDenseElementsLength];
+            for (int i = 0; i < _componentsPools._dense.Length; i++)
+                _componentsPools._dense[i] = BinarySerializer.DeserializeInt(bytes, ref startIndex);
+            #endregion
+
+            #region update sets
+            var includeUpdateSetsCount = BinarySerializer.DeserializeInt(bytes, ref startIndex);
+            for (int i = includeUpdateSetsCount; i > 0; i--)
+            {
+                var key = BinarySerializer.DeserializeInt(bytes, ref startIndex);
+                _includeUpdateSets[key] = new HashSet<int>();
+            }
+            foreach (var set in _includeUpdateSets.Values)
+            {
+                var count = BinarySerializer.DeserializeInt(bytes, ref startIndex);
+                for (int i = 0; i < count; i++)
+                    set.Add(BinarySerializer.DeserializeInt(bytes, ref startIndex));
+            }
+
+            var excludeUpdateSetsCount = BinarySerializer.DeserializeInt(bytes, ref startIndex);
+            for (int i = excludeUpdateSetsCount; i > 0; i--)
+            {
+                var key = BinarySerializer.DeserializeInt(bytes, ref startIndex);
+                _excludeUpdateSets[key] = new HashSet<int>();
+            }
+            foreach (var set in _excludeUpdateSets.Values)
+            {
+                var count = BinarySerializer.DeserializeInt(bytes, ref startIndex);
+                for (int i = 0; i < count; i++)
+                    set.Add(BinarySerializer.DeserializeInt(bytes, ref startIndex));
+            }
+            #endregion
+
+            _filtersCollection.Deserialize(bytes, ref startIndex);
         }
 
 #region Entities methods
