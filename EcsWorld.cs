@@ -156,14 +156,15 @@ namespace ECS
             #region components pools
             BinarySerializer.SerializeInt(_componentsPools._sparse.Length, bytes, ref startIndex);
             BinarySerializer.SerializeIntegerArray(_componentsPools._sparse, bytes, ref startIndex);
+
             BinarySerializer.SerializeInt(_componentsPools._values.Length, bytes, ref startIndex);
             BinarySerializer.SerializeInt(_componentsPools._values._elements.Length, bytes, ref startIndex);
+
             for (int i = 0; i < _componentsPools._values.Length; i++)
-                _componentsPools._values[i].Serialize(bytes, ref startIndex);
-            BinarySerializer.SerializeInt(_componentsPools._dense.Length, bytes, ref startIndex);
-            BinarySerializer.SerializeInt(_componentsPools._dense._elements.Length, bytes, ref startIndex);
-            for (int i = 0; i < _componentsPools._dense.Length; i++)
+            {
                 BinarySerializer.SerializeInt(_componentsPools._dense[i], bytes, ref startIndex);
+                _componentsPools._values[i].Serialize(bytes, ref startIndex);
+            }
             #endregion
 
             #region update sets
@@ -217,25 +218,24 @@ namespace ECS
             #region components pools
             var poolsSparseLength = BinarySerializer.DeserializeInt(bytes, ref startIndex);
             _componentsPools._sparse = BinarySerializer.DeserializeIntegerArray(bytes, ref startIndex, poolsSparseLength);
+            
             _componentsPools._values._end = BinarySerializer.DeserializeInt(bytes, ref startIndex);
             var poolsValuesElementsLength = BinarySerializer.DeserializeInt(bytes, ref startIndex);
             _componentsPools._values._elements = new IComponentsPool[poolsValuesElementsLength];
+
+            _componentsPools._dense._end = _componentsPools._values._end;
+            _componentsPools._dense._elements = new int[poolsValuesElementsLength];
+
             for (int i = 0; i < _componentsPools._values.Length; i++)
             {
-                IComponentsPool pool;
-                if (true/*if components pool*/)
-                    pool = ComponentsPool<int/*determine real type*/>.CreateUninitialized();
-                else //if tags pool
-                    pool = new TagsPool<int/*determine real type*/>();
+                int typeIdx = BinarySerializer.DeserializeInt(bytes, ref startIndex);
+                _componentsPools._dense[i] = typeIdx;
+
+                IComponentsPool pool = ComponentRegistartor.CreatePool(typeIdx);
                 pool.Deserialize(bytes, ref startIndex);
                 _componentsPools._values[i] = pool;
             }
 
-            _componentsPools._dense._end = BinarySerializer.DeserializeInt(bytes, ref startIndex);
-            var poolsDenseElementsLength = BinarySerializer.DeserializeInt(bytes, ref startIndex);
-            _componentsPools._dense._elements = new int[poolsDenseElementsLength];
-            for (int i = 0; i < _componentsPools._dense.Length; i++)
-                _componentsPools._dense[i] = BinarySerializer.DeserializeInt(bytes, ref startIndex);
             #endregion
 
             #region update sets
@@ -365,13 +365,28 @@ namespace ECS
             _masks.Add(new BitMask());//TODO: precache with _registeredComponents.Count
             return _entites.Length - 1;
         }
-#endregion
+        #endregion
 
-#region Components methods
+        #region Components methods
         //TODO: add reactive callbacks
 
+#if DEBUG
+        private void CheckRegistration<T>()
+        {
+            if (!ComponentRegistartor.IsRegistered<T>())
+                throw new EcsException("component not registered: " + typeof(T));
+        }
+#endif
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Have<T>(int id) => _masks[id].Check(ComponentMeta<T>.Id);
+        public bool Have<T>(int id)
+        {
+#if DEBUG
+            CheckRegistration<T>();
+#endif
+
+            return _masks[id].Check(ComponentMeta<T>.Id);
+        }
 
         private void AddIdToFlters(int id, HashSet<int> filterIds)
         {
@@ -445,6 +460,10 @@ namespace ECS
 
         public ref T AddComponent<T>(int id, T component = default)
         {
+#if DEBUG
+            CheckRegistration<T>();
+#endif
+
             UpdateFiltersOnAdd<T>(id);
 
             var componentId = ComponentMeta<T>.Id;
@@ -460,6 +479,10 @@ namespace ECS
 
         public void AddTag<T>(int id)
         {
+#if DEBUG
+            CheckRegistration<T>();
+#endif
+
             UpdateFiltersOnAdd<T>(id);
 
             var componentId = ComponentMeta<T>.Id;
@@ -477,6 +500,8 @@ namespace ECS
         public ref T GetComponent<T>(int id)
         {
 #if DEBUG
+            CheckRegistration<T>();
+
             if (!Have<T>(id))
                 throw new EcsException("entity have no " + typeof(T));
 #endif
@@ -524,7 +549,14 @@ namespace ECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void RemoveComponent<T>(int id) => RemoveComponent(id, ComponentMeta<T>.Id);
+        public void RemoveComponent<T>(int id)
+        {
+#if DEBUG
+            CheckRegistration<T>();
+#endif
+
+            RemoveComponent(id, ComponentMeta<T>.Id);
+        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void RemoveComponent(int id, int componentId)
