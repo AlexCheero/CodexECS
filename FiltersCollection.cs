@@ -143,12 +143,21 @@ namespace ECS
 
         public void Serialize(byte[] outBytes, ref int startIndex)
         {
-            throw new NotImplementedException();
+            BinarySerializer.SerializeInt(_set.Count, outBytes, ref startIndex);
+            foreach (var filter in _set)
+                filter.Serialize(outBytes, ref startIndex);
         }
 
         public void Deserialize(byte[] bytes, ref int startIndex)
         {
-            throw new NotImplementedException();
+            int count = BinarySerializer.DeserializeInt(bytes, ref startIndex);
+            for (int i = 0; i < count; i++)
+            {
+                var filter = new EcsFilter();
+                filter.Deserialize(bytes, ref startIndex);
+                _set.Add(filter);
+                _list.Add(filter);
+            }
         }
     }
 }
