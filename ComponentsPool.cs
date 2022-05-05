@@ -128,60 +128,48 @@ namespace ECS
 
         public void Serialize(byte[] outBytes, ref int startIndex)
         {
+            //serialize only struct components
+            if (!typeof(T).IsValueType)
+                return;
+
             BinarySerializer.SerializeInt(_sparse.Length, outBytes, ref startIndex);
             BinarySerializer.SerializeInt(_values.Length, outBytes, ref startIndex);
 
             BinarySerializer.SerializeIntegerArray(_sparse, outBytes, ref startIndex);
             BinarySerializer.SerializeIntegerArray(_dense, outBytes, ref startIndex);
 
-            if (typeof(T).IsValueType)
-            {
-                for (int i = 0; i < _values.Length; i++)
-                    BinarySerializer.SerializeStruct(_values[i], outBytes, ref startIndex);
-            }
-            else
-            {
-                //Serialize ref type components
-                throw new NotImplementedException();
-            }
+            for (int i = 0; i < _values.Length; i++)
+                BinarySerializer.SerializeStruct(_values[i], outBytes, ref startIndex);
         }
 
         public void Deserialize(byte[] bytes, ref int startIndex)
         {
+            //deserialize only struct components
+            if (!typeof(T).IsValueType)
+                return;
+
             var sparseLength = BinarySerializer.DeserializeInt(bytes, ref startIndex);
             var valuesLength = BinarySerializer.DeserializeInt(bytes, ref startIndex);
 
             _sparse = BinarySerializer.DeserializeIntegerArray(bytes, ref startIndex, sparseLength);
             _dense = BinarySerializer.DeserializeIntegerArray(bytes, ref startIndex, valuesLength);
 
-            if (typeof(T).IsValueType)
-            {
-                var sizeOfInstance = Marshal.SizeOf(default(T));
+            var sizeOfInstance = Marshal.SizeOf(default(T));
 #if DEBUG
-                if (valuesLength % sizeOfInstance != 0)
-                    throw new EcsException("deserialization size mismatch");
+            if (valuesLength % sizeOfInstance != 0)
+                throw new EcsException("deserialization size mismatch");
 #endif
-                _values = new SimpleVector<T>(valuesLength);
-                for (int i = 0; i < valuesLength; i++, startIndex += sizeOfInstance)
-                    _values[i] = BinarySerializer.DeserializeStruct<T>(bytes, startIndex, sizeOfInstance);
-            }
-            else
-            {
-                //Deserialize ref type components
-                throw new NotImplementedException();
-            }
+            _values = new SimpleVector<T>(valuesLength);
+            for (int i = 0; i < valuesLength; i++, startIndex += sizeOfInstance)
+                _values[i] = BinarySerializer.DeserializeStruct<T>(bytes, startIndex, sizeOfInstance);
         }
 
         public int ByteLength()
         {
             if (typeof(T).IsValueType)
-            {
                 return 8 + (_sparse.Length * 4) + (_dense.Length * 4) + (Marshal.SizeOf(default(T)) * _values.Length);
-            }
             else
-            {
-                throw new NotImplementedException();
-            }
+                return 0; //serialize only struct components
         }
         #endregion
 
