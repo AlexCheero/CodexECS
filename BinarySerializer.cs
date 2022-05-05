@@ -15,7 +15,7 @@ namespace ECS
 
         public static int DeserializeInt(byte[] bytes, ref int startIndex)
         {
-            int i = bytes[startIndex];
+            int i = bytes[startIndex++];
             i |= bytes[startIndex++] << 8;
             i |= bytes[startIndex++] << 16;
             i |= bytes[startIndex++] << 24;

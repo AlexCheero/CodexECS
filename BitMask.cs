@@ -281,18 +281,18 @@ namespace ECS
             for (int i = 0; i < sizeof(MaskInternal); i++)
                 outBytes[startIndex++] = (byte)(_m1 >> (8 * i));
 
+            if (_mn == null || _mn.Length == 0)
+            {
+                BinarySerializer.SerializeInt(0, outBytes, ref startIndex);
+            }
             if (_mn != null && _mn.Length > 0)
             {
-                for (int j = 0; j < sizeof(MaskInternal); j++)
-                    outBytes[startIndex++] = (byte)(_mn[0] >> (8 * j));
+                BinarySerializer.SerializeInt(_mn.Length, outBytes, ref startIndex);
 
-                var chunksLength = Length / SizeOfPartInBits;
-                for (int i = 1; i < chunksLength; i++)
+                for (int i = 0; i < _mn.Length; i++)
                 {
                     for (int j = 0; j < sizeof(MaskInternal); j++)
-                    {
                         outBytes[startIndex++] = (byte)(_mn[i] >> (8 * j));
-                    }
                 }
             }
         }
@@ -300,22 +300,21 @@ namespace ECS
         public void Deserialize(byte[] bytes, ref int startIndex)
         {
             Length = bytes[startIndex++];
-            for (int i = 1; i < sizeof(int); i++, startIndex++)
-                Length |= bytes[startIndex] << 8 * i;
+            for (int i = 1; i < sizeof(int); i++)
+                Length |= bytes[startIndex++] << 8 * i;
 
             _m1 = bytes[startIndex++];
-            for (int i = 1; i < sizeof(MaskInternal); i++, startIndex++)
-                _m1 |= (MaskInternal)bytes[startIndex] << 8 * i;
+            for (int i = 1; i < sizeof(MaskInternal); i++)
+                _m1 |= (MaskInternal)bytes[startIndex++] << 8 * i;
 
-            if (Length > 1)
+            int mnLength = BinarySerializer.DeserializeInt(bytes, ref startIndex);
+            if (mnLength > 0)
             {
-                var chunksLength = Length / SizeOfPartInBits;
-                _mn = new MaskInternal[chunksLength - 1];
-                for (int i = 1; i < chunksLength; i++)
+                _mn = new MaskInternal[mnLength];
+                for (int i = 0; i < _mn.Length; i++)
                 {
-                    _mn[i] = bytes[startIndex++];
-                    for (int j = 1; j < sizeof(MaskInternal); j++, startIndex++)
-                        _mn[i] |= (MaskInternal)bytes[startIndex] << 8 * j;
+                    for (int j = 0; j < sizeof(MaskInternal); j++)
+                        _mn[i] |= (MaskInternal)bytes[startIndex++] << 8 * i;
                 }
             }
         }
