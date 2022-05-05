@@ -281,7 +281,7 @@ namespace ECS
             for (int i = 0; i < sizeof(MaskInternal); i++)
                 outBytes[startIndex++] = (byte)(_m1 >> (8 * i));
 
-            if (_mn == null || _mn.Length == 0)
+            if (_mn != null && _mn.Length > 0)
             {
                 for (int j = 0; j < sizeof(MaskInternal); j++)
                     outBytes[startIndex++] = (byte)(_mn[0] >> (8 * j));
