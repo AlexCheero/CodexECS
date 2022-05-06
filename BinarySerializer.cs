@@ -56,8 +56,7 @@ namespace ECS
             Marshal.FreeHGlobal(ptr);
         }
 
-        //TODO: make consistent (startIndex as ref)
-        public static T DeserializeStruct<T>(byte[] bytes, int startIndex, int sizeOfInstance)
+        public static T DeserializeStruct<T>(byte[] bytes, ref int startIndex, int sizeOfInstance)
         {
 #if DEBUG
             if (!typeof(T).IsValueType)
@@ -71,6 +70,8 @@ namespace ECS
 
             str = (T)Marshal.PtrToStructure(ptr, str.GetType());
             Marshal.FreeHGlobal(ptr);
+
+            startIndex += sizeOfInstance;
 
             return str;
         }

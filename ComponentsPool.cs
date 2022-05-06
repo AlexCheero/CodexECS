@@ -133,11 +133,13 @@ namespace ECS
                 return;
 
             BinarySerializer.SerializeInt(_sparse.Length, outBytes, ref startIndex);
-            BinarySerializer.SerializeInt(_values.Length, outBytes, ref startIndex);
-
             BinarySerializer.SerializeIntegerArray(_sparse, outBytes, ref startIndex);
+
+            BinarySerializer.SerializeInt(_dense.Length, outBytes, ref startIndex);
             BinarySerializer.SerializeIntegerArray(_dense, outBytes, ref startIndex);
 
+            BinarySerializer.SerializeInt(_values.Length, outBytes, ref startIndex);
+            BinarySerializer.SerializeInt(_values._elements.Length, outBytes, ref startIndex);
             for (int i = 0; i < _values.Length; i++)
                 BinarySerializer.SerializeStruct(_values[i], outBytes, ref startIndex);
         }
@@ -149,19 +151,17 @@ namespace ECS
                 return;
 
             var sparseLength = BinarySerializer.DeserializeInt(bytes, ref startIndex);
-            var valuesLength = BinarySerializer.DeserializeInt(bytes, ref startIndex);
-
             _sparse = BinarySerializer.DeserializeIntegerArray(bytes, ref startIndex, sparseLength);
-            _dense = BinarySerializer.DeserializeIntegerArray(bytes, ref startIndex, valuesLength);
 
+            var denseLength = BinarySerializer.DeserializeInt(bytes, ref startIndex);
+            _dense = BinarySerializer.DeserializeIntegerArray(bytes, ref startIndex, denseLength);
+
+            _values._end = BinarySerializer.DeserializeInt(bytes, ref startIndex);
             var sizeOfInstance = Marshal.SizeOf(default(T));
-#if DEBUG
-            if (valuesLength % sizeOfInstance != 0)
-                throw new EcsException("deserialization size mismatch");
-#endif
-            _values = new SimpleVector<T>(valuesLength);
-            for (int i = 0; i < valuesLength; i++, startIndex += sizeOfInstance)
-                _values[i] = BinarySerializer.DeserializeStruct<T>(bytes, startIndex, sizeOfInstance);
+            var valuesElementsLength = BinarySerializer.DeserializeInt(bytes, ref startIndex);
+            _values._elements = new T[valuesElementsLength];
+            for (int i = 0; i < _values.Length; i++)
+                _values[i] = BinarySerializer.DeserializeStruct<T>(bytes, ref startIndex, sizeOfInstance);
         }
 
         public int ByteLength()
@@ -173,13 +173,14 @@ namespace ECS
         }
         #endregion
 
-        //public ref T this[int id]
-        //{
-        //    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        //    get => ref _values[_sparse[id]];
-        //}
-
-        private ComponentsPool() { }
+        private ComponentsPool()
+        {
+            _sparse = new int[EcsCacheSettings.PoolSize];
+            _dense = new int[EcsCacheSettings.PoolSize];
+            for (int i = 0; i < EcsCacheSettings.PoolSize; i++)
+                _sparse[i] = -1;
+            _values = new SimpleVector<T>(EcsCacheSettings.PoolSize);
+        }
 
         //factory method for deserialization
         public static ComponentsPool<T> CreateUninitialized() => new ComponentsPool<T>();
