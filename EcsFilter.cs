@@ -145,8 +145,12 @@ namespace ECS
                 _filteredEntities.Clear();
             else
                 _filteredEntities = new Dictionary<int, int>(EcsCacheSettings.FilteredEntitiesSize);
-            foreach (var entity in other._filteredEntities)
-                _filteredEntities.Add(entity.Key, entity.Value);
+            
+            if (other._filteredEntities != null)
+            {
+                foreach (var entity in other._filteredEntities)
+                    _filteredEntities.Add(entity.Key, entity.Value);
+            }
             
             if (_entitiesVector == null)
                 _entitiesVector = new SimpleVector<int>(other._entitiesVector._elements.Length);
@@ -202,6 +206,8 @@ namespace ECS
             Excludes.Deserialize(bytes, ref startIndex);
 
             int filteredEntitiesCount = BinarySerializer.DeserializeInt(bytes, ref startIndex);
+            if (filteredEntitiesCount > 0 && _filteredEntities == null)
+                _filteredEntities = new Dictionary<int, int>();
             for (int i = 0; i < filteredEntitiesCount; i++)
             {
                 int key = BinarySerializer.DeserializeInt(bytes, ref startIndex);
@@ -209,6 +215,8 @@ namespace ECS
                 _filteredEntities.Add(key, value);
             }
 
+            if (_entitiesVector == null)
+                _entitiesVector = new SimpleVector<int>();
             _entitiesVector._end = BinarySerializer.DeserializeInt(bytes, ref startIndex);
             var entitesElementsLength = BinarySerializer.DeserializeInt(bytes, ref startIndex);
             _entitiesVector._elements = new int[entitesElementsLength];
