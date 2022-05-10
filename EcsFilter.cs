@@ -18,8 +18,7 @@ namespace ECS
         public int Length => _entitiesVector.Length;
         public int this[int i] => _entitiesVector[i];
 
-        private class BoxedInt { public int Value = 0; }
-        private BoxedInt _lockCount;
+        private int _lockCount;
 
         private int? _cachedHash;
         public int HashCode
@@ -62,21 +61,21 @@ namespace ECS
             _addSet = dummy ? null : new HashSet<int>();
             _removeSet = dummy ? null : new HashSet<int>();
             _cachedHash = GetHashFromMasks(Includes, Excludes);
-            _lockCount = dummy ? null : new BoxedInt();
+            _lockCount = 0;
             _entitiesVector = dummy ? null : new SimpleVector<int>(EcsCacheSettings.FilteredEntitiesSize);
         }
 
         public void Iterate(IteartionDelegate iteartionDelegate)
         {
-            _lockCount.Value++;
+            _lockCount++;
             iteartionDelegate(_entitiesVector._elements, _entitiesVector._end);
-            _lockCount.Value--;
+            _lockCount--;
 #if DEBUG
-            if (_lockCount.Value < 0)
+            if (_lockCount < 0)
                 throw new EcsException("_lockCount shouldn't be negative");
             else
 #endif
-            if (_lockCount.Value == 0)
+            if (_lockCount == 0)
             {
                 foreach (var id in _addSet)
                 {
@@ -108,7 +107,7 @@ namespace ECS
 
         public void Add(int id)
         {
-            if (_lockCount.Value > 0)
+            if (_lockCount > 0)
                 _addSet.Add(id);
             else if (!_filteredEntities.ContainsKey(id))
             {
@@ -119,7 +118,7 @@ namespace ECS
 
         public void Remove(int id)
         {
-            if (_lockCount.Value > 0)
+            if (_lockCount > 0)
                 _removeSet.Add(id);
             else if (_filteredEntities.TryGetValue(id, out int idx))
             {
@@ -223,9 +222,14 @@ namespace ECS
             for (int i = 0; i < _entitiesVector.Length; i++)
                 _entitiesVector[i] = BinarySerializer.DeserializeInt(bytes, ref startIndex);
 
+            if (_addSet == null)
+                _addSet = new HashSet<int>();
             int addSetCount = BinarySerializer.DeserializeInt(bytes, ref startIndex);
             for (int i = 0; i < addSetCount; i++)
                 _addSet.Add(BinarySerializer.DeserializeInt(bytes, ref startIndex));
+
+            if (_removeSet == null)
+                _removeSet = new HashSet<int>();
             int removeSetCount = BinarySerializer.DeserializeInt(bytes, ref startIndex);
             for (int i = 0; i < removeSetCount; i++)
                 _removeSet.Add(BinarySerializer.DeserializeInt(bytes, ref startIndex));
