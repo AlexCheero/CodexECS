@@ -157,6 +157,7 @@ namespace ECS
             for (int i = 0; i < count; i++)
             {
                 var filter = new EcsFilter();
+                filter.Init();
                 filter.Deserialize(bytes, ref startIndex);
                 _set.Add(filter);
                 _list.Add(filter);

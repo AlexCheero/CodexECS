@@ -51,6 +51,15 @@ namespace ECS
             return hash;
         }
 
+        //init method for blank filter for serialization
+        public void Init()
+        {
+            _filteredEntities = new Dictionary<int, int>();
+            _entitiesVector = new SimpleVector<int>();
+            _addSet = new HashSet<int>();
+            _removeSet = new HashSet<int>();
+        }
+
         public EcsFilter(in BitMask includes, in BitMask excludes, bool dummy = false)
         {
             Includes = default;
