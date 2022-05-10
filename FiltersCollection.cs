@@ -150,6 +150,9 @@ namespace ECS
 
         public void Deserialize(byte[] bytes, ref int startIndex)
         {
+            _set.Clear();
+            _list.Clear();
+
             int count = BinarySerializer.DeserializeInt(bytes, ref startIndex);
             for (int i = 0; i < count; i++)
             {

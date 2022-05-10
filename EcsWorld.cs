@@ -239,6 +239,8 @@ namespace ECS
             #endregion
 
             #region update sets
+            _includeUpdateSets.Clear();
+
             var includeUpdateSetsCount = BinarySerializer.DeserializeInt(bytes, ref startIndex);
             for (int i = includeUpdateSetsCount; i > 0; i--)
             {
@@ -251,6 +253,8 @@ namespace ECS
                 for (int i = 0; i < count; i++)
                     set.Add(BinarySerializer.DeserializeInt(bytes, ref startIndex));
             }
+
+            _excludeUpdateSets.Clear();
 
             var excludeUpdateSetsCount = BinarySerializer.DeserializeInt(bytes, ref startIndex);
             for (int i = excludeUpdateSetsCount; i > 0; i--)
@@ -535,7 +539,7 @@ namespace ECS
                     DebugEntity(id, sb);
                     sb.Append('\n');
                 }
-            }    
+            }
         }
 #endif
 
