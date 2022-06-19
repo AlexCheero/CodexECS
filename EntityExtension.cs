@@ -65,8 +65,5 @@ namespace ECS
             version <<= BitSizeHalved;
             entity.Val = entity.GetId() | version;
         }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static int ToId(this Entity entity) => entity.GetId();
     }
 }

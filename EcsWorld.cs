@@ -109,7 +109,7 @@ namespace ECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private ref Entity GetRefById(Entity other) => ref GetRefById(other.ToId());
+        private ref Entity GetRefById(Entity other) => ref GetRefById(other.GetId());
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Entity GetById(int id) => GetRefById(id);
@@ -129,6 +129,13 @@ namespace ECS
                 return false;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool IsEntityValid(Entity entity)
+        {
+            var id = entity.GetId();
+            return !IsDead(id) && entity.GetVersion() == GetById(id).GetVersion();
+        }
+
         private int GetRecycledId()
         {
             ref var curr = ref _recycleListHead;
@@ -139,10 +146,10 @@ namespace ECS
                 next = ref GetRefById(next);
             }
 
-            next.SetId(curr.ToId());
+            next.SetId(curr.GetId());
             next.IncrementVersion();
             curr.SetNullId();
-            return next.ToId();
+            return next.GetId();
         }
 
         public void Delete(int id)
@@ -330,7 +337,7 @@ namespace ECS
             for (int i = 0; i < _entites.Length; i++)
             {
                 var entity = _entites[i];
-                var id = entity.ToId();
+                var id = entity.GetId();
                 if (!IsDead(id))
                 {
                     sb.Append(id + ":");
