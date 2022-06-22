@@ -63,16 +63,46 @@ namespace ECS
             _cachedHash = GetHashFromMasks(Includes, Excludes);
             _lockCount = dummy ? null : new BoxedInt();
             _entitiesVector = dummy ? null : new SimpleVector<int>(EcsCacheSettings.FilteredEntitiesSize);
+
+            currentEntityIndex = -1;
         }
 
-        public void Iterate(IteartionDelegate iteartionDelegate)
+        #region Enumerable
+        private int currentEntityIndex;
+        public int Current
         {
-            _lockCount.Value++;
-            iteartionDelegate(_entitiesVector._elements, _entitiesVector._end);
+            get => _entitiesVector._elements[currentEntityIndex];
+        }
+
+        public bool MoveNext()
+        {
+            if (_entitiesVector._end == 0)
+                return false;//no need to cleanup on empty set
+
+            if (currentEntityIndex >= _entitiesVector._end - 1)
+            {
+                Cleanup();
+                return false;
+            }
+
+            if (currentEntityIndex == -1)
+            {
+                _lockCount.Value++;
+            }
+            currentEntityIndex++;
+            return true;
+        }
+
+        //should always Reset if breaking loop to decrease _lockCount
+        public void Cleanup()
+        {
+            currentEntityIndex = -1;
             _lockCount.Value--;
 #if DEBUG
             if (_lockCount.Value < 0)
                 throw new EcsException("_lockCount shouldn't be negative");
+            else if (_lockCount.Value > 0)
+                throw new EcsException("_lockCount is bigger than 0 on cleanup. should be removed if multithreading is used");
             else
 #endif
             if (_lockCount.Value == 0)
@@ -104,6 +134,9 @@ namespace ECS
                 _removeSet.Clear();
             }
         }
+
+        public EcsFilter GetEnumerator() => this;
+        #endregion
 
         public void Add(int id)
         {

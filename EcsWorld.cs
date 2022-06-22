@@ -37,6 +37,9 @@ namespace ECS
         private Dictionary<int, HashSet<int>> _excludeUpdateSets;
         private FiltersCollection _filtersCollection;
 
+        private List<int> _delayedDeleteList;
+        private readonly Dictionary<int, Enumerable> _enumerators;
+
         public EcsWorld(int entitiesReserved = 32)
         {
             //TODO: ensure that _entities and masks are always have same length
@@ -47,6 +50,9 @@ namespace ECS
             _includeUpdateSets = new Dictionary<int, HashSet<int>>();
             _excludeUpdateSets = new Dictionary<int, HashSet<int>>();
             _filtersCollection = new FiltersCollection();
+
+            _delayedDeleteList = new List<int>();
+            _enumerators = new Dictionary<int, Enumerable>();
         }
 
         //prealloc ctor
@@ -60,6 +66,9 @@ namespace ECS
             _includeUpdateSets = other._includeUpdateSets;
             _excludeUpdateSets = other._excludeUpdateSets;
             _filtersCollection = new FiltersCollection(other._filtersCollection.Length);
+
+            _delayedDeleteList = new List<int>();
+            _enumerators = new Dictionary<int, Enumerable>();
         }
 
         public void Copy(in EcsWorld other)
@@ -152,8 +161,93 @@ namespace ECS
             return next.GetId();
         }
 
+        #region Enumerable
+        private int _lockCounter;
+        private bool IsLocked { get => _lockCounter > 0; }
+        private void Lock()
+        {
+#if DEBUG
+            if (_lockCounter > 0)
+                throw new EcsException("_lockCounter is positive. error only for single thread");
+#endif
+
+            _lockCounter++;
+        }
+        private void Unlock()
+        {
+            _lockCounter--;
+
+#if DEBUG
+            if (_lockCounter < 0)
+                throw new EcsException("world's lock counter negative");
+            else
+#endif
+
+            if (_lockCounter == 0)
+            {
+                foreach (var id in _delayedDeleteList)
+                    Delete(id);
+                _delayedDeleteList.Clear();
+            }
+        }
+
+        public class Enumerable : IDisposable
+        {
+            private EcsWorld _world;
+            private EcsFilter _filter;
+            private bool _enumerationFinished;
+
+            public Enumerable(EcsWorld world, int filterId)
+            {
+                _world = world;
+                _filter = _world._filtersCollection[filterId];
+                _enumerationFinished = false;
+            }
+
+            public Enumerable GetEnumerator() => this;
+
+            public int Current
+            {
+                get => _filter.Current;
+            }
+
+            public bool MoveNext()
+            {
+                bool wasMoved = _filter.MoveNext();
+                if (!wasMoved)
+                {
+                    _world.Unlock();
+                    _enumerationFinished = true;
+                }
+                return wasMoved;
+            }
+
+            public void Dispose()
+            {
+                if (_world.IsLocked)
+                    _world.Unlock();
+                if (!_enumerationFinished)
+                    _filter.Cleanup();
+            }
+        }
+
+        public Enumerable Enumerate(int filterId)
+        {
+            Lock();
+            if (!_enumerators.ContainsKey(filterId))
+                _enumerators.Add(filterId, new Enumerable(this, filterId));
+            return _enumerators[filterId];
+        }
+        #endregion
+
         public void Delete(int id)
         {
+            if (IsLocked)
+            {
+                _delayedDeleteList.Add(id);
+                return;
+            }
+
             ref Entity entity = ref GetRefById(id);
 #if DEBUG
             if (IsDead(id))
@@ -171,7 +265,8 @@ namespace ECS
                 nextSetBit = mask.GetNextSetBit(nextSetBit + 1);
             }
 
-            _filtersCollection.RemoveId(id);
+            //TODO: check if this method is really needed here (it seems that while loop above does all the work)
+            //_filtersCollection.RemoveId(id);
 
             ref var recycleListEnd = ref _recycleListHead;
             while (!recycleListEnd.IsNull())
@@ -413,8 +508,6 @@ namespace ECS
 
             return filterId;
         }
-
-        public EcsFilter GetFilter(int id) => _filtersCollection[id];
 #endregion
     }
 }

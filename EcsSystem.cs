@@ -6,7 +6,6 @@ namespace ECS
     {
         protected int Id<T>() => ComponentMeta<T>.Id;
 
-        //TODO: add check that system is registered before Ticking
         public abstract void Tick(EcsWorld world);
     }
 }
