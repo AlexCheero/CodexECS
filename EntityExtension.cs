@@ -37,12 +37,12 @@ namespace ECS
             if (id >= NullEntity.Val)
                 throw new EcsException("set overflow id");
 #endif
-            entity.Val = id | entity.GetVersion();
+            entity.Val = id | (entity.GetVersion() << BitSizeHalved);
         }
 
         public static void SetNullId(this ref Entity entity)
         {
-            entity.Val = NullEntity.GetId() | entity.GetVersion();
+            entity.Val = NullEntity.GetId() | (entity.GetVersion() << BitSizeHalved);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -63,7 +63,7 @@ namespace ECS
             EntityType version = entity.GetVersion();
             version++;
             version <<= BitSizeHalved;
-            entity.Val = entity.GetId() | version;
+            entity.Val = entity.GetId() | (version << BitSizeHalved);
         }
     }
 }
