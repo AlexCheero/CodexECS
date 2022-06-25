@@ -21,14 +21,17 @@ namespace ECS
             if (NullEntity.GetVersion() > 0)
                 throw new EcsException("NullEntity should always have 0 version");
         }
+
+        public static string ToString(this in Entity entity)
+        {
+            return Convert.ToString(entity.Val, 2).PadLeft(32, '0');
+        }
 #endif
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static EntityType GetId(this in Entity entity)
         {
-            var id = entity.Val << BitSizeHalved;
-            id >>= BitSizeHalved;
-            return id;
+            return entity.Val & NullEntity.Val;
         }
 
         public static void SetId(this ref Entity entity, in EntityType id)
@@ -62,7 +65,6 @@ namespace ECS
         {
             EntityType version = entity.GetVersion();
             version++;
-            version <<= BitSizeHalved;
             entity.Val = entity.GetId() | (version << BitSizeHalved);
         }
     }
