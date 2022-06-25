@@ -1,4 +1,7 @@
-﻿using System.Runtime.CompilerServices;
+﻿#if DEBUG
+using System;
+#endif
+using System.Runtime.CompilerServices;
 using EntityType = System.Int32;
 
 namespace ECS
