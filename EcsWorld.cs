@@ -387,6 +387,21 @@ namespace ECS
             return ref pool.Add(id, component);
         }
 
+        public void AddComponentNoReturn<T>(int id, T component = default)
+        {
+            UpdateFiltersOnAdd<T>(id);
+
+            var componentId = ComponentMeta<T>.Id;
+            if (!_componentsPools.Contains(componentId))
+                _componentsPools.Add(componentId, new ComponentsPool<T>(EcsCacheSettings.PoolSize));
+            var pool = (ComponentsPool<T>)_componentsPools[componentId];
+#if DEBUG
+            if (pool == null)
+                throw new EcsException("invalid pool");
+#endif
+            pool.Add(id, component);
+        }
+
         public void AddTag<T>(int id)
         {
             UpdateFiltersOnAdd<T>(id);
@@ -508,6 +523,22 @@ namespace ECS
 
             return filterId;
         }
-#endregion
+        #endregion
+
+#if UNITY_EDITOR
+        //TODO: implement non alloc via buffer of _componentsPools.Length
+        public IEnumerable<Type> GetPoolTypes(int id, bool isComponent)
+        {
+            var mask = _masks[id];
+            var nextSetBit = mask.GetNextSetBit(0);
+            while (nextSetBit != -1)
+            {
+                var pool = _componentsPools[nextSetBit];
+                if (pool.IsComponent)
+                    yield return _componentsPools[nextSetBit].GetComponentType();
+                nextSetBit = mask.GetNextSetBit(nextSetBit + 1);
+            }
+        }
+#endif
     }
 }

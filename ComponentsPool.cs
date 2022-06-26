@@ -19,6 +19,12 @@ namespace ECS
 #if DEBUG
         public string DebugString(int id);
 #endif
+
+#if UNITY_EDITOR
+        public bool IsComponent { get; }
+
+        public Type GetComponentType();
+#endif
     }
 
     class ComponentsPool<T> : IComponentsPool
@@ -39,6 +45,12 @@ namespace ECS
                     throw new EcsException("indices mismatch 2");
             }
         }
+#endif
+
+#if UNITY_EDITOR
+        public bool IsComponent { get => true; }
+
+        public Type GetComponentType() => typeof(T);
 #endif
 
         #region Interface implementation
@@ -230,6 +242,12 @@ namespace ECS
         {
             return typeof(T).ToString();
         }
+#endif
+
+#if UNITY_EDITOR
+        public bool IsComponent { get => false; }
+
+        public Type GetComponentType() => typeof(T);
 #endif
     }
 }
