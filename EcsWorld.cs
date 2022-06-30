@@ -167,8 +167,9 @@ namespace ECS
         private void Lock()
         {
 #if DEBUG
-            if (_lockCounter > 0)
-                throw new EcsException("_lockCounter is positive. error only for single thread");
+            //TODO: could cause problems even for single thread in nested loops
+            //if (_lockCounter > 0)
+            //    throw new EcsException("_lockCounter is positive. error only for single thread");
 #endif
 
             _lockCounter++;
