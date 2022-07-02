@@ -525,21 +525,5 @@ namespace ECS
             return filterId;
         }
         #endregion
-
-#if UNITY_EDITOR
-        //TODO: implement non alloc via buffer of _componentsPools.Length
-        public IEnumerable<Type> GetPoolTypes(int id, bool isComponent)
-        {
-            var mask = _masks[id];
-            var nextSetBit = mask.GetNextSetBit(0);
-            while (nextSetBit != -1)
-            {
-                var pool = _componentsPools[nextSetBit];
-                if (pool.IsComponent)
-                    yield return _componentsPools[nextSetBit].GetComponentType();
-                nextSetBit = mask.GetNextSetBit(nextSetBit + 1);
-            }
-        }
-#endif
     }
 }
