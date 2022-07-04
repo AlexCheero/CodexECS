@@ -260,7 +260,7 @@ namespace ECS
 #endif
             var mask = _masks[id];
             foreach (var bit in mask)
-                RemoveComponent(id, bit);
+                RemoveComponent(bit, id);
 
             //TODO: check if this method is really needed here (it seems that while loop above does all the work)
             //_filtersCollection.RemoveId(id);
@@ -292,7 +292,7 @@ namespace ECS
             return _entites.Length - 1;
         }
 
-        //TODO: implement overrideIfExists
+        //TODO: implement copying without component override
         public void CopyComponents(Entity from, Entity to/*, bool overrideIfExists*/)
         {
 #if DEBUG
@@ -310,6 +310,7 @@ namespace ECS
             {
                 _componentsPools[bit].CopyItem(fromId, toId);
                 toMask.Set(bit);
+                UpdateFiltersOnAdd(bit, toId);
             }
         }
 #endregion
@@ -351,13 +352,11 @@ namespace ECS
             }
         }
 
-        private void UpdateFiltersOnAdd<T>(int id)
+        private void UpdateFiltersOnAdd(int componentId, int id)
         {
-            var componentId = ComponentMeta<T>.Id;
             if (_excludeUpdateSets.ContainsKey(componentId))
                 RemoveIdFromFilters(id, _excludeUpdateSets[componentId]);
 
-            //TODO: it is not clear that mask changed in UpdateFiltersOn... think of a better place for this
             _masks[id].Set(componentId);
 
             if (!_includeUpdateSets.ContainsKey(componentId))
@@ -393,9 +392,9 @@ namespace ECS
 
         public ref T AddComponent<T>(int id, T component = default)
         {
-            UpdateFiltersOnAdd<T>(id);
-
             var componentId = ComponentMeta<T>.Id;
+            UpdateFiltersOnAdd(componentId, id);
+            
             if (!_componentsPools.Contains(componentId))
                 _componentsPools.Add(componentId, new ComponentsPool<T>(EcsCacheSettings.PoolSize));
             var pool = (ComponentsPool<T>)_componentsPools[componentId];
@@ -406,26 +405,13 @@ namespace ECS
             return ref pool.Add(id, component);
         }
 
-        public void AddComponentNoReturn<T>(int id, T component = default)
-        {
-            UpdateFiltersOnAdd<T>(id);
-
-            var componentId = ComponentMeta<T>.Id;
-            if (!_componentsPools.Contains(componentId))
-                _componentsPools.Add(componentId, new ComponentsPool<T>(EcsCacheSettings.PoolSize));
-            var pool = (ComponentsPool<T>)_componentsPools[componentId];
-#if DEBUG
-            if (pool == null)
-                throw new EcsException("invalid pool");
-#endif
-            pool.Add(id, component);
-        }
+        public void AddComponentNoReturn<T>(int id, T component = default) => AddComponent<T>(id, component);
 
         public void AddTag<T>(int id)
         {
-            UpdateFiltersOnAdd<T>(id);
-
             var componentId = ComponentMeta<T>.Id;
+            UpdateFiltersOnAdd(componentId, id);
+
             if (!_componentsPools.Contains(componentId))
                 _componentsPools.Add(componentId, new TagsPool<T>(EcsCacheSettings.PoolSize));
             var pool = (TagsPool<T>)_componentsPools[componentId];
@@ -483,10 +469,10 @@ namespace ECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void RemoveComponent<T>(int id) => RemoveComponent(id, ComponentMeta<T>.Id);
+        public void RemoveComponent<T>(int id) => RemoveComponent(ComponentMeta<T>.Id, id);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void RemoveComponent(int id, int componentId)
+        private void RemoveComponent(int componentId, int id)
         {
             UpdateFiltersOnRemove(componentId, id);
             _componentsPools[componentId].Remove(id);
