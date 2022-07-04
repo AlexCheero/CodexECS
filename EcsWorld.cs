@@ -127,7 +127,7 @@ namespace ECS
         public bool IsDead(int id) => GetRefById(id).GetId() != id;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool IsNull(int id) => GetById(id).IsNull();
+        public bool IsNull(int id) => id == EntityExtension.NullEntity.GetId();
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Equals(int entity1, int entity2)
@@ -142,7 +142,7 @@ namespace ECS
         public bool IsEntityValid(Entity entity)
         {
             var id = entity.GetId();
-            return !IsDead(id) && entity.GetVersion() == GetById(id).GetVersion();
+            return !entity.IsNull() && !IsDead(id) && entity.GetVersion() == GetById(id).GetVersion();
         }
 
         private int GetRecycledId()
