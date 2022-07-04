@@ -292,7 +292,8 @@ namespace ECS
             return _entites.Length - 1;
         }
 
-        public void CopyComponents(Entity from, Entity to)
+        //TODO: implement overrideIfExists
+        public void CopyComponents(Entity from, Entity to/*, bool overrideIfExists*/)
         {
 #if DEBUG
             if (!IsEntityValid(from))
@@ -304,8 +305,12 @@ namespace ECS
             var fromId = from.GetId();
             var toId = to.GetId();
             var fromMask = _masks[fromId];
+            ref var toMask = ref _masks[toId];
             foreach (var bit in fromMask)
+            {
                 _componentsPools[bit].CopyItem(fromId, toId);
+                toMask.Set(bit);
+            }
         }
 #endregion
 
@@ -352,6 +357,7 @@ namespace ECS
             if (_excludeUpdateSets.ContainsKey(componentId))
                 RemoveIdFromFilters(id, _excludeUpdateSets[componentId]);
 
+            //TODO: it is not clear that mask changed in UpdateFiltersOn... think of a better place for this
             _masks[id].Set(componentId);
 
             if (!_includeUpdateSets.ContainsKey(componentId))
