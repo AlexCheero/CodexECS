@@ -184,17 +184,8 @@ namespace ECS
                 _nextSetBit = GetNextSetBit(_nextSetBit + 1);
             return _nextSetBit != -1;
         }
-        #endregion
 
-        /* usage:
-         * var nextSetBit = mask.GetNextSetBit(0);
-         * while (nextSetBit != -1)
-         * {
-         *     your code here
-         *     nextSetBit = mask.GetNextSetBit(nextSetBit + 1);
-         * }
-         */
-        public int GetNextSetBit(int fromPosition)
+        private int GetNextSetBit(int fromPosition)
         {
             for (int i = fromPosition; i < Length; i++)
             {
@@ -215,6 +206,7 @@ namespace ECS
 
             return -1;
         }
+        #endregion
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Clear()

@@ -259,12 +259,8 @@ namespace ECS
                 throw new EcsException("trying to delete null entity");
 #endif
             var mask = _masks[id];
-            var nextSetBit = mask.GetNextSetBit(0);
-            while (nextSetBit != -1)
-            {
-                RemoveComponent(id, nextSetBit);
-                nextSetBit = mask.GetNextSetBit(nextSetBit + 1);
-            }
+            foreach (var bit in mask)
+                RemoveComponent(id, bit);
 
             //TODO: check if this method is really needed here (it seems that while loop above does all the work)
             //_filtersCollection.RemoveId(id);
@@ -294,6 +290,18 @@ namespace ECS
             _entites.Add(lastEntity);
             _masks.Add(new BitMask());//TODO: precache with _registeredComponents.Count
             return _entites.Length - 1;
+        }
+
+        public void MoveComponents(Entity from, Entity to)
+        {
+#if DEBUG
+            if (!IsEntityValid(from))
+                throw new EcsException("trying to move components from invalid entity");
+            if (!IsEntityValid(to))
+                throw new EcsException("trying to move components to invalid entity");
+#endif
+
+
         }
 #endregion
 
@@ -435,12 +443,8 @@ namespace ECS
         public void DebugEntity(int id, StringBuilder sb)
         {
             var mask = _masks[id];
-            var nextSetBit = mask.GetNextSetBit(0);
-            while (nextSetBit != -1)
-            {
-                sb.Append("\n\t" + DebugString(id, nextSetBit));
-                nextSetBit = mask.GetNextSetBit(nextSetBit + 1);
-            }
+            foreach (var bit in mask)
+                sb.Append("\n\t" + DebugString(id, bit));
         }
 
         public void DebugAll(StringBuilder sb)
@@ -483,26 +487,23 @@ namespace ECS
         private void AddFilterToUpdateSets(in BitMask components, int filterIdx
             , Dictionary<int, HashSet<int>> sets)
         {
-            var nextSetBit = components.GetNextSetBit(0);
-            while (nextSetBit != -1)
+            foreach (var bit in components)
             {
-                if (!sets.ContainsKey(nextSetBit))
+                if (!sets.ContainsKey(bit))
                 {
 #if UNITY
-                    sets.Add(nextSetBit, new HashSet<int>());
+                    sets.Add(bit, new HashSet<int>());
 #else
                     sets.Add(nextSetBit, new HashSet<int>(EcsCacheSettings.UpdateSetSize));
 #endif
                 }
 
 #if DEBUG
-                if (sets[nextSetBit].Contains(filterIdx))
+                if (sets[bit].Contains(filterIdx))
                     throw new EcsException("set already contains this filter!");
 #endif
 
-                sets[nextSetBit].Add(filterIdx);
-
-                nextSetBit = components.GetNextSetBit(nextSetBit + 1);
+                sets[bit].Add(filterIdx);
             }
         }
 

@@ -34,19 +34,10 @@ namespace ECS
         public static int GetHashFromMasks(in BitMask includes, in BitMask excludes)
         {
             int hash = 17;
-            var nextSetBit = includes.GetNextSetBit(0);
-            while (nextSetBit != -1)
-            {
-                hash = hash * 23 + nextSetBit.GetHashCode();
-                nextSetBit = includes.GetNextSetBit(nextSetBit + 1);
-            }
-
-            nextSetBit = excludes.GetNextSetBit(0);
-            while (nextSetBit != -1)
-            {
-                hash = hash * 23 + nextSetBit.GetHashCode();
-                nextSetBit = excludes.GetNextSetBit(nextSetBit + 1);
-            }
+            foreach (var bit in includes)
+                hash = hash * 23 + bit.GetHashCode();
+            foreach (var bit in excludes)
+                hash = hash * 23 + bit.GetHashCode();
 
             return hash;
         }
