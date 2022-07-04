@@ -40,6 +40,10 @@ namespace ECS
         private List<int> _delayedDeleteList;
         private readonly Dictionary<int, Enumerable> _enumerators;
 
+        public delegate void OnAddRemoveHandler(EcsWorld world, int id);
+        private Dictionary<int, OnAddRemoveHandler> _onAddEvents;
+        private Dictionary<int, OnAddRemoveHandler> _onRemoveEvents;
+
         public EcsWorld(int entitiesReserved = 32)
         {
             //TODO: ensure that _entities and masks are always have same length
@@ -53,6 +57,9 @@ namespace ECS
 
             _delayedDeleteList = new List<int>();
             _enumerators = new Dictionary<int, Enumerable>();
+
+            _onAddEvents = new Dictionary<int, OnAddRemoveHandler>();
+            _onRemoveEvents = new Dictionary<int, OnAddRemoveHandler>();
         }
 
         //prealloc ctor
@@ -69,6 +76,9 @@ namespace ECS
 
             _delayedDeleteList = new List<int>();
             _enumerators = new Dictionary<int, Enumerable>();
+
+            _onAddEvents = other._onAddEvents;
+            _onRemoveEvents = other._onRemoveEvents;
         }
 
         public void Copy(in EcsWorld other)
@@ -310,7 +320,7 @@ namespace ECS
             {
                 _componentsPools[bit].CopyItem(fromId, toId);
                 toMask.Set(bit);
-                UpdateFiltersOnAdd(bit, toId);
+                OnAdd(bit, toId);
             }
         }
 #endregion
@@ -350,6 +360,41 @@ namespace ECS
                 //could try to remove same id several times due to delayed set modification operations
                 filter.Remove(id);
             }
+        }
+
+        public bool CheckAgainstMasks(int id, BitMask includes = default, BitMask excludes = default) =>
+            _masks[id].InclusivePass(includes) && _masks[id].ExclusivePass(excludes);
+
+        public void SubscribeOnAdd<T>(OnAddRemoveHandler handler)
+        {
+            var componentId = ComponentMeta<T>.Id;
+            if (_onAddEvents.ContainsKey(componentId))
+                _onAddEvents[componentId] += handler;
+            else
+                _onAddEvents[componentId] = handler;
+        }
+
+        public void SubscribeOnRemove<T>(OnAddRemoveHandler handler)
+        {
+            var componentId = ComponentMeta<T>.Id;
+            if (_onRemoveEvents.ContainsKey(componentId))
+                _onRemoveEvents[componentId] += handler;
+            else
+                _onRemoveEvents[componentId] = handler;
+        }
+
+        private void OnAdd(int componentId, int id)
+        {
+            UpdateFiltersOnAdd(componentId, id);
+            if (_onAddEvents.ContainsKey(componentId))
+                _onAddEvents[componentId].Invoke(this, id);
+        }
+
+        private void OnRemove(int componentId, int id)
+        {
+            UpdateFiltersOnRemove(componentId, id);
+            if (_onRemoveEvents.ContainsKey(componentId))
+                _onRemoveEvents[componentId].Invoke(this, id);
         }
 
         private void UpdateFiltersOnAdd(int componentId, int id)
@@ -393,7 +438,7 @@ namespace ECS
         public ref T AddComponent<T>(int id, T component = default)
         {
             var componentId = ComponentMeta<T>.Id;
-            UpdateFiltersOnAdd(componentId, id);
+            OnAdd(componentId, id);
             
             if (!_componentsPools.Contains(componentId))
                 _componentsPools.Add(componentId, new ComponentsPool<T>(EcsCacheSettings.PoolSize));
@@ -410,7 +455,7 @@ namespace ECS
         public void AddTag<T>(int id)
         {
             var componentId = ComponentMeta<T>.Id;
-            UpdateFiltersOnAdd(componentId, id);
+            OnAdd(componentId, id);
 
             if (!_componentsPools.Contains(componentId))
                 _componentsPools.Add(componentId, new TagsPool<T>(EcsCacheSettings.PoolSize));
@@ -474,7 +519,7 @@ namespace ECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void RemoveComponent(int componentId, int id)
         {
-            UpdateFiltersOnRemove(componentId, id);
+            OnRemove(componentId, id);
             _componentsPools[componentId].Remove(id);
         }
 #endregion
