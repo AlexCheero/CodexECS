@@ -25,7 +25,6 @@ namespace ECS
             _m1 = m1;
             _mn = mn;
             Length = 0;
-            _iterPosition = -1;
             _nextSetBit = -1;
         }
 
@@ -34,7 +33,6 @@ namespace ECS
             _m1 = 0;
             _mn = null;
             Length = 0;
-            _iterPosition = -1;
             _nextSetBit = -1;
 
             Set(positions);
