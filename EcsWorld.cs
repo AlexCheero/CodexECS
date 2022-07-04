@@ -292,7 +292,7 @@ namespace ECS
             return _entites.Length - 1;
         }
 
-        public void MoveComponents(Entity from, Entity to)
+        public void CopyComponents(Entity from, Entity to)
         {
 #if DEBUG
             if (!IsEntityValid(from))
@@ -301,7 +301,11 @@ namespace ECS
                 throw new EcsException("trying to move components to invalid entity");
 #endif
 
-
+            var fromId = from.GetId();
+            var toId = to.GetId();
+            var fromMask = _masks[fromId];
+            foreach (var bit in fromMask)
+                _componentsPools[bit].CopyItem(fromId, toId);
         }
 #endregion
 

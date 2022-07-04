@@ -16,6 +16,8 @@ namespace ECS
         public void Copy(in IComponentsPool other);
         public IComponentsPool Duplicate();
 
+        public void CopyItem(int from, int to);
+
 #if DEBUG
         public string DebugString(int id);
 #endif
@@ -39,9 +41,22 @@ namespace ECS
                     throw new EcsException("indices mismatch 2");
             }
         }
+
+        public string DebugString(int id)
+        {
+            StringBuilder sb = new StringBuilder();
+            sb.Append(typeof(T).ToString() + ". ");
+
+            var props = _values[_sparse[id]].GetType().GetFields();
+            foreach (var p in props)
+                sb.Append(p.Name + ": " + p.GetValue(_values[_sparse[id]]) + ", ");
+            sb.Remove(sb.Length - 2, 2);//remove last comma
+
+            return sb.ToString();
+        }
 #endif
 
-        #region Interface implementation
+#region Interface implementation
         public int Length
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -120,7 +135,16 @@ namespace ECS
             newPool.Copy(this);
             return newPool;
         }
-#endregion
+
+        public void CopyItem(int from, int to)
+        {
+#if DEBUG
+            if (!Contains(from))
+                throw new EcsException("trying to copy non existent component");
+#endif
+            Add(to, _values[_sparse[from]]);
+        }
+        #endregion
 
         //public ref T this[int id]
         //{
@@ -168,26 +192,15 @@ namespace ECS
 
             return ref _values[_sparse[id]];
         }
-
-#if DEBUG
-        public string DebugString(int id)
-        {
-            StringBuilder sb = new StringBuilder();
-            sb.Append(typeof(T).ToString() + ". ");
-
-            var props = _values[_sparse[id]].GetType().GetFields();
-            foreach (var p in props)
-                sb.Append(p.Name + ": " + p.GetValue(_values[_sparse[id]]) + ", ");
-            sb.Remove(sb.Length - 2, 2);//remove last comma
-
-            return sb.ToString();
-        }
-#endif
     }
 
     class TagsPool<T> : IComponentsPool
     {
         private BitMask _tags;
+
+#if DEBUG
+        public string DebugString(int id) => typeof(T).ToString();
+#endif
 
 #region Interface implementation
         public int Length
@@ -215,7 +228,16 @@ namespace ECS
             newPool.Copy(this);
             return newPool;
         }
-#endregion
+
+        public void CopyItem(int from, int to)
+        {
+#if DEBUG
+            if (!Contains(from))
+                throw new EcsException("trying to copy non existent component");
+#endif
+            Add(to);
+        }
+        #endregion
 
         public TagsPool(int initialCapacity = 0)
         {
@@ -224,12 +246,5 @@ namespace ECS
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Add(int id) => _tags.Set(id);
-
-#if DEBUG
-        public string DebugString(int id)
-        {
-            return typeof(T).ToString();
-        }
-#endif
     }
 }
