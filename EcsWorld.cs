@@ -320,7 +320,8 @@ namespace ECS
             {
                 _componentsPools[bit].CopyItem(fromId, toId);
                 toMask.Set(bit);
-                OnAdd(bit, toId);
+                UpdateFiltersOnAdd(bit, toId);
+                CallAddEvent(bit, toId);
             }
         }
 #endregion
@@ -383,16 +384,14 @@ namespace ECS
                 _onRemoveEvents[componentId] = handler;
         }
 
-        private void OnAdd(int componentId, int id)
+        private void CallAddEvent(int componentId, int id)
         {
-            UpdateFiltersOnAdd(componentId, id);
             if (_onAddEvents.ContainsKey(componentId))
                 _onAddEvents[componentId].Invoke(this, id);
         }
 
-        private void OnRemove(int componentId, int id)
+        private void CallRemoveEvent(int componentId, int id)
         {
-            UpdateFiltersOnRemove(componentId, id);
             if (_onRemoveEvents.ContainsKey(componentId))
                 _onRemoveEvents[componentId].Invoke(this, id);
         }
@@ -438,8 +437,8 @@ namespace ECS
         public ref T AddComponent<T>(int id, T component = default)
         {
             var componentId = ComponentMeta<T>.Id;
-            OnAdd(componentId, id);
-            
+            UpdateFiltersOnAdd(componentId, id);
+
             if (!_componentsPools.Contains(componentId))
                 _componentsPools.Add(componentId, new ComponentsPool<T>(EcsCacheSettings.PoolSize));
             var pool = (ComponentsPool<T>)_componentsPools[componentId];
@@ -447,7 +446,11 @@ namespace ECS
             if (pool == null)
                 throw new EcsException("invalid pool");
 #endif
-            return ref pool.Add(id, component);
+            ref var addedComponent = ref pool.Add(id, component);
+
+            CallAddEvent(componentId, id);
+
+            return ref addedComponent;
         }
 
         public void AddComponentNoReturn<T>(int id, T component = default) => AddComponent<T>(id, component);
@@ -455,7 +458,7 @@ namespace ECS
         public void AddTag<T>(int id)
         {
             var componentId = ComponentMeta<T>.Id;
-            OnAdd(componentId, id);
+            UpdateFiltersOnAdd(componentId, id);
 
             if (!_componentsPools.Contains(componentId))
                 _componentsPools.Add(componentId, new TagsPool<T>(EcsCacheSettings.PoolSize));
@@ -465,6 +468,8 @@ namespace ECS
                 throw new EcsException("invalid pool");
 #endif
             pool.Add(id);
+
+            CallAddEvent(componentId, id);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -519,8 +524,9 @@ namespace ECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void RemoveComponent(int componentId, int id)
         {
-            OnRemove(componentId, id);
+            UpdateFiltersOnRemove(componentId, id);
             _componentsPools[componentId].Remove(id);
+            CallRemoveEvent(componentId, id);
         }
 #endregion
 #region Filters methods
