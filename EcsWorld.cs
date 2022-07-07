@@ -44,6 +44,7 @@ namespace ECS
         public delegate void OnAddRemoveHandler(EcsWorld world, int id);
         private Dictionary<int, OnAddRemoveHandler> _onAddEvents;
         private Dictionary<int, OnAddRemoveHandler> _onRemoveEvents;
+        private Dictionary<int, HashSet<int>> _mutualExclusivity;
 
         public EcsWorld(int entitiesReserved = 32)
         {
@@ -61,6 +62,7 @@ namespace ECS
 
             _onAddEvents = new Dictionary<int, OnAddRemoveHandler>();
             _onRemoveEvents = new Dictionary<int, OnAddRemoveHandler>();
+            _mutualExclusivity = new Dictionary<int, HashSet<int>>();
         }
 
         //prealloc ctor
@@ -80,6 +82,7 @@ namespace ECS
 
             _onAddEvents = other._onAddEvents;
             _onRemoveEvents = other._onRemoveEvents;
+            _mutualExclusivity = other._mutualExclusivity;
         }
 
         public void Copy(in EcsWorld other)
@@ -333,6 +336,9 @@ namespace ECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Have<T>(int id) => _masks[id].Check(ComponentMeta<T>.Id);
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private bool Have(int componentId, int id) => _masks[id].Check(componentId);
+
         private void AddIdToFlters(int id, HashSet<int> filterIds)
         {
             foreach (var filterId in filterIds)
@@ -441,6 +447,18 @@ namespace ECS
             typeof(T).GetProperties(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).Length == 0;
 #endif
 
+        private void RemoveMutuallyExclusiveComponents(int componentId, int id)
+        {
+            if (_mutualExclusivity.ContainsKey(componentId))
+            {
+                foreach (var otherComponentId in _mutualExclusivity[componentId])
+                {
+                    if (Have(otherComponentId, id))
+                        RemoveComponent(otherComponentId, id);
+                }
+            }
+        }
+
         public ref T AddComponent<T>(int id, T component = default)
         {
 #if DEBUG
@@ -461,11 +479,12 @@ namespace ECS
             ref var addedComponent = ref pool.Add(id, component);
 
             CallAddEvent(componentId, id);
+            RemoveMutuallyExclusiveComponents(componentId, id);
 
             return ref addedComponent;
         }
 
-        public void AddComponentNoReturn<T>(int id, T component = default) => AddComponent<T>(id, component);
+        public void AddComponentNoReturn<T>(int id, T component = default) => AddComponent(id, component);
 
         public void AddTag<T>(int id)
         {
@@ -486,6 +505,7 @@ namespace ECS
             pool.Add(id);
 
             CallAddEvent(componentId, id);
+            RemoveMutuallyExclusiveComponents(componentId, id);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -543,6 +563,22 @@ namespace ECS
             UpdateFiltersOnRemove(componentId, id);
             _componentsPools[componentId].Remove(id);
             CallRemoveEvent(componentId, id);
+        }
+
+        public void SetMutualExclusivity<T1, T2>()
+        {
+            var id1 = ComponentMeta<T1>.Id;
+            var id2 = ComponentMeta<T2>.Id;
+
+            if (_mutualExclusivity.ContainsKey(id1))
+                _mutualExclusivity[id1].Add(id2);
+            else
+                _mutualExclusivity[id1] = new HashSet<int>() { id2 };
+
+            if (_mutualExclusivity.ContainsKey(id2))
+                _mutualExclusivity[id2].Add(id1);
+            else
+                _mutualExclusivity[id2] = new HashSet<int>() { id1 };
         }
 #endregion
 #region Filters methods
