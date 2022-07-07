@@ -4,6 +4,7 @@ using System.Runtime.CompilerServices;
 
 #if DEBUG
 using System.Text;
+using System.Reflection;
 #endif
 
 //TODO: cover with tests
@@ -434,8 +435,19 @@ namespace ECS
             AddIdToFlters(id, _excludeUpdateSets[componentId]);
         }
 
+#if DEBUG
+        private bool IsTag<T>() =>
+            typeof(T).GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).Length == 0 &&
+            typeof(T).GetProperties(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).Length == 0;
+#endif
+
         public ref T AddComponent<T>(int id, T component = default)
         {
+#if DEBUG
+            if (IsTag<T>())
+                throw new EcsException("trying to add tag as component");
+#endif
+
             var componentId = ComponentMeta<T>.Id;
             UpdateFiltersOnAdd(componentId, id);
 
@@ -457,6 +469,10 @@ namespace ECS
 
         public void AddTag<T>(int id)
         {
+#if DEBUG
+            if (!IsTag<T>())
+                throw new EcsException("trying to add component as tag");
+#endif
             var componentId = ComponentMeta<T>.Id;
             UpdateFiltersOnAdd(componentId, id);
 
