@@ -484,25 +484,30 @@ namespace ECS
             return ref addedComponent;
         }
 
-        public void AddComponentNoReturn<T>(int id, T component = default) => AddComponent(id, component);
-
-        public void AddTag<T>(int id)
+        public void Add<T>(int id, T component = default)
         {
-#if DEBUG
-            if (!IsTag<T>())
-                throw new EcsException("trying to add component as tag");
-#endif
             var componentId = ComponentMeta<T>.Id;
             UpdateFiltersOnAdd(componentId, id);
 
+            var isTag = IsTag<T>();
             if (!_componentsPools.Contains(componentId))
-                _componentsPools.Add(componentId, new TagsPool<T>(EcsCacheSettings.PoolSize));
-            var pool = (TagsPool<T>)_componentsPools[componentId];
+            {
+                IComponentsPool newPool;
+                if (isTag)
+                    newPool = new TagsPool<T>(EcsCacheSettings.PoolSize);
+                else
+                    newPool = new ComponentsPool<T>(EcsCacheSettings.PoolSize);
+                _componentsPools.Add(componentId, newPool);
+            }
+            var pool = _componentsPools[componentId];
 #if DEBUG
             if (pool == null)
                 throw new EcsException("invalid pool");
 #endif
-            pool.Add(id);
+            if (isTag)
+                ((TagsPool<T>)pool).Add(id);
+            else
+                ((ComponentsPool<T>)pool).Add(id, component);
 
             CallAddEvent(componentId, id);
             RemoveMutuallyExclusiveComponents(componentId, id);
