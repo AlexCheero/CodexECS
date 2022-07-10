@@ -331,8 +331,6 @@ namespace ECS
 #endregion
 
 #region Components methods
-        //TODO: add reactive callbacks
-
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Have<T>(int id) => _masks[id].Check(ComponentMeta<T>.Id);
 
@@ -459,7 +457,7 @@ namespace ECS
             }
         }
 
-        public ref T AddComponent<T>(int id, T component = default)
+        public ref T AddAndReturnRef<T>(int id, T component = default)
         {
 #if DEBUG
             if (IsTag<T>())
@@ -556,7 +554,7 @@ namespace ECS
             if (Have<T>(id))
                 return ref GetComponent<T>(id);
             else
-                return ref AddComponent<T>(id);
+                return ref AddAndReturnRef<T>(id);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
