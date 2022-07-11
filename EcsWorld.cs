@@ -42,10 +42,25 @@ namespace ECS
         private readonly Dictionary<int, Enumerable> _enumerators;
 
         public delegate void OnAddRemoveHandler(EcsWorld world, int id);
-        public delegate void OnChangedHandler<T>(EcsWorld world, int id, T oldVal, T newVal);
+
+        interface IOnChangedHandler { }
+        public class OnChangedHandler<T> : IOnChangedHandler
+        {
+            public delegate void Handler(EcsWorld world, int id, T oldVal, T newVal);
+            private event Handler _handler;
+
+            public OnChangedHandler(Handler handler) => _handler = handler;
+
+            public void Trigger(EcsWorld world, int id, T oldVal, T newVal) =>
+                _handler.Invoke(world, id, oldVal, newVal);
+
+            public void AddCallback(Handler handler) => _handler += handler;
+        }
+
         private Dictionary<int, OnAddRemoveHandler> _onAddEvents;
         private Dictionary<int, OnAddRemoveHandler> _onRemoveEvents;
         private Dictionary<int, HashSet<int>> _mutualExclusivity;
+        private Dictionary<int, IOnChangedHandler> _onChangedEvents;
 
         public EcsWorld(int entitiesReserved = 32)
         {
@@ -64,6 +79,7 @@ namespace ECS
             _onAddEvents = new Dictionary<int, OnAddRemoveHandler>();
             _onRemoveEvents = new Dictionary<int, OnAddRemoveHandler>();
             _mutualExclusivity = new Dictionary<int, HashSet<int>>();
+            _onChangedEvents = new Dictionary<int, IOnChangedHandler>();
         }
 
         //prealloc ctor
@@ -84,6 +100,7 @@ namespace ECS
             _onAddEvents = other._onAddEvents;
             _onRemoveEvents = other._onRemoveEvents;
             _mutualExclusivity = other._mutualExclusivity;
+            _onChangedEvents = other._onChangedEvents;
         }
 
         public void Copy(in EcsWorld other)
@@ -372,36 +389,6 @@ namespace ECS
         public bool CheckAgainstMasks(int id, BitMask includes = default, BitMask excludes = default) =>
             _masks[id].InclusivePass(includes) && _masks[id].ExclusivePass(excludes);
 
-        public void SubscribeOnAdd<T>(OnAddRemoveHandler handler)
-        {
-            var componentId = ComponentMeta<T>.Id;
-            if (_onAddEvents.ContainsKey(componentId))
-                _onAddEvents[componentId] += handler;
-            else
-                _onAddEvents[componentId] = handler;
-        }
-
-        public void SubscribeOnRemove<T>(OnAddRemoveHandler handler)
-        {
-            var componentId = ComponentMeta<T>.Id;
-            if (_onRemoveEvents.ContainsKey(componentId))
-                _onRemoveEvents[componentId] += handler;
-            else
-                _onRemoveEvents[componentId] = handler;
-        }
-
-        private void CallAddEvent(int componentId, int id)
-        {
-            if (_onAddEvents.ContainsKey(componentId))
-                _onAddEvents[componentId].Invoke(this, id);
-        }
-
-        private void CallRemoveEvent(int componentId, int id)
-        {
-            if (_onRemoveEvents.ContainsKey(componentId))
-                _onRemoveEvents[componentId].Invoke(this, id);
-        }
-
         private void UpdateFiltersOnAdd(int componentId, int id)
         {
             if (_excludeUpdateSets.ContainsKey(componentId))
@@ -460,12 +447,15 @@ namespace ECS
 
         public ref T AddAndReturnRef<T>(int id, T component = default)
         {
+            var componentId = ComponentMeta<T>.Id;
+
 #if DEBUG
             if (IsTag<T>())
                 throw new EcsException("trying to add tag as component");
+            if (_onChangedEvents.ContainsKey(componentId))
+                throw new EcsException("there are systems that subscribed on changes of this component. use SetComponent to trigger them");
 #endif
 
-            var componentId = ComponentMeta<T>.Id;
             UpdateFiltersOnAdd(componentId, id);
 
             if (!_componentsPools.Contains(componentId))
@@ -526,11 +516,14 @@ namespace ECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ref T GetComponentByRef<T>(int id)
         {
+            var componentId = ComponentMeta<T>.Id;
 #if DEBUG
             if (!Have<T>(id))
                 throw new EcsException("entity have no " + typeof(T));
+            if (_onChangedEvents.ContainsKey(componentId))
+                throw new EcsException("there are systems that subscribed on changes of this component. use SetComponent to trigger them");
 #endif
-            var pool = (ComponentsPool<T>)_componentsPools[ComponentMeta<T>.Id];
+            var pool = (ComponentsPool<T>)_componentsPools[componentId];
             return ref pool._values[pool._sparse[id]];
         }
 
@@ -554,6 +547,52 @@ namespace ECS
             CallRemoveEvent(componentId, id);
         }
 
+        //this method used to trigger OnChanged reactive systems
+        public void SetComponent<T>(int id, T newVal)
+        {
+            var oldVal = GetComponent<T>(id);
+
+            var componentId = ComponentMeta<T>.Id;
+#if DEBUG
+            if (!Have<T>(id))
+                throw new EcsException("entity have no " + typeof(T));
+#endif
+            var pool = (ComponentsPool<T>)_componentsPools[componentId];
+            pool._values[pool._sparse[id]] = newVal;
+
+            TriggerChanged(id, oldVal, newVal);
+        }
+
+        public void SubscribeOnAdd<T>(OnAddRemoveHandler handler)
+        {
+            var componentId = ComponentMeta<T>.Id;
+            if (_onAddEvents.ContainsKey(componentId))
+                _onAddEvents[componentId] += handler;
+            else
+                _onAddEvents[componentId] = handler;
+        }
+
+        public void SubscribeOnRemove<T>(OnAddRemoveHandler handler)
+        {
+            var componentId = ComponentMeta<T>.Id;
+            if (_onRemoveEvents.ContainsKey(componentId))
+                _onRemoveEvents[componentId] += handler;
+            else
+                _onRemoveEvents[componentId] = handler;
+        }
+
+        private void CallAddEvent(int componentId, int id)
+        {
+            if (_onAddEvents.ContainsKey(componentId))
+                _onAddEvents[componentId].Invoke(this, id);
+        }
+
+        private void CallRemoveEvent(int componentId, int id)
+        {
+            if (_onRemoveEvents.ContainsKey(componentId))
+                _onRemoveEvents[componentId].Invoke(this, id);
+        }
+
         public void SetMutualExclusivity<T1, T2>()
         {
             var id1 = ComponentMeta<T1>.Id;
@@ -570,17 +609,19 @@ namespace ECS
                 _mutualExclusivity[id2] = new HashSet<int>() { id1 };
         }
 
-        //this method used to trigger OnChanged reactive systems
-        public void SetComponent<T>(int id, T newVal)
+        public void SubscribeOnChange<T>(OnChangedHandler<T>.Handler handlerCallback)
         {
-            var oldVal = GetComponent<T>(id);
-            GetComponentByRef<T>(id) = newVal;
-            TriggerChanged(id, oldVal, newVal);
+            var componentId = ComponentMeta<T>.Id;
+            if (_onChangedEvents.ContainsKey(componentId))
+                ((OnChangedHandler<T>)_onChangedEvents[componentId]).AddCallback(handlerCallback);
+            else
+                _onChangedEvents[componentId] = new OnChangedHandler<T>(handlerCallback);
         }
 
         private void TriggerChanged<T>(int id, T oldVal, T newVal)
         {
-
+            var componentId = ComponentMeta<T>.Id;
+            ((OnChangedHandler<T>)_onChangedEvents[componentId]).Trigger(this, id, oldVal, newVal);
         }
 
 #if DEBUG
