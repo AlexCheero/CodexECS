@@ -42,6 +42,7 @@ namespace ECS
         private readonly Dictionary<int, Enumerable> _enumerators;
 
         public delegate void OnAddRemoveHandler(EcsWorld world, int id);
+        public delegate void OnChangedHandler<T>(EcsWorld world, int id, T oldVal, T newVal);
         private Dictionary<int, OnAddRemoveHandler> _onAddEvents;
         private Dictionary<int, OnAddRemoveHandler> _onRemoveEvents;
         private Dictionary<int, HashSet<int>> _mutualExclusivity;
@@ -512,7 +513,18 @@ namespace ECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ref T GetComponent<T>(int id)
+        public T GetComponent<T>(int id)
+        {
+#if DEBUG
+            if (!Have<T>(id))
+                throw new EcsException("entity have no " + typeof(T));
+#endif
+            var pool = (ComponentsPool<T>)_componentsPools[ComponentMeta<T>.Id];
+            return pool._values[pool._sparse[id]];
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ref T GetComponentByRef<T>(int id)
         {
 #if DEBUG
             if (!Have<T>(id))
@@ -522,37 +534,11 @@ namespace ECS
             return ref pool._values[pool._sparse[id]];
         }
 
-#if DEBUG
-        private string DebugString(int id, int componentId) => _componentsPools[componentId].DebugString(id);
-
-        public void DebugEntity(int id, StringBuilder sb)
-        {
-            var mask = _masks[id];
-            foreach (var bit in mask)
-                sb.Append("\n\t" + DebugString(id, bit));
-        }
-
-        public void DebugAll(StringBuilder sb)
-        {
-            for (int i = 0; i < _entites.Length; i++)
-            {
-                var entity = _entites[i];
-                var id = entity.GetId();
-                if (!IsDead(id))
-                {
-                    sb.Append(id + ":");
-                    DebugEntity(id, sb);
-                    sb.Append('\n');
-                }
-            }    
-        }
-#endif
-
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ref T GetOrAddComponent<T>(int id)
+        public ref T GetOrAddComponentRef<T>(int id)
         {
             if (Have<T>(id))
-                return ref GetComponent<T>(id);
+                return ref GetComponentByRef<T>(id);
             else
                 return ref AddAndReturnRef<T>(id);
         }
@@ -583,6 +569,45 @@ namespace ECS
             else
                 _mutualExclusivity[id2] = new HashSet<int>() { id1 };
         }
+
+        //this method used to trigger OnChanged reactive systems
+        public void SetComponent<T>(int id, T newVal)
+        {
+            var oldVal = GetComponent<T>(id);
+            GetComponentByRef<T>(id) = newVal;
+            TriggerChanged(id, oldVal, newVal);
+        }
+
+        private void TriggerChanged<T>(int id, T oldVal, T newVal)
+        {
+
+        }
+
+#if DEBUG
+        private string DebugString(int id, int componentId) => _componentsPools[componentId].DebugString(id);
+
+        public void DebugEntity(int id, StringBuilder sb)
+        {
+            var mask = _masks[id];
+            foreach (var bit in mask)
+                sb.Append("\n\t" + DebugString(id, bit));
+        }
+
+        public void DebugAll(StringBuilder sb)
+        {
+            for (int i = 0; i < _entites.Length; i++)
+            {
+                var entity = _entites[i];
+                var id = entity.GetId();
+                if (!IsDead(id))
+                {
+                    sb.Append(id + ":");
+                    DebugEntity(id, sb);
+                    sb.Append('\n');
+                }
+            }
+        }
+#endif
 #endregion
 #region Filters methods
 
@@ -627,6 +652,6 @@ namespace ECS
 
             return filterId;
         }
-        #endregion
+#endregion
     }
 }
