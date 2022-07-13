@@ -292,7 +292,7 @@ namespace ECS
 #endif
             var mask = _masks[id];
             foreach (var bit in mask)
-                RemoveComponent(bit, id);
+                Remove(bit, id);
 
             //TODO: check if this method is really needed here (it seems that while loop above does all the work)
             //_filtersCollection.RemoveId(id);
@@ -440,7 +440,7 @@ namespace ECS
                 foreach (var otherComponentId in _mutualExclusivity[componentId])
                 {
                     if (Have(otherComponentId, id))
-                        RemoveComponent(otherComponentId, id);
+                        Remove(otherComponentId, id);
                 }
             }
         }
@@ -537,10 +537,10 @@ namespace ECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void RemoveComponent<T>(int id) => RemoveComponent(ComponentMeta<T>.Id, id);
+        public void Remove<T>(int id) => Remove(ComponentMeta<T>.Id, id);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void RemoveComponent(int componentId, int id)
+        private void Remove(int componentId, int id)
         {
             UpdateFiltersOnRemove(componentId, id);
             _componentsPools[componentId].Remove(id);
