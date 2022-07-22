@@ -427,11 +427,9 @@ namespace ECS
             AddIdToFlters(id, _excludeUpdateSets[componentId]);
         }
 
-#if DEBUG
         private bool IsTag<T>() =>
             typeof(T).GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).Length == 0 &&
             typeof(T).GetProperties(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).Length == 0;
-#endif
 
         private void RemoveMutuallyExclusiveComponents(int componentId, int id)
         {
