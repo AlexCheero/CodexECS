@@ -43,7 +43,7 @@ namespace ECS
         {
             _m1 = other._m1;
             Length = other.Length;
-            var chunksLength = Length / SizeOfPartInBits;
+            var chunksLength = Math.Ceiling((float)Length / SizeOfPartInBits);
             if (chunksLength > 1)
             {
                 if (_mn == null || _mn.Length < Length)
