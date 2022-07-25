@@ -19,9 +19,7 @@ namespace ECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static EntityType GetId(this in EntityType entity)
         {
-            var id = entity << BitSizeHalved;
-            id >>= BitSizeHalved;
-            return id;
+            return entity & NullEntity;
         }
 
         public static void SetId(this ref EntityType entity, in EntityType id)
@@ -30,12 +28,12 @@ namespace ECS
             if (id >= NullEntity)
                 throw new EcsException("set overflow id");
 #endif
-            entity = id | entity.GetVersion();
+            entity = id | (entity.GetVersion() << BitSizeHalved);
         }
 
         public static void SetNullId(this ref EntityType entity)
         {
-            entity = NullEntity.GetId() | entity.GetVersion();
+            entity = NullEntity.GetId() | (entity.GetVersion() << BitSizeHalved);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -55,8 +53,7 @@ namespace ECS
         {
             EntityType version = entity.GetVersion();
             version++;
-            version <<= BitSizeHalved;
-            entity = entity.GetId() | version;
+            entity = entity.GetId() | (version << BitSizeHalved);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
