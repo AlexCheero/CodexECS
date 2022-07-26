@@ -43,19 +43,21 @@ namespace ECS
         {
             _m1 = other._m1;
             Length = other.Length;
-            var chunksLength = GetDynamicChunksLength(Length);
-            if (chunksLength > 0)
-            {
-                if (_mn == null || _mn.Length < Length)
-                {
-                    var newChunksLength = 2;
-                    while (newChunksLength < chunksLength)
-                        newChunksLength <<= 1;
-                    _mn = new MaskInternal[newChunksLength];
-                }
 
-                for (int i = 0; i < chunksLength; i++)
+            var otherArrLength = other._mn != null ? other._mn.Length : 0;
+            if (otherArrLength > 0)
+            {
+                if (_mn == null || _mn.Length < otherArrLength)
+                    _mn = new MaskInternal[other._mn.Length];
+                for (int i = 0; i < other._mn.Length; i++)
                     _mn[i] = other._mn[i];
+                for (int i = other._mn.Length; i < _mn.Length; i++)
+                    _mn[i] = 0;
+            }
+            else if (_mn != null)
+            {
+                for (int i = 0; i < _mn.Length; i++)
+                    _mn[i] = 0;
             }
         }
 
