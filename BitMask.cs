@@ -39,15 +39,15 @@ namespace ECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private int GetChunksLength(int length) => (int)Math.Ceiling((float)length / SizeOfPartInBits);
+        private int GetDynamicChunksLength(int length) => (int)Math.Ceiling((float)length / SizeOfPartInBits) - 1;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Copy(in BitMask other)
         {
             _m1 = other._m1;
             Length = other.Length;
-            var chunksLength = GetChunksLength(Length);
-            if (chunksLength > 1)
+            var chunksLength = GetDynamicChunksLength(Length);
+            if (chunksLength > 0)
             {
                 if (_mn == null || _mn.Length < Length)
                 {
@@ -233,8 +233,8 @@ namespace ECS
             if (!InclusivePass_Internal(_m1, filter._m1))
                 return false;
 
-            var chunksCount = GetChunksLength(filter.Length);
-            for (int i = 0; i < chunksCount - 1; i++)
+            var chunksCount = GetDynamicChunksLength(filter.Length);
+            for (int i = 0; i < chunksCount; i++)
             {
                 var filterChunk = filter._mn[i];
                 if (filterChunk == 0)
@@ -254,7 +254,7 @@ namespace ECS
                 return false;
             if (filter._mn != null && _mn != null)
             {
-                var chunksCount = GetChunksLength(filter.Length);
+                var chunksCount = GetDynamicChunksLength(filter.Length);
                 for (int i = 0; i < chunksCount && i < _mn.Length; i++)
                 {
                     if ((filter._mn[i] & _mn[i]) != 0)
@@ -276,7 +276,7 @@ namespace ECS
 
             if (_mn != null)
             {
-                int length = GetChunksLength(Length) - 1;
+                int length = GetDynamicChunksLength(Length);
                 for (int i = 0; i < length; i++)
                 {
                     if (_mn[i] != other._mn[i])
