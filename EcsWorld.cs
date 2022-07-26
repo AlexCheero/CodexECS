@@ -306,6 +306,13 @@ namespace ECS
                 return false;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool IsEntityValid(EntityType entity)
+        {
+            var id = entity.GetId();
+            return !IsDead(id) && entity.GetVersion() == GetById(id).GetVersion();
+        }
+
         private int GetRecycledId()
         {
             ref var curr = ref _recycleListHead;
@@ -334,12 +341,8 @@ namespace ECS
                 throw new EcsException("trying to delete null entity");
 #endif
             var mask = _masks[id];
-            var nextSetBit = mask.GetNextSetBit(0);
-            while (nextSetBit != -1)
-            {
-                RemoveComponent(id, nextSetBit);
-                nextSetBit = mask.GetNextSetBit(nextSetBit + 1);
-            }
+            foreach (var bit in mask)
+                RemoveComponent(id, bit);
 
             _filtersCollection.RemoveId(id);
 
@@ -519,12 +522,8 @@ namespace ECS
         public void DebugEntity(int id, StringBuilder sb)
         {
             var mask = _masks[id];
-            var nextSetBit = mask.GetNextSetBit(0);
-            while (nextSetBit != -1)
-            {
-                sb.Append("\n\t" + DebugString(id, nextSetBit));
-                nextSetBit = mask.GetNextSetBit(nextSetBit + 1);
-            }
+            foreach (var bit in mask)
+                sb.Append("\n\t" + DebugString(id, bit));
         }
 
         public void DebugAll(StringBuilder sb)
@@ -574,26 +573,23 @@ namespace ECS
         private void AddFilterToUpdateSets(in BitMask components, int filterIdx
             , Dictionary<int, HashSet<int>> sets)
         {
-            var nextSetBit = components.GetNextSetBit(0);
-            while (nextSetBit != -1)
+            foreach (var bit in components)
             {
-                if (!sets.ContainsKey(nextSetBit))
+                if (!sets.ContainsKey(bit))
                 {
 #if UNITY
-                    sets.Add(nextSetBit, new HashSet<int>());
+                    sets.Add(bit, new HashSet<int>());
 #else
                     sets.Add(nextSetBit, new HashSet<int>(EcsCacheSettings.UpdateSetSize));
 #endif
                 }
 
 #if DEBUG
-                if (sets[nextSetBit].Contains(filterIdx))
+                if (sets[bit].Contains(filterIdx))
                     throw new EcsException("set already contains this filter!");
 #endif
 
-                sets[nextSetBit].Add(filterIdx);
-
-                nextSetBit = components.GetNextSetBit(nextSetBit + 1);
+                sets[bit].Add(filterIdx);
             }
         }
 

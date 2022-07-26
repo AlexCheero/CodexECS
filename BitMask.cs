@@ -25,6 +25,7 @@ namespace ECS
             _m1 = m1;
             _mn = mn;
             Length = 0;
+            _nextSetBit = -1;
         }
 
         public BitMask(params int[] positions)
@@ -32,6 +33,8 @@ namespace ECS
             _m1 = 0;
             _mn = null;
             Length = 0;
+            _nextSetBit = -1;
+
             Set(positions);
         }
 
@@ -172,15 +175,22 @@ namespace ECS
             return (m & (1 << position)) != 0;
         }
 
-        /* usage:
-         * var nextSetBit = mask.GetNextSetBit(0);
-         * while (nextSetBit != -1)
-         * {
-         *     your code here
-         *     nextSetBit = mask.GetNextSetBit(nextSetBit + 1);
-         * }
-         */
-        public int GetNextSetBit(int fromPosition)
+        #region Enumerable
+        private int _nextSetBit;
+
+        public BitMask GetEnumerator() => this;
+        public int Current { get => _nextSetBit; }
+
+        public bool MoveNext()
+        {
+            if (_nextSetBit == -1)
+                _nextSetBit = GetNextSetBit(0);
+            else
+                _nextSetBit = GetNextSetBit(_nextSetBit + 1);
+            return _nextSetBit != -1;
+        }
+
+        private int GetNextSetBit(int fromPosition)
         {
             for (int i = fromPosition; i < Length; i++)
             {
@@ -201,6 +211,7 @@ namespace ECS
 
             return -1;
         }
+        #endregion
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Clear()
