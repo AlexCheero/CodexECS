@@ -531,9 +531,9 @@ namespace ECS
             for (int i = 0; i < _entites.Length; i++)
             {
                 var entity = _entites[i];
-                var id = entity.ToId();
-                if (!IsDead(id))
+                if (IsEntityValid(entity))
                 {
+                    var id = entity.GetId();
                     sb.Append(id + ":");
                     DebugEntity(id, sb);
                     sb.Append('\n');
