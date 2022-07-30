@@ -8,7 +8,7 @@ namespace ECS
 
     public struct BitMask
     {
-        private const int SizeOfPartInBits = sizeof(MaskInternal) * 8;
+        public const int SizeOfPartInBits = sizeof(MaskInternal) * 8;
         private MaskInternal _m1;
         private MaskInternal[] _mn;
 
@@ -18,14 +18,6 @@ namespace ECS
             get;
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             private set;
-        }
-
-        public BitMask(MaskInternal m1 = 0, MaskInternal[] mn = null)
-        {
-            _m1 = m1;
-            _mn = mn;
-            Length = 0;
-            _nextSetBit = -1;
         }
 
         public BitMask(params int[] positions)
@@ -222,6 +214,7 @@ namespace ECS
                 for (int i = 0; i < _mn.Length; i++)
                     _mn[i] = 0;
             }
+            Length = 0;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
