@@ -436,10 +436,10 @@ namespace ECS
 
             if (!_includeUpdateSets.ContainsKey(componentId))
             {
-#if UNITY
-                _includeUpdateSets.Add(componentId, new HashSet<int>());
-#else
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP2_0_OR_GREATER || NET5_0_OR_GREATER || NET472_OR_GREATER
                 _includeUpdateSets.Add(componentId, new HashSet<int>(EcsCacheSettings.UpdateSetSize));
+#else
+                _includeUpdateSets.Add(componentId, new HashSet<int>());
 #endif
             }
             AddIdToFlters(id, _includeUpdateSets[componentId]);
@@ -456,10 +456,10 @@ namespace ECS
 
             if (!_excludeUpdateSets.ContainsKey(componentId))
             {
-#if UNITY
-                _excludeUpdateSets.Add(componentId, new HashSet<int>());
-#else
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP2_0_OR_GREATER || NET5_0_OR_GREATER || NET472_OR_GREATER
                 _excludeUpdateSets.Add(componentId, new HashSet<int>(EcsCacheSettings.UpdateSetSize));
+#else
+                _excludeUpdateSets.Add(componentId, new HashSet<int>());               
 #endif
             }
             AddIdToFlters(id, _excludeUpdateSets[componentId]);
@@ -577,10 +577,10 @@ namespace ECS
             {
                 if (!sets.ContainsKey(bit))
                 {
-#if UNITY
-                    sets.Add(bit, new HashSet<int>());
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP2_0_OR_GREATER || NET5_0_OR_GREATER || NET472_OR_GREATER
+                    sets.Add(bit, new HashSet<int>(EcsCacheSettings.UpdateSetSize));
 #else
-                    sets.Add(nextSetBit, new HashSet<int>(EcsCacheSettings.UpdateSetSize));
+                    sets.Add(bit, new HashSet<int>());                   
 #endif
                 }
 

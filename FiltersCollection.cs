@@ -43,10 +43,10 @@ namespace ECS
         //all prealloc should be performed only for world's copies
         public FiltersCollection(int prealloc = 0)
         {
-#if UNITY
-            _set = new HashSet<EcsFilter>(_filterComparer);
-#else
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP2_0_OR_GREATER || NET5_0_OR_GREATER || NET472_OR_GREATER
             _set = new HashSet<EcsFilter>(prealloc, _filterComparer);
+#else
+            _set = new HashSet<EcsFilter>(_filterComparer);           
 #endif
             _list = new List<EcsFilter>(prealloc);
         }
@@ -55,11 +55,10 @@ namespace ECS
         public bool TryAdd(in BitMask includes, in BitMask excludes, out int idx)
         {
             var dummy = new EcsFilter(in includes, in excludes, true);
-#if UNITY
-            var addNew = !_set.Contains(dummy);
-#else
-
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP2_0_OR_GREATER || NET5_0_OR_GREATER || NET472_OR_GREATER
             var addNew = !_set.TryGetValue(dummy, out dummy);
+#else
+            var addNew = !_set.Contains(dummy);
 #endif
             if (addNew)
             {
