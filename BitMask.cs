@@ -39,6 +39,33 @@ namespace ECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private int GetDynamicChunksLength(int length) => (int)Math.Ceiling((float)length / SizeOfPartInBits) - 1;
 
+        // [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        // public void Copy(in BitMask other)
+        // {
+        //     _m1 = other._m1;
+        //     Length = other.Length;
+        //     var chunksLength = GetChunksLength(Length);
+        //     if (chunksLength > 1)
+        //     {
+        //         if (_mn == null || _mn.Length < Length)
+        //         {
+        //             var newChunksLength = 2;
+        //             while (newChunksLength < chunksLength)
+        //                 newChunksLength <<= 1;
+        //             _mn = new MaskInternal[newChunksLength];
+        //         }
+
+        //         try {
+
+        //         for (int i = 0; i < chunksLength; i++)
+        //             _mn[i] = other._mn[i];
+        //         } catch (Exception) {
+        //             UnityEngine.Debug.LogError("this: " + this + ", other: " + other);
+        //             throw;
+        //         }
+        //     }
+        // }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Copy(in BitMask other)
         {
@@ -300,7 +327,7 @@ namespace ECS
             return true;
         }
 
-        public void Serialize(byte[] outBytes, ref int startIndex)
+        public void Serialize(byte[] outBytes, ref int startIndex, bool log)
         {
             for (int i = 0; i < sizeof(int); i++)
                 outBytes[startIndex++] = (byte)(Length >> (8 * i));
@@ -318,13 +345,16 @@ namespace ECS
 
                 for (int i = 0; i < _mn.Length; i++)
                 {
+                    if (log)
+                        UnityEngine.Debug.LogWarning($"Serializing _mn {i} at {startIndex}");
+
                     for (int j = 0; j < sizeof(MaskInternal); j++)
                         outBytes[startIndex++] = (byte)(_mn[i] >> (8 * j));
                 }
             }
         }
 
-        public void Deserialize(byte[] bytes, ref int startIndex)
+        public void Deserialize(byte[] bytes, ref int startIndex, bool log)
         {
             Length = bytes[startIndex++];
             for (int i = 1; i < sizeof(int); i++)
@@ -340,6 +370,9 @@ namespace ECS
                 _mn = new MaskInternal[mnLength];
                 for (int i = 0; i < _mn.Length; i++)
                 {
+                    if (log)
+                        UnityEngine.Debug.LogWarning($"Deserializing _mn {i} at {startIndex}");
+
                     for (int j = 0; j < sizeof(MaskInternal); j++)
                         _mn[i] |= (MaskInternal)bytes[startIndex++] << 8 * j;
                 }

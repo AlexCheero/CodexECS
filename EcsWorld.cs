@@ -36,7 +36,7 @@ namespace ECS
         //update sets holds indices of filters by types
         private Dictionary<int, HashSet<int>> _includeUpdateSets;
         private Dictionary<int, HashSet<int>> _excludeUpdateSets;
-        private FiltersCollection _filtersCollection;
+        public FiltersCollection _filtersCollection;
 
         public EcsWorld(int entitiesReserved = 32)
         {
@@ -150,7 +150,7 @@ namespace ECS
             BinarySerializer.SerializeInt(_masks.Length, bytes, ref startIndex);
             BinarySerializer.SerializeInt(_masks._elements.Length, bytes, ref startIndex);
             for (int i = 0; i < _masks.Length; i++)
-                _masks[i].Serialize(bytes, ref startIndex);
+                _masks[i].Serialize(bytes, ref startIndex, false);
             #endregion
 
             #region components pools
@@ -162,8 +162,10 @@ namespace ECS
 
             for (int i = 0; i < _componentsPools._values.Length; i++)
             {
+                UnityEngine.Debug.LogWarning($"Serializing {i} at {startIndex}");
+                UnityEngine.Debug.LogWarning($"Serializing type index: {_componentsPools._dense[i]}");
                 BinarySerializer.SerializeInt(_componentsPools._dense[i], bytes, ref startIndex);
-                _componentsPools._values[i].Serialize(bytes, ref startIndex);
+                _componentsPools._values[i].Serialize(bytes, ref startIndex, i == 14);
             }
             #endregion
 
@@ -178,6 +180,7 @@ namespace ECS
                     BinarySerializer.SerializeInt(idx, bytes, ref startIndex);
             }
 
+            UnityEngine.Debug.Log($"serializing excludeUpdateSetsCount: {_excludeUpdateSets.Count}");
             BinarySerializer.SerializeInt(_excludeUpdateSets.Count, bytes, ref startIndex);
             foreach (var key in _excludeUpdateSets.Keys)
                 BinarySerializer.SerializeInt(key, bytes, ref startIndex);
@@ -212,7 +215,7 @@ namespace ECS
             var masksElementsLength = BinarySerializer.DeserializeInt(bytes, ref startIndex);
             _masks._elements = new BitMask[masksElementsLength];
             for (int i = 0; i < _masks.Length; i++)
-                _masks[i].Deserialize(bytes, ref startIndex);
+                _masks[i].Deserialize(bytes, ref startIndex, false);
             #endregion
 
             #region components pools
@@ -228,11 +231,19 @@ namespace ECS
 
             for (int i = 0; i < _componentsPools._values.Length; i++)
             {
+                UnityEngine.Debug.LogWarning($"Deserializing {i} at {startIndex}");
                 int typeIdx = BinarySerializer.DeserializeInt(bytes, ref startIndex);
+
+                if (typeIdx == -1) {
+                    UnityEngine.Debug.LogError($"TYPEIDX is -1 at {startIndex - 4}, index: {i}");
+                }
+
                 _componentsPools._dense[i] = typeIdx;
 
+                UnityEngine.Debug.LogWarning($"Deserializing type index: {typeIdx}");
+
                 IComponentsPool pool = ComponentRegistartor.CreatePool(typeIdx);
-                pool.Deserialize(bytes, ref startIndex);
+                pool.Deserialize(bytes, ref startIndex, i == 14);
                 _componentsPools._values[i] = pool;
             }
 
@@ -539,6 +550,64 @@ namespace ECS
                     sb.Append('\n');
                 }
             }
+
+            return;
+
+            sb.Append("=== include update sets ===\n");
+
+            foreach (var pair in _includeUpdateSets)
+            {
+                sb.Append($"{pair.Key}:\n");
+
+                foreach (var entry in pair.Value)
+                {
+                    sb.Append($"\t{entry}\n");
+                }
+            }
+
+            sb.Append("=== exclude update sets ===\n");
+
+            foreach (var pair in _excludeUpdateSets)
+            {
+                sb.Append($"{pair.Key}:\n");
+
+                foreach (var entry in pair.Value)
+                {
+                    sb.Append($"\t{entry}\n");
+                }
+            }
+
+            sb.Append("=== masks ===\n");
+
+            for (var i = 0; i < _masks.Length; i++)
+            {
+                sb.Append($"\t{_masks[i].ToString()}\n");
+            }
+
+            sb.Append("=== component pools dense ===\n");
+
+            for (var i = 0; i < _componentsPools._dense.Length; i++)
+            {
+                sb.Append($"\t{_componentsPools._dense[i]}\n");
+            }
+
+            sb.Append("=== component pools sparse ===\n");
+
+            for (var i = 0; i < _componentsPools._sparse.Length; i++)
+            {
+                sb.Append($"\t{_componentsPools._sparse[i]}\n");
+            }
+
+            sb.Append("=== filters collection ===\n");
+
+            _filtersCollection.Debug(sb);
+        }
+
+        public string DebugAll()
+        {
+            var sb = new StringBuilder();
+            DebugAll(sb);
+            return sb.ToString();
         }
 #endif
 

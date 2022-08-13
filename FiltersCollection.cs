@@ -4,7 +4,7 @@ using System.Runtime.CompilerServices;
 
 namespace ECS
 {
-    class FiltersCollection
+    public class FiltersCollection
     {
         class FilterEqComparer : IEqualityComparer<EcsFilter>
         {
@@ -160,6 +160,23 @@ namespace ECS
                 filter.Deserialize(bytes, ref startIndex);
                 _set.Add(filter);
                 _list.Add(filter);
+            }
+        }
+
+        public void Debug(System.Text.StringBuilder sb)
+        {
+            sb.Append("--- set ---\n");
+
+            foreach (var entry in _set)
+            {
+                sb.Append($"\texcludes: {entry.Excludes}, includes: {entry.Includes}\n");
+            }
+
+            sb.Append("--- list ---\n");
+
+            for (var i = 0; i < _list.Count; i++)
+            {
+                sb.Append($"\t{i}: excludes: {_list[i].Excludes}, includes: {_list[i].Includes}\n");
             }
         }
     }

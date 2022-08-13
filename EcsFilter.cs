@@ -172,8 +172,8 @@ namespace ECS
 
         public void Serialize(byte[] outBytes, ref int startIndex)
         {
-            Includes.Serialize(outBytes, ref startIndex);
-            Excludes.Serialize(outBytes, ref startIndex);
+            Includes.Serialize(outBytes, ref startIndex, false);
+            Excludes.Serialize(outBytes, ref startIndex, false);
             
             BinarySerializer.SerializeInt(_filteredEntities.Count, outBytes, ref startIndex);
             foreach (var pair in _filteredEntities)
@@ -190,8 +190,8 @@ namespace ECS
 
         public void Deserialize(byte[] bytes, ref int startIndex)
         {
-            Includes.Deserialize(bytes, ref startIndex);
-            Excludes.Deserialize(bytes, ref startIndex);
+            Includes.Deserialize(bytes, ref startIndex, false);
+            Excludes.Deserialize(bytes, ref startIndex, false);
 
             int filteredEntitiesCount = BinarySerializer.DeserializeInt(bytes, ref startIndex);
             if (filteredEntitiesCount > 0 && _filteredEntities == null)

@@ -17,8 +17,8 @@ namespace ECS
         public void Copy(in IComponentsPool other);
         public IComponentsPool Duplicate();
 
-        public void Serialize(byte[] outBytes, ref int startIndex);
-        public void Deserialize(byte[] bytes, ref int startIndex);
+        public void Serialize(byte[] outBytes, ref int startIndex, bool log);
+        public void Deserialize(byte[] bytes, ref int startIndex, bool log);
         public int ByteLength();
 
 #if DEBUG
@@ -126,42 +126,75 @@ namespace ECS
             return newPool;
         }
 
-        public void Serialize(byte[] outBytes, ref int startIndex)
+        public void Serialize(byte[] outBytes, ref int startIndex, bool log)
         {
+            if (log)
+                UnityEngine.Debug.LogWarning($"Serializing value type: {typeof(T).IsValueType} {typeof(T).Name}");
+
             //serialize only struct components
             if (!typeof(T).IsValueType)
                 return;
 
+            if (log)
+                UnityEngine.Debug.LogWarning($"Serializing _sparse at {startIndex}");
+
             BinarySerializer.SerializeInt(_sparse.Length, outBytes, ref startIndex);
             BinarySerializer.SerializeIntegerArray(_sparse, outBytes, ref startIndex);
+
+            if (log)
+                UnityEngine.Debug.LogWarning($"Serializing _dense at {startIndex}");
 
             BinarySerializer.SerializeInt(_dense.Length, outBytes, ref startIndex);
             BinarySerializer.SerializeIntegerArray(_dense, outBytes, ref startIndex);
 
+            if (log)
+                UnityEngine.Debug.LogWarning($"Serializing _values at {startIndex}");
+
             BinarySerializer.SerializeInt(_values.Length, outBytes, ref startIndex);
             BinarySerializer.SerializeInt(_values._elements.Length, outBytes, ref startIndex);
-            for (int i = 0; i < _values.Length; i++)
+
+            for (int i = 0; i < _values.Length; i++) {
+                if (log)
+                    UnityEngine.Debug.LogWarning($"Serializing _values {i} at {startIndex}");
+
                 BinarySerializer.SerializeStruct(_values[i], outBytes, ref startIndex);
+            }
         }
 
-        public void Deserialize(byte[] bytes, ref int startIndex)
+        public void Deserialize(byte[] bytes, ref int startIndex, bool log)
         {
             //deserialize only struct components
+            if (log)
+                UnityEngine.Debug.LogWarning($"Deserializing value type: {typeof(T).IsValueType} {typeof(T).Name}");
+
             if (!typeof(T).IsValueType)
                 return;
+
+            if (log)
+                UnityEngine.Debug.LogWarning($"Deserializing _sparse at {startIndex}");
 
             var sparseLength = BinarySerializer.DeserializeInt(bytes, ref startIndex);
             _sparse = BinarySerializer.DeserializeIntegerArray(bytes, ref startIndex, sparseLength);
 
+            if (log)
+                UnityEngine.Debug.LogWarning($"Deserializing _dense at {startIndex}");
+
             var denseLength = BinarySerializer.DeserializeInt(bytes, ref startIndex);
             _dense = BinarySerializer.DeserializeIntegerArray(bytes, ref startIndex, denseLength);
+
+            if (log)
+                UnityEngine.Debug.LogWarning($"Deserializing _values at {startIndex}");
 
             _values._end = BinarySerializer.DeserializeInt(bytes, ref startIndex);
             var sizeOfInstance = Marshal.SizeOf(default(T));
             var valuesElementsLength = BinarySerializer.DeserializeInt(bytes, ref startIndex);
             _values._elements = new T[valuesElementsLength];
-            for (int i = 0; i < _values.Length; i++)
+            for (int i = 0; i < _values.Length; i++) {
+                if (log)
+                    UnityEngine.Debug.LogWarning($"Deserializing _values {i} at {startIndex}");
+
                 _values[i] = BinarySerializer.DeserializeStruct<T>(bytes, ref startIndex, sizeOfInstance);
+            }
         }
 
         public int ByteLength()
@@ -175,6 +208,8 @@ namespace ECS
 
         private ComponentsPool()
         {
+            if (typeof(T) == typeof(BotTag))
+                UnityEngine.Debug.LogWarning($"Creating component pool {typeof(T).Name} with default capacity: {EcsCacheSettings.PoolSize}");
             _sparse = new int[EcsCacheSettings.PoolSize];
             _dense = new int[EcsCacheSettings.PoolSize];
             for (int i = 0; i < EcsCacheSettings.PoolSize; i++)
@@ -187,6 +222,8 @@ namespace ECS
 
         public ComponentsPool(int initialCapacity)
         {
+            if (typeof(T) == typeof(BotTag))
+                UnityEngine.Debug.LogWarning($"Creating component pool {typeof(T).Name} with capacity: {initialCapacity}");
             _sparse = new int[initialCapacity];
             _dense = new int[initialCapacity];
             for (int i = 0; i < initialCapacity; i++)
@@ -232,9 +269,18 @@ namespace ECS
             StringBuilder sb = new StringBuilder();
             sb.Append(typeof(T).ToString() + ". ");
 
-            var props = _values[_sparse[id]].GetType().GetFields();
-            foreach (var p in props)
-                sb.Append(p.Name + ": " + p.GetValue(_values[_sparse[id]]) + ", ");
+            var value = _values[_sparse[id]];
+            var props = value.GetType().GetFields();
+
+            if (value is JointsComponent joints)
+                sb.Append(joints.MyToString());
+            else
+                foreach (var p in props)
+                {
+                    sb.Append(p.Name + ": ");
+                    sb.Append(p.GetValue(value) + ", ");
+                }
+
             sb.Remove(sb.Length - 2, 2);//remove last comma
 
             return sb.ToString();
@@ -273,14 +319,20 @@ namespace ECS
             return newPool;
         }
 
-        public void Serialize(byte[] outBytes, ref int startIndex)
+        public void Serialize(byte[] outBytes, ref int startIndex, bool log)
         {
-            _tags.Serialize(outBytes, ref startIndex);
+            if (log)
+                UnityEngine.Debug.LogWarning($"Serializing tags at {startIndex}");
+
+            _tags.Serialize(outBytes, ref startIndex, log);
         }
 
-        public void Deserialize(byte[] bytes, ref int startIndex)
+        public void Deserialize(byte[] bytes, ref int startIndex, bool log)
         {
-            _tags.Deserialize(bytes, ref startIndex);
+            if (log)
+                UnityEngine.Debug.LogWarning($"Deserializing tags at {startIndex}");
+
+            _tags.Deserialize(bytes, ref startIndex, log);
         }
 
         public int ByteLength() => _tags.ByteLength;
@@ -288,6 +340,8 @@ namespace ECS
 
         public TagsPool(int initialCapacity = 0)
         {
+            if (typeof(T) == typeof(BotTag))
+                UnityEngine.Debug.LogWarning($"Creating tags pool {typeof(T).Name} with capacity: {initialCapacity}");
             _tags = new BitMask();
         }
 
