@@ -283,7 +283,7 @@ namespace ECS
         {
 #if DEBUG
             if (id == EntityExtension.NullEntity.GetId() || !IsEnitityInRange(id))
-                throw new EcsException("wrong entity id");
+                throw new EcsException($"Entity ID {id} is out of range [0; {_entites.Length})");
 #endif
             return ref _entites[id];
         }
@@ -510,7 +510,7 @@ namespace ECS
             CheckRegistration<T>();
 
             if (!Have<T>(id))
-                throw new EcsException("entity have no " + typeof(T));
+                throw new EcsException($"Entity {id} has no " + typeof(T) + " component.");
 #endif
             var pool = (ComponentsPool<T>)_componentsPools[ComponentMeta<T>.Id];
             return ref pool._values[pool._sparse[id]];

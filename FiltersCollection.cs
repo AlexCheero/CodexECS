@@ -34,7 +34,7 @@ namespace ECS
             {
 #if DEBUG
                 if (i >= _list.Count)
-                    throw new EcsException("wrong filter index");
+                    throw new EcsException($"Wrong filter index: {i}. _list.Count: {_list.Count}");
 #endif
                 return _list[i];
             }
