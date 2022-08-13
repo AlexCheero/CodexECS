@@ -166,10 +166,6 @@ namespace ECS
             length += 2 * sizeof(int) * _filteredEntities.Count;
             length += 2 * sizeof(int);//_entitiesVector.Length and _entitiesVector._elements.Length
             length += sizeof(int) * _entitiesVector.Length;
-            length += sizeof(int); //_addSet.Count
-            length += sizeof(int) * _addSet.Count;
-            length += sizeof(int); //_removeSet.Count
-            length += sizeof(int) * _removeSet.Count;
 
             return length;
         }
@@ -190,13 +186,6 @@ namespace ECS
             BinarySerializer.SerializeInt(_entitiesVector._elements.Length, outBytes, ref startIndex);
             for (int i = 0; i < _entitiesVector.Length; i++)
                 BinarySerializer.SerializeInt(_entitiesVector[i], outBytes, ref startIndex);
-
-            BinarySerializer.SerializeInt(_addSet.Count, outBytes, ref startIndex);
-            foreach (int idx in _addSet)
-                BinarySerializer.SerializeInt(idx, outBytes, ref startIndex);
-            BinarySerializer.SerializeInt(_removeSet.Count, outBytes, ref startIndex);
-            foreach (int idx in _removeSet)
-                BinarySerializer.SerializeInt(idx, outBytes, ref startIndex);
         }
 
         public void Deserialize(byte[] bytes, ref int startIndex)
@@ -224,15 +213,9 @@ namespace ECS
 
             if (_addSet == null)
                 _addSet = new HashSet<int>();
-            int addSetCount = BinarySerializer.DeserializeInt(bytes, ref startIndex);
-            for (int i = 0; i < addSetCount; i++)
-                _addSet.Add(BinarySerializer.DeserializeInt(bytes, ref startIndex));
 
             if (_removeSet == null)
                 _removeSet = new HashSet<int>();
-            int removeSetCount = BinarySerializer.DeserializeInt(bytes, ref startIndex);
-            for (int i = 0; i < removeSetCount; i++)
-                _removeSet.Add(BinarySerializer.DeserializeInt(bytes, ref startIndex));
         }
     }
 }
