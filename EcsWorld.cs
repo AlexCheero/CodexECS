@@ -316,11 +316,11 @@ namespace ECS
         private int GetRecycledId()
         {
             ref var curr = ref _recycleListHead;
-            ref var next = ref GetRefById(curr);
+            ref var next = ref GetRefById(_recycleListHead);
             while (!next.IsNull())
             {
                 curr = ref next;
-                next = ref GetRefById(next);
+                next = ref GetRefById(next.GetId());
             }
 
             next.SetId(curr.ToId());
@@ -348,7 +348,7 @@ namespace ECS
 
             ref var recycleListEnd = ref _recycleListHead;
             while (!recycleListEnd.IsNull())
-                recycleListEnd = ref GetRefById(recycleListEnd);
+                recycleListEnd = ref GetRefById(recycleListEnd.GetId());
             recycleListEnd.SetId(id);
             entity.SetNullId();
         }
