@@ -210,7 +210,7 @@ namespace ECS
 
 #if DEBUG
             if (_sparse[id] > -1)
-                throw new EcsException("sparse set already have element at this index");
+                throw new EcsException($"Sparse set already has an element {_sparse[id]} at this index {id}");
 #endif
 
             _sparse[id] = _values.Length;
