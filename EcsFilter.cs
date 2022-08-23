@@ -8,7 +8,7 @@ namespace ECS
         public BitMask Includes;
         public BitMask Excludes;
         //TODO: implement sortable groups
-        private Dictionary<int, int> _filteredEntities;
+        private SortedDictionary<int, int> _filteredEntities;
         private SimpleVector<int> _entitiesVector;
         private HashSet<int> _addSet;
         private HashSet<int> _removeSet;
@@ -45,7 +45,7 @@ namespace ECS
         //init method for blank filter for serialization
         public void Init()
         {
-            _filteredEntities = new Dictionary<int, int>();
+            _filteredEntities = new SortedDictionary<int, int>();
             _entitiesVector = new SimpleVector<int>();
             _addSet = new HashSet<int>();
             _removeSet = new HashSet<int>();
@@ -57,7 +57,7 @@ namespace ECS
             Includes.Copy(includes);
             Excludes = default;
             Excludes.Copy(excludes);
-            _filteredEntities = dummy ? null : new Dictionary<int, int>(EcsCacheSettings.FilteredEntitiesSize);
+            _filteredEntities = dummy ? null : new SortedDictionary<int, int>();
             _addSet = dummy ? null : new HashSet<int>();
             _removeSet = dummy ? null : new HashSet<int>();
             _cachedHash = GetHashFromMasks(Includes, Excludes);
@@ -143,7 +143,7 @@ namespace ECS
             if (_filteredEntities != null)
                 _filteredEntities.Clear();
             else
-                _filteredEntities = new Dictionary<int, int>(EcsCacheSettings.FilteredEntitiesSize);
+                _filteredEntities = new SortedDictionary<int, int>();
             
             if (other._filteredEntities != null)
             {
@@ -195,7 +195,7 @@ namespace ECS
 
             int filteredEntitiesCount = BinarySerializer.DeserializeInt(bytes, ref startIndex);
             if (filteredEntitiesCount > 0 && _filteredEntities == null)
-                _filteredEntities = new Dictionary<int, int>();
+                _filteredEntities = new SortedDictionary<int, int>();
             for (int i = 0; i < filteredEntitiesCount; i++)
             {
                 int key = BinarySerializer.DeserializeInt(bytes, ref startIndex);
