@@ -121,7 +121,7 @@ namespace ECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public IComponentsPool Duplicate()
         {
-            var newPool = new ComponentsPool<T>(Length);
+            var newPool = new ComponentsPool<T>(_values._elements.Length);
             newPool.Copy(this);
             return newPool;
         }
