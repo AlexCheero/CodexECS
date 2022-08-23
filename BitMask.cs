@@ -341,7 +341,7 @@ namespace ECS
                 for (int i = 0; i < _mn.Length; i++)
                 {
                     for (int j = 0; j < sizeof(MaskInternal); j++)
-                        _mn[i] |= (MaskInternal)bytes[startIndex++] << 8 * i;
+                        _mn[i] |= (MaskInternal)bytes[startIndex++] << 8 * j;
                 }
             }
         }
