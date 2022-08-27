@@ -283,12 +283,12 @@ namespace ECS
 
             ref Entity entity = ref GetRefById(id);
 #if DEBUG
+            if (entity.IsNull())
+                throw new EcsException("trying to delete null entity");
             if (IsDead(id))
                 throw new EcsException("trying to delete already dead entity");
             if (!IsEnitityInRange(id))
                 throw new EcsException("trying to delete wrong entity");
-            if (entity.IsNull())
-                throw new EcsException("trying to delete null entity");
 #endif
             var mask = _masks[id];
             foreach (var bit in mask)
