@@ -83,11 +83,11 @@ namespace ECS
         public void Clear()
         {
             //TODO: make proper define
-#if UNITY
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP2_0_OR_GREATER || NET5_0_OR_GREATER
+            Array.Fill(_sparse, -1);
+#else
             for (int i = 0; i < _sparse.Length; i++)
                 _sparse[i] = -1;
-#else
-            Array.Fill(_sparse, -1);
 #endif
 
             _values.Clear();
@@ -100,11 +100,11 @@ namespace ECS
                 Array.Resize(ref _sparse, other._sparse.Length);
             else if (_sparse.Length > other._sparse.Length)
             {
-#if UNITY
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP2_0_OR_GREATER || NET5_0_OR_GREATER
+                Array.Fill(_sparse, -1, other._sparse.Length, _sparse.Length - other._sparse.Length);
+#else
                 for (int i = other._sparse.Length; i < _sparse.Length; i++)
                     _sparse[i] = -1;
-#else
-                Array.Fill(_sparse, -1, other._sparse.Length, _sparse.Length - other._sparse.Length);
 #endif
             }
             Array.Copy(other._sparse, _sparse, other._sparse.Length);
