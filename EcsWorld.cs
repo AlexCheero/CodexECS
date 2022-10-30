@@ -38,7 +38,7 @@ namespace ECS
         private Dictionary<int, HashSet<int>> _excludeUpdateSets;
         private FiltersCollection _filtersCollection;
 
-        private List<int> _delayedDeleteList;
+        private HashSet<int> _delayedDeleteList;
         private readonly Dictionary<int, Enumerable> _enumerators;
 
         public delegate void OnAddRemoveHandler(EcsWorld world, int id);
@@ -73,7 +73,7 @@ namespace ECS
             _excludeUpdateSets = new Dictionary<int, HashSet<int>>();
             _filtersCollection = new FiltersCollection();
 
-            _delayedDeleteList = new List<int>();
+            _delayedDeleteList = new HashSet<int>();
             _enumerators = new Dictionary<int, Enumerable>();
 
             _onAddEvents = new Dictionary<int, OnAddRemoveHandler>();
@@ -94,7 +94,7 @@ namespace ECS
             _excludeUpdateSets = other._excludeUpdateSets;
             _filtersCollection = new FiltersCollection(other._filtersCollection.Length);
 
-            _delayedDeleteList = new List<int>();
+            _delayedDeleteList = new HashSet<int>();
             _enumerators = new Dictionary<int, Enumerable>();
 
             _onAddEvents = other._onAddEvents;
