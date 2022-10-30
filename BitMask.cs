@@ -20,12 +20,18 @@ namespace ECS
             private set;
         }
 
+        public BitMask(MaskInternal m1 = 0, MaskInternal[] mn = null)
+        {
+            _m1 = m1;
+            _mn = mn;
+            Length = 0;
+        }
+
         public BitMask(params int[] positions)
         {
             _m1 = 0;
             _mn = null;
             Length = 0;
-            _nextSetBit = -1;
 
             Set(positions);
         }
@@ -168,41 +174,54 @@ namespace ECS
         }
 
         #region Enumerable
-        private int _nextSetBit;
-
-        public BitMask GetEnumerator() => this;
-        public int Current { get => _nextSetBit; }
-
-        public bool MoveNext()
+        public struct Enumerator
         {
-            if (_nextSetBit == -1)
-                _nextSetBit = GetNextSetBit(0);
-            else
-                _nextSetBit = GetNextSetBit(_nextSetBit + 1);
-            return _nextSetBit != -1;
-        }
+            private int _nextSetBit;
+            private BitMask _bitMask;
 
-        private int GetNextSetBit(int fromPosition)
-        {
-            for (int i = fromPosition; i < Length; i++)
+            public Enumerator(BitMask bitMask)
             {
-                int chunkIdx = i / SizeOfPartInBits;
-                if (CheckChunkIdx(chunkIdx))
-                    return -1;
-
-                var m = _m1;
-                if (chunkIdx > 0)
-                    m = _mn[chunkIdx - 1];
-
-                for (int j = i % SizeOfPartInBits; j < SizeOfPartInBits; j++)
-                {
-                    if ((m & (1 << j)) != 0)
-                        return j + (chunkIdx * SizeOfPartInBits);
-                }
+                _bitMask = bitMask;
+                _nextSetBit = -1;
             }
 
-            return -1;
+            public int Current => _nextSetBit;
+
+            public bool MoveNext()
+            {
+                if (_nextSetBit == -1)
+                    _nextSetBit = GetNextSetBit(0);
+                else
+                    _nextSetBit = GetNextSetBit(_nextSetBit + 1);
+
+                return _nextSetBit != -1;
+            }
+
+            private int GetNextSetBit(int fromPosition)
+            {
+                for (int i = fromPosition; i < _bitMask.Length; i++)
+                {
+                    int chunkIdx = i / SizeOfPartInBits;
+                    if (_bitMask.CheckChunkIdx(chunkIdx))
+                        return -1;
+
+                    var m = _bitMask._m1;
+                    if (chunkIdx > 0)
+                        m = _bitMask._mn[chunkIdx - 1];
+
+                    for (int j = i % SizeOfPartInBits; j < SizeOfPartInBits; j++)
+                    {
+                        if ((m & (1 << j)) != 0)
+                            return j + (chunkIdx * SizeOfPartInBits);
+                    }
+                }
+
+                return -1;
+            }
         }
+
+        public Enumerator GetEnumerator() => new Enumerator(this);
+        
         #endregion
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -214,7 +233,6 @@ namespace ECS
                 for (int i = 0; i < _mn.Length; i++)
                     _mn[i] = 0;
             }
-            Length = 0;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
