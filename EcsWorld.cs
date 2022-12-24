@@ -473,6 +473,10 @@ namespace ECS
 
         public void Add<T>(int id, T component = default)
         {
+#if DEBUG
+            if (id < 0)
+                throw new EcsException("negative id");
+#endif
             var componentId = ComponentMeta<T>.Id;
             UpdateFiltersOnAdd(componentId, id);
 
@@ -627,6 +631,11 @@ namespace ECS
 
         public void DebugEntity(int id, StringBuilder sb)
         {
+            if (id < 0)
+            {
+                sb.Append("negative entity");
+                return;
+            }
             var mask = _masks[id];
             foreach (var bit in mask)
                 sb.Append("\n\t" + DebugString(id, bit));
