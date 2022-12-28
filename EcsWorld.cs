@@ -415,29 +415,6 @@ namespace ECS
             typeof(T).GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).Length == 0 &&
             typeof(T).GetProperties(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).Length == 0;
 
-        public ref T AddAndReturnRef<T>(int id, T component = default)
-        {
-            var componentId = ComponentMeta<T>.Id;
-
-#if DEBUG
-            if (IsTag<T>())
-                throw new EcsException("trying to add tag as component");
-#endif
-
-            UpdateFiltersOnAdd(componentId, id);
-
-            if (!_componentsPools.Contains(componentId))
-                _componentsPools.Add(componentId, new ComponentsPool<T>(EcsCacheSettings.PoolSize));
-            var pool = (ComponentsPool<T>)_componentsPools[componentId];
-#if DEBUG
-            if (pool == null)
-                throw new EcsException("invalid pool");
-#endif
-            ref var addedComponent = ref pool.Add(id, component);
-
-            return ref addedComponent;
-        }
-
         public void Add<T>(int id, T component = default)
         {
 #if DEBUG
@@ -469,35 +446,22 @@ namespace ECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public T GetComponent<T>(int id)
+        public ref T GetComponent<T>(int id)
         {
 #if DEBUG
             if (!Have<T>(id))
                 throw new EcsException("entity have no " + typeof(T));
 #endif
             var pool = (ComponentsPool<T>)_componentsPools[ComponentMeta<T>.Id];
-            return pool._values[pool._sparse[id]];
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ref T GetComponentByRef<T>(int id)
-        {
-            var componentId = ComponentMeta<T>.Id;
-#if DEBUG
-            if (!Have<T>(id))
-                throw new EcsException("entity have no " + typeof(T));
-#endif
-            var pool = (ComponentsPool<T>)_componentsPools[componentId];
             return ref pool._values[pool._sparse[id]];
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ref T GetOrAddComponentRef<T>(int id)
+        public ref T GetOrAddComponent<T>(int id)
         {
             if (Have<T>(id))
-                return ref GetComponentByRef<T>(id);
-            else
-                return ref AddAndReturnRef<T>(id);
+                return ref GetComponent<T>(id);
+            Add<T>(id);
+            return ref GetComponent<T>(id);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
