@@ -10,6 +10,12 @@ using System.Reflection;
 //TODO: cover with tests
 namespace ECS
 {
+    public interface IComponentStash { }
+    public class ComponentStash<T> : IComponentStash
+    {
+        public T Value;
+    }
+    
     //TODO: think about implementing dynamically counted initial size
     public static class EcsCacheSettings
     {
@@ -330,6 +336,30 @@ namespace ECS
                 UpdateFiltersOnAdd(bit, toId);
             }
         }
+
+        public Dictionary<int, IComponentStash> StashEntity(Entity entity) => StashEntity(entity.GetId());
+
+        public Dictionary<int, IComponentStash> StashEntity(int id)
+        {
+            var stash = new Dictionary<int, IComponentStash>();
+            foreach (var bit in _masks[id])
+                stash.Add(bit, _componentsPools[bit].GetStash(id));
+            
+            return stash;
+        }
+
+        public int CreateFromStash(Dictionary<int, IComponentStash> stash)
+        {
+            var id = Create();
+            foreach (var componentStash in stash)
+                AddComponentFromStash(id, componentStash.Key, componentStash.Value);
+            return id;
+        }
+
+        private void AddComponentFromStash(int id, int componentId, IComponentStash componentStash)
+        {
+            var pool = _componentsPools[componentId];
+        }
 #endregion
 
 #region Components methods
@@ -411,10 +441,6 @@ namespace ECS
             AddIdToFlters(id, _excludeUpdateSets[componentId]);
         }
 
-        private bool IsTag<T>() =>
-            typeof(T).GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).Length == 0 &&
-            typeof(T).GetProperties(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).Length == 0;
-
         public void Add<T>(int id, T component = default)
         {
 #if DEBUG
@@ -424,7 +450,7 @@ namespace ECS
             var componentId = ComponentMeta<T>.Id;
             UpdateFiltersOnAdd(componentId, id);
 
-            var isTag = IsTag<T>();
+            var isTag = ComponentMeta<T>.IsTag;
             if (!_componentsPools.Contains(componentId))
             {
                 IComponentsPool newPool;
