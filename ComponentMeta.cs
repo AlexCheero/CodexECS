@@ -1,4 +1,6 @@
-﻿using System.Reflection;
+﻿using System;
+using System.Collections.Generic;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Threading;
 
@@ -26,6 +28,18 @@ namespace ECS
             Id = Interlocked.Increment(ref ComponentIdCounter.Counter);
             IsTag = typeof(T).GetFields(SearchFlags).Length == 0 &&
                     typeof(T).GetProperties(SearchFlags).Length == 0;
+            
+            if (IsTag)
+                PoolFactory.FactoryMethods.Add(Id, (poolSize) => new TagsPool<T>(poolSize));
+            else
+                PoolFactory.FactoryMethods.Add(Id, (poolSize) => new ComponentsPool<T>(poolSize));
         }
+    }
+
+    internal static class PoolFactory
+    {
+        internal static readonly Dictionary<int, Func<int, IComponentsPool>> FactoryMethods;
+
+        static PoolFactory() => FactoryMethods = new Dictionary<int, Func<int, IComponentsPool>>();
     }
 }

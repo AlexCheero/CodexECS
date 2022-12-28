@@ -352,13 +352,12 @@ namespace ECS
         {
             var id = Create();
             foreach (var componentStash in stash)
-                AddComponentFromStash(id, componentStash.Key, componentStash.Value);
+            {
+                UpdateFiltersOnAdd(componentStash.Key, id);
+                var pool = GetPool(componentStash.Key);
+                pool.AddFromStash(id, componentStash.Value);
+            }
             return id;
-        }
-
-        private void AddComponentFromStash(int id, int componentId, IComponentStash componentStash)
-        {
-            var pool = _componentsPools[componentId];
         }
 #endregion
 
@@ -450,25 +449,22 @@ namespace ECS
             var componentId = ComponentMeta<T>.Id;
             UpdateFiltersOnAdd(componentId, id);
 
-            var isTag = ComponentMeta<T>.IsTag;
-            if (!_componentsPools.Contains(componentId))
-            {
-                IComponentsPool newPool;
-                if (isTag)
-                    newPool = new TagsPool<T>(EcsCacheSettings.PoolSize);
-                else
-                    newPool = new ComponentsPool<T>(EcsCacheSettings.PoolSize);
-                _componentsPools.Add(componentId, newPool);
-            }
-            var pool = _componentsPools[componentId];
+            var pool = GetPool(componentId);
 #if DEBUG
             if (pool == null)
                 throw new EcsException("invalid pool");
 #endif
-            if (isTag)
+            if (ComponentMeta<T>.IsTag)
                 ((TagsPool<T>)pool).Add(id);
             else
                 ((ComponentsPool<T>)pool).Add(id, component);
+        }
+
+        private IComponentsPool GetPool(int componentId)
+        {
+            if (!_componentsPools.Contains(componentId))
+                _componentsPools.Add(componentId, PoolFactory.FactoryMethods[componentId](EcsCacheSettings.PoolSize));
+            return _componentsPools[componentId];
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

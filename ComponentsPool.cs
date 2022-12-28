@@ -20,6 +20,8 @@ namespace ECS
 
         public IComponentStash GetStash(int id);
 
+        public void AddFromStash(int id, IComponentStash stash);
+
 #if DEBUG
         public string DebugString(int id);
 #endif
@@ -155,6 +157,12 @@ namespace ECS
             };
             return stash;
         }
+
+        public void AddFromStash(int id, IComponentStash stash)
+        {
+            var concreteStash = stash as ComponentStash<T>;
+            Add(id, concreteStash.Value);
+        }
 #endregion
 
         //public ref T this[int id]
@@ -250,6 +258,12 @@ namespace ECS
         }
         
         public IComponentStash GetStash(int id) => default(ComponentStash<T>);
+        
+        public void AddFromStash(int id, IComponentStash stash)
+        {
+            var concreteStash = stash as ComponentStash<T>;
+            Add(id);
+        }
 #endregion
 
         public TagsPool(int initialCapacity = 0)
