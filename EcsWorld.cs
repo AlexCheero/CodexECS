@@ -57,11 +57,6 @@ namespace ECS
             public void AddCallback(Handler handler) => _handler += handler;
         }
 
-        private Dictionary<int, OnAddRemoveHandler> _onAddEvents;
-        private Dictionary<int, OnAddRemoveHandler> _onRemoveEvents;
-        private Dictionary<int, HashSet<int>> _mutualExclusivity;
-        private Dictionary<int, IOnChangedHandler> _onChangedEvents;
-
         public EcsWorld(int entitiesReserved = 32)
         {
             //TODO: ensure that _entities and masks are always have same length
@@ -75,11 +70,6 @@ namespace ECS
 
             _delayedDeleteList = new HashSet<int>();
             _enumerators = new Dictionary<int, Enumerable>();
-
-            _onAddEvents = new Dictionary<int, OnAddRemoveHandler>();
-            _onRemoveEvents = new Dictionary<int, OnAddRemoveHandler>();
-            _mutualExclusivity = new Dictionary<int, HashSet<int>>();
-            _onChangedEvents = new Dictionary<int, IOnChangedHandler>();
         }
 
         //prealloc ctor
@@ -96,11 +86,6 @@ namespace ECS
 
             _delayedDeleteList = new HashSet<int>();
             _enumerators = new Dictionary<int, Enumerable>();
-
-            _onAddEvents = other._onAddEvents;
-            _onRemoveEvents = other._onRemoveEvents;
-            _mutualExclusivity = other._mutualExclusivity;
-            _onChangedEvents = other._onChangedEvents;
         }
 
         public void Copy(in EcsWorld other)
@@ -343,7 +328,6 @@ namespace ECS
                 _componentsPools[bit].CopyItem(fromId, toId);
                 toMask.Set(bit);
                 UpdateFiltersOnAdd(bit, toId);
-                CallAddEvent(bit, toId);
             }
         }
 #endregion
@@ -431,18 +415,6 @@ namespace ECS
             typeof(T).GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).Length == 0 &&
             typeof(T).GetProperties(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).Length == 0;
 
-        private void RemoveMutuallyExclusiveComponents(int componentId, int id)
-        {
-            if (_mutualExclusivity.ContainsKey(componentId))
-            {
-                foreach (var otherComponentId in _mutualExclusivity[componentId])
-                {
-                    if (Have(otherComponentId, id))
-                        Remove(otherComponentId, id);
-                }
-            }
-        }
-
         public ref T AddAndReturnRef<T>(int id, T component = default)
         {
             var componentId = ComponentMeta<T>.Id;
@@ -450,8 +422,6 @@ namespace ECS
 #if DEBUG
             if (IsTag<T>())
                 throw new EcsException("trying to add tag as component");
-            if (_onChangedEvents.ContainsKey(componentId))
-                throw new EcsException("there are systems that subscribed on changes of this component. use SetComponent to trigger them");
 #endif
 
             UpdateFiltersOnAdd(componentId, id);
@@ -464,9 +434,6 @@ namespace ECS
                 throw new EcsException("invalid pool");
 #endif
             ref var addedComponent = ref pool.Add(id, component);
-
-            CallAddEvent(componentId, id);
-            RemoveMutuallyExclusiveComponents(componentId, id);
 
             return ref addedComponent;
         }
@@ -499,9 +466,6 @@ namespace ECS
                 ((TagsPool<T>)pool).Add(id);
             else
                 ((ComponentsPool<T>)pool).Add(id, component);
-
-            CallAddEvent(componentId, id);
-            RemoveMutuallyExclusiveComponents(componentId, id);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -522,8 +486,6 @@ namespace ECS
 #if DEBUG
             if (!Have<T>(id))
                 throw new EcsException("entity have no " + typeof(T));
-            if (_onChangedEvents.ContainsKey(componentId))
-                throw new EcsException("there are systems that subscribed on changes of this component. use SetComponent to trigger them");
 #endif
             var pool = (ComponentsPool<T>)_componentsPools[componentId];
             return ref pool._values[pool._sparse[id]];
@@ -546,84 +508,6 @@ namespace ECS
         {
             UpdateFiltersOnRemove(componentId, id);
             _componentsPools[componentId].Remove(id);
-            CallRemoveEvent(componentId, id);
-        }
-
-        //this method used to trigger OnChanged reactive systems
-        public void SetComponent<T>(int id, T newVal)
-        {
-            var oldVal = GetComponent<T>(id);
-
-            var componentId = ComponentMeta<T>.Id;
-#if DEBUG
-            if (!Have<T>(id))
-                throw new EcsException("entity have no " + typeof(T));
-#endif
-            var pool = (ComponentsPool<T>)_componentsPools[componentId];
-            pool._values[pool._sparse[id]] = newVal;
-
-            TriggerChanged(id, oldVal, newVal);
-        }
-
-        public void SubscribeOnAdd<T>(OnAddRemoveHandler handler)
-        {
-            var componentId = ComponentMeta<T>.Id;
-            if (_onAddEvents.ContainsKey(componentId))
-                _onAddEvents[componentId] += handler;
-            else
-                _onAddEvents[componentId] = handler;
-        }
-
-        public void SubscribeOnRemove<T>(OnAddRemoveHandler handler)
-        {
-            var componentId = ComponentMeta<T>.Id;
-            if (_onRemoveEvents.ContainsKey(componentId))
-                _onRemoveEvents[componentId] += handler;
-            else
-                _onRemoveEvents[componentId] = handler;
-        }
-
-        private void CallAddEvent(int componentId, int id)
-        {
-            if (_onAddEvents.ContainsKey(componentId))
-                _onAddEvents[componentId].Invoke(this, id);
-        }
-
-        private void CallRemoveEvent(int componentId, int id)
-        {
-            if (_onRemoveEvents.ContainsKey(componentId))
-                _onRemoveEvents[componentId].Invoke(this, id);
-        }
-
-        public void SetMutualExclusivity<T1, T2>()
-        {
-            var id1 = ComponentMeta<T1>.Id;
-            var id2 = ComponentMeta<T2>.Id;
-
-            if (_mutualExclusivity.ContainsKey(id1))
-                _mutualExclusivity[id1].Add(id2);
-            else
-                _mutualExclusivity[id1] = new HashSet<int>() { id2 };
-
-            if (_mutualExclusivity.ContainsKey(id2))
-                _mutualExclusivity[id2].Add(id1);
-            else
-                _mutualExclusivity[id2] = new HashSet<int>() { id1 };
-        }
-
-        public void SubscribeOnChange<T>(OnChangedHandler<T>.Handler handlerCallback)
-        {
-            var componentId = ComponentMeta<T>.Id;
-            if (_onChangedEvents.ContainsKey(componentId))
-                ((OnChangedHandler<T>)_onChangedEvents[componentId]).AddCallback(handlerCallback);
-            else
-                _onChangedEvents[componentId] = new OnChangedHandler<T>(handlerCallback);
-        }
-
-        private void TriggerChanged<T>(int id, T oldVal, T newVal)
-        {
-            var componentId = ComponentMeta<T>.Id;
-            ((OnChangedHandler<T>)_onChangedEvents[componentId]).Trigger(this, id, oldVal, newVal);
         }
 
 #if DEBUG
