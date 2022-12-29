@@ -19,7 +19,7 @@ namespace ECS
             [MethodImpl(MethodImplOptions.AggressiveInlining)] private set;
         }
         
-        public static bool IsTag { get; private set; }
+        public static bool IsTag { get; }
 
         private const BindingFlags SearchFlags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
 

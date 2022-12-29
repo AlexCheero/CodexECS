@@ -18,10 +18,6 @@ namespace ECS
 
         public void CopyItem(int from, int to);
 
-        public IComponentStash GetStash(int id);
-
-        public void AddFromStash(int id, IComponentStash stash);
-
 #if DEBUG
         public string DebugString(int id);
 #endif
@@ -148,24 +144,6 @@ namespace ECS
 #endif
             Add(to, _values[_sparse[from]]);
         }
-        
-        public IComponentStash GetStash(int id)
-        {
-            var stash = new ComponentStash<T>
-            {
-                Value = _values[_sparse[id]]
-            };
-            return stash;
-        }
-
-        public void AddFromStash(int id, IComponentStash stash)
-        {
-            var concreteStash = stash as ComponentStash<T>;
-            // if (Contains(id))
-            //     _values[_sparse[id]] = concreteStash.Value;
-            // else
-            Add(id, concreteStash.Value);
-        }
 #endregion
 
         //public ref T this[int id]
@@ -259,10 +237,6 @@ namespace ECS
 #endif
             Add(to);
         }
-
-        public IComponentStash GetStash(int id) => new ComponentStash<T>();
-        
-        public void AddFromStash(int id, IComponentStash stash) => Add(id);
 #endregion
 
         public TagsPool(int initialCapacity = 0)

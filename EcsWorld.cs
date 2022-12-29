@@ -4,15 +4,11 @@ using System.Runtime.CompilerServices;
 
 #if DEBUG
 using System.Text;
-using System.Reflection;
 #endif
 
 //TODO: cover with tests
 namespace ECS
 {
-    public interface IComponentStash { }
-    public class ComponentStash<T> : IComponentStash { public T Value; }
-    
     //TODO: think about implementing dynamically counted initial size
     public static class EcsCacheSettings
     {
@@ -333,44 +329,6 @@ namespace ECS
                 _componentsPools[bit].CopyItem(fromId, toId);
                 toMask.Set(bit);
                 UpdateFiltersOnAdd(bit, toId);
-            }
-        }
-
-        public Dictionary<int, IComponentStash> StashEntity(Entity entity) => StashEntity(entity.GetId());
-
-        public Dictionary<int, IComponentStash> StashEntity(int id)
-        {
-            var stash = new Dictionary<int, IComponentStash>();
-            foreach (var bit in _masks[id])
-                stash.Add(bit, _componentsPools[bit].GetStash(id));
-            
-            return stash;
-        }
-
-        public int CreateFromStash(Dictionary<int, IComponentStash> stash)
-        {
-            var id = Create();
-            foreach (var componentStash in stash)
-            {
-                UpdateFiltersOnAdd(componentStash.Key, id);
-                var pool = GetPool(componentStash.Key);
-                pool.AddFromStash(id, componentStash.Value);
-            }
-            return id;
-        }
-
-        public void CopyFromStash(Entity entity, Dictionary<int, IComponentStash> stash) =>
-            CopyFromStash(entity.GetId(), stash);
-        public void CopyFromStash(int id, Dictionary<int, IComponentStash> stash)
-        {
-            var mask = _masks[id];
-            foreach (var bit in mask)
-                Remove(bit, id);
-            foreach (var componentStash in stash)
-            {
-                UpdateFiltersOnAdd(componentStash.Key, id);
-                var pool = GetPool(componentStash.Key);
-                pool.AddFromStash(id, componentStash.Value);
             }
         }
 #endregion
