@@ -161,6 +161,9 @@ namespace ECS
         public void AddFromStash(int id, IComponentStash stash)
         {
             var concreteStash = stash as ComponentStash<T>;
+            // if (Contains(id))
+            //     _values[_sparse[id]] = concreteStash.Value;
+            // else
             Add(id, concreteStash.Value);
         }
 #endregion
@@ -256,14 +259,10 @@ namespace ECS
 #endif
             Add(to);
         }
+
+        public IComponentStash GetStash(int id) => new ComponentStash<T>();
         
-        public IComponentStash GetStash(int id) => default(ComponentStash<T>);
-        
-        public void AddFromStash(int id, IComponentStash stash)
-        {
-            var concreteStash = stash as ComponentStash<T>;
-            Add(id);
-        }
+        public void AddFromStash(int id, IComponentStash stash) => Add(id);
 #endregion
 
         public TagsPool(int initialCapacity = 0)

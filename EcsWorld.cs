@@ -11,10 +11,7 @@ using System.Reflection;
 namespace ECS
 {
     public interface IComponentStash { }
-    public class ComponentStash<T> : IComponentStash
-    {
-        public T Value;
-    }
+    public class ComponentStash<T> : IComponentStash { public T Value; }
     
     //TODO: think about implementing dynamically counted initial size
     public static class EcsCacheSettings
@@ -134,8 +131,10 @@ namespace ECS
         private ref Entity GetRefById(int id)
         {
 #if DEBUG
-            if (id == EntityExtension.NullEntity.GetId() || !IsEnitityInRange(id))
-                throw new EcsException("wrong entity id");
+            if (id == EntityExtension.NullEntity.GetId())
+                throw new EcsException("null entity id");
+            if (!IsEnitityInRange(id))
+                throw new EcsException("wrong entity id: " + id);
 #endif
             return ref _entites[id];
         }
@@ -358,6 +357,21 @@ namespace ECS
                 pool.AddFromStash(id, componentStash.Value);
             }
             return id;
+        }
+
+        public void CopyFromStash(Entity entity, Dictionary<int, IComponentStash> stash) =>
+            CopyFromStash(entity.GetId(), stash);
+        public void CopyFromStash(int id, Dictionary<int, IComponentStash> stash)
+        {
+            var mask = _masks[id];
+            foreach (var bit in mask)
+                Remove(bit, id);
+            foreach (var componentStash in stash)
+            {
+                UpdateFiltersOnAdd(componentStash.Key, id);
+                var pool = GetPool(componentStash.Key);
+                pool.AddFromStash(id, componentStash.Value);
+            }
         }
 #endregion
 
