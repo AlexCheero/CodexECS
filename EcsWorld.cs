@@ -462,6 +462,16 @@ namespace ECS
         public void Remove<T>(int id) => Remove(ComponentMeta<T>.Id, id);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool TryRemove<T>(int id)
+        {
+            if (!Have<T>(id))
+                return false;
+            Remove(ComponentMeta<T>.Id, id);
+            return true;
+
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void Remove(int componentId, int id)
         {
             UpdateFiltersOnRemove(componentId, id);
