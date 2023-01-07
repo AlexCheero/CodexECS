@@ -159,9 +159,14 @@ namespace ECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool IsEntityValid(Entity entity)
         {
+            if (entity.IsNull())
+                return false;
             var id = entity.GetId();
-            return !entity.IsNull() && !IsDead(id) && entity.GetVersion() == GetById(id).GetVersion();
+            return !IsDead(id) && entity.GetVersion() == GetById(id).GetVersion();
         }
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool IsIdValid(int id) => id >= 0 && id != EntityExtension.NullEntity.GetId() && !IsDead(id);
 
         private int GetRecycledId()
         {
