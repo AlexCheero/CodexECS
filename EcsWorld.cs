@@ -486,16 +486,15 @@ namespace ECS
 #if DEBUG
         private string DebugString(int id, int componentId) => _componentsPools[componentId].DebugString(id);
 
-        public void DebugEntity(int id, StringBuilder sb)
+        public string DebugEntity(int id)
         {
             if (id < 0)
-            {
-                sb.Append("negative entity");
-                return;
-            }
+                return "negative entity";
             var mask = _masks[id];
+            StringBuilder sb = new StringBuilder();
             foreach (var bit in mask)
                 sb.Append("\n\t" + DebugString(id, bit));
+            return sb.ToString();
         }
 
         public void DebugAll(StringBuilder sb)
@@ -506,8 +505,7 @@ namespace ECS
                 if (IsEntityValid(entity))
                 {
                     var id = entity.GetId();
-                    sb.Append(id + ":");
-                    DebugEntity(id, sb);
+                    sb.Append(id + ": " + DebugEntity(id));
                     sb.Append('\n');
                 }
             }
