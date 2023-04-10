@@ -555,6 +555,8 @@ namespace ECS
 
             return filterId;
         }
+
+        public int EntitiesCount(int filterId) => _filtersCollection[filterId].Length;
 #endregion
     }
 }
