@@ -557,6 +557,13 @@ namespace ECS
         }
 
         public int EntitiesCount(int filterId) => _filtersCollection[filterId].Length;
+
+        public int GetFirst(int filterId)
+        {
+            foreach (var id in Enumerate(filterId))
+                return id;
+            return -1;
+        }
 #endregion
     }
 }
