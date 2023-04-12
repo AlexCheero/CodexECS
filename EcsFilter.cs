@@ -65,23 +65,12 @@ namespace ECS
             get => _entitiesVector._elements[currentEntityIndex];
         }
 
+        public void Lock() => _lockCount.Value++;
+
         public bool MoveNext()
         {
-            if (_entitiesVector._end == 0)
-                return false;//no need to cleanup on empty set
-
-            if (currentEntityIndex >= _entitiesVector._end - 1)
-            {
-                Cleanup();
-                return false;
-            }
-
-            if (currentEntityIndex == -1)
-            {
-                _lockCount.Value++;
-            }
             currentEntityIndex++;
-            return true;
+            return currentEntityIndex < _entitiesVector._end;
         }
 
         //should always Reset if breaking loop to decrease _lockCount

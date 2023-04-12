@@ -219,39 +219,30 @@ namespace ECS
         {
             private EcsWorld _world;
             private EcsFilter _filter;
-            private bool _enumerationFinished;
 
             public Enumerable(EcsWorld world, int filterId)
             {
                 _world = world;
                 _filter = _world._filtersCollection[filterId];
-                _enumerationFinished = false;
             }
 
-            public Enumerable GetEnumerator() => this;
+            public Enumerable GetEnumerator()
+            {
+                _filter.Lock();
+                return this;
+            }
 
             public int Current
             {
                 get => _filter.Current;
             }
 
-            public bool MoveNext()
-            {
-                bool wasMoved = _filter.MoveNext();
-                if (!wasMoved)
-                {
-                    _world.Unlock();
-                    _enumerationFinished = true;
-                }
-                return wasMoved;
-            }
+            public bool MoveNext() => _filter.MoveNext();
 
             public void Dispose()
             {
-                if (_world.IsLocked)
-                    _world.Unlock();
-                if (!_enumerationFinished)
-                    _filter.Cleanup();
+                _world.Unlock();
+                _filter.Cleanup();
             }
         }
 
