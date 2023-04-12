@@ -564,6 +564,14 @@ namespace ECS
                 return id;
             return -1;
         }
+
+        public int GetNthEntityFromFilter(int filterId, int n)
+        {
+            if (filterId >= _filtersCollection.Length)
+                return -1;
+            var filter = _filtersCollection[filterId];
+            return filter.Length > n ? filter[n] : -1;
+        }
 #endregion
     }
 }
