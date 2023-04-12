@@ -38,7 +38,7 @@ namespace ECS
         private FiltersCollection _filtersCollection;
 
         private HashSet<int> _delayedDeleteList;
-        private readonly Dictionary<int, Enumerable> _enumerators;
+        private readonly Dictionary<int, List<Enumerable>> _enumerables;
 
         public delegate void OnAddRemoveHandler(EcsWorld world, int id);
 
@@ -68,7 +68,7 @@ namespace ECS
             _filtersCollection = new FiltersCollection();
 
             _delayedDeleteList = new HashSet<int>();
-            _enumerators = new Dictionary<int, Enumerable>();
+            _enumerables = new Dictionary<int, List<Enumerable>>();
         }
 
         //prealloc ctor
@@ -84,7 +84,7 @@ namespace ECS
             _filtersCollection = new FiltersCollection(other._filtersCollection.Length);
 
             _delayedDeleteList = new HashSet<int>();
-            _enumerators = new Dictionary<int, Enumerable>();
+            _enumerables = new Dictionary<int, List<Enumerable>>();
         }
 
         public void Copy(in EcsWorld other)
@@ -220,6 +220,8 @@ namespace ECS
             private EcsWorld _world;
             private EcsFilter _filter;
 
+            public bool IsInUse { get; private set; }
+
             public Enumerable(EcsWorld world, int filterId)
             {
                 _world = world;
@@ -229,6 +231,7 @@ namespace ECS
             public Enumerable GetEnumerator()
             {
                 _filter.Lock();
+                IsInUse = true;
                 return this;
             }
 
@@ -241,6 +244,7 @@ namespace ECS
 
             public void Dispose()
             {
+                IsInUse = false;
                 _world.Unlock();
                 _filter.Cleanup();
             }
@@ -249,9 +253,15 @@ namespace ECS
         public Enumerable Enumerate(int filterId)
         {
             Lock();
-            if (!_enumerators.ContainsKey(filterId))
-                _enumerators.Add(filterId, new Enumerable(this, filterId));
-            return _enumerators[filterId];
+            if (!_enumerables.ContainsKey(filterId))
+                _enumerables.Add(filterId, new List<Enumerable> { new Enumerable(this, filterId) });
+            foreach (var enumerable in _enumerables[filterId])
+                if (!enumerable.IsInUse)
+                    return enumerable;
+            var newEnumerable = new Enumerable(this, filterId);
+            _enumerables[filterId].Add(newEnumerable);
+
+            return newEnumerable;
         }
         #endregion
 

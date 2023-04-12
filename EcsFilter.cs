@@ -81,8 +81,6 @@ namespace ECS
 #if DEBUG
             if (_lockCount.Value < 0)
                 throw new EcsException("_lockCount shouldn't be negative");
-            else if (_lockCount.Value > 0)
-                throw new EcsException("_lockCount is bigger than 0 on cleanup. should be removed if multithreading is used");
             else
 #endif
             if (_lockCount.Value == 0)
