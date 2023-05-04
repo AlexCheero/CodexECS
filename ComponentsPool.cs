@@ -20,6 +20,7 @@ namespace ECS
 
 #if DEBUG
         public string DebugString(int id);
+        public Type GetComponentType();
 #endif
     }
 
@@ -54,9 +55,11 @@ namespace ECS
 
             return sb.ToString();
         }
+
+        public Type GetComponentType() => typeof(T);
 #endif
 
-#region Interface implementation
+        #region Interface implementation
         public int Length
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -200,6 +203,7 @@ namespace ECS
 
 #if DEBUG
         public string DebugString(int id) => typeof(T).ToString();
+        public Type GetComponentType() => typeof(T);
 #endif
 
 #region Interface implementation

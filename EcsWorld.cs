@@ -485,6 +485,14 @@ namespace ECS
         }
 
 #if DEBUG
+        public void GetTypesForId(int id, HashSet<Type> buffer)
+        {
+            buffer.Clear();
+            var mask = _masks[id];
+            foreach (var bit in mask)
+                buffer.Add(_componentsPools[bit].GetComponentType());
+        }
+
         private string DebugString(int id, int componentId) => _componentsPools[componentId].DebugString(id);
 
         public string DebugEntity(int id)
