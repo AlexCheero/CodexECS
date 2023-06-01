@@ -1,8 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Threading;
+using Tags;
 
 namespace ECS
 {
@@ -21,13 +21,10 @@ namespace ECS
         
         public static bool IsTag { get; }
 
-        private const BindingFlags SearchFlags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
-
         static ComponentMeta()
         {
             Id = Interlocked.Increment(ref ComponentIdCounter.Counter);
-            IsTag = typeof(T).GetFields(SearchFlags).Length == 0 &&
-                    typeof(T).GetProperties(SearchFlags).Length == 0;
+            IsTag = typeof(ITag).IsAssignableFrom(typeof(T));
             
             if (IsTag)
                 PoolFactory.FactoryMethods.Add(Id, (poolSize) => new TagsPool<T>(poolSize));
