@@ -7,5 +7,7 @@ namespace ECS
         protected static int Id<T>() => ComponentMeta<T>.Id;
 
         public abstract void Tick(EcsWorld world);
+
+        public virtual bool IsPausable => true;
     }
 }
