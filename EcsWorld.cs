@@ -560,6 +560,18 @@ namespace ECS
                 var filter = _filtersCollection[filterId];
                 AddFilterToUpdateSets(in filter.Includes, filterId, _includeUpdateSets);
                 AddFilterToUpdateSets(in filter.Excludes, filterId, _excludeUpdateSets);
+
+                for ( int i = 0; i < _entites.Length; i++ )
+                {
+                    if (!IsEntityValid(_entites[i]))
+                        continue;
+
+                    var id = _entites[i].GetId();
+                    var pass = _masks[id].InclusivePass(filter.Includes);
+                    pass &= _masks[id].ExclusivePass(filter.Excludes);
+                    if (pass)
+                        filter.Add(id);
+                }
             }
 
             return filterId;
