@@ -110,6 +110,40 @@ namespace ECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public BitMask And(int i)
+        {
+            var mask = this;
+            mask.Set(i);
+            return mask;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public BitMask And(params int[] positions)
+        {
+            var mask = this;
+            for (int i = 0; i < positions.Length; i++)
+                mask.Set(positions[i]);
+            return mask;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public BitMask AndNot(int i)
+        {
+            var mask = this;
+            mask.Unset(i);
+            return mask;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public BitMask AndNot(params int[] positions)
+        {
+            var mask = this;
+            for (int i = 0; i < positions.Length; i++)
+                mask.Unset(positions[i]);
+            return mask;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool CheckChunkIdx(int idx) => idx > 0 && (_mn == null || _mn.Length <= idx - 1);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
