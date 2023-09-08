@@ -6,8 +6,9 @@ namespace ECS
     {
         protected static int Id<T>() => ComponentMeta<T>.Id;
 
-        public abstract void Tick(EcsWorld world);
-
         public virtual bool IsPausable => true;
+
+        public virtual void Init(EcsWorld world) { }
+        public abstract void Tick(EcsWorld world);
     }
 }
