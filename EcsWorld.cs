@@ -418,6 +418,25 @@ namespace ECS
             AddIdToFlters(id, _excludeUpdateSets[componentId]);
         }
 
+        public void AddReference(Type type, int id, object component)
+        {
+#if DEBUG
+            if (component is ValueType)
+                throw new EcsException("trying to add object of value type as reference");
+            if (id < 0)
+                throw new EcsException("negative id");
+#endif
+            var componentId = ComponentTypeToIdMapping.Mapping[type];
+            UpdateFiltersOnAdd(componentId, id);
+
+            var pool = GetPool(componentId);
+#if DEBUG
+            if (pool == null)
+                throw new EcsException("invalid pool");
+#endif
+            pool.AddReference(id, component);
+        }
+
         public void Add<T>(int id, T component = default)
         {
 #if DEBUG

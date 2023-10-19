@@ -11,6 +11,11 @@ namespace ECS
         internal static int Counter = -1;
     }
 
+    public static class ComponentTypeToIdMapping
+    {
+        public static Dictionary<Type, int> Mapping = new();
+    }
+
     public static class ComponentMeta<T>
     {
         public static int Id
@@ -24,7 +29,9 @@ namespace ECS
         static ComponentMeta()
         {
             Id = Interlocked.Increment(ref ComponentIdCounter.Counter);
-            IsTag = typeof(ITag).IsAssignableFrom(typeof(T));
+            var type = typeof(T);
+            ComponentTypeToIdMapping.Mapping[type] = Id;
+            IsTag = typeof(ITag).IsAssignableFrom(type);
             
             if (IsTag)
                 PoolFactory.FactoryMethods.Add(Id, (poolSize) => new TagsPool<T>(poolSize));

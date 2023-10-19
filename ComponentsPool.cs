@@ -18,6 +18,8 @@ namespace ECS
 
         public void CopyItem(int from, int to);
 
+        public void AddReference(int id, object value);
+
 #if DEBUG
         public string DebugString(int id);
         public Type GetComponentType();
@@ -164,6 +166,15 @@ namespace ECS
             _values = new SimpleVector<T>(initialCapacity);
         }
 
+        public void AddReference(int id, object value)
+        {
+#if DEBUG
+            if (value is ValueType)
+                throw new EcsException("trying to add object of value type as reference");
+#endif
+            Add(id, (T)value);
+        }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ref T Add(int id, T value)
         {
@@ -250,5 +261,8 @@ namespace ECS
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Add(int id) => _tags.Set(id);
+
+        public void AddReference(int id, object value) =>
+            throw new EcsException("trying to call AddReference for TagsPool");
     }
 }
