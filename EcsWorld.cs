@@ -187,7 +187,7 @@ namespace ECS
         #region Enumerable
         private int _lockCounter;
         private bool IsLocked { get => _lockCounter > 0; }
-        private void Lock()
+        public void Lock()
         {
 #if DEBUG
             //TODO: could cause problems even for single thread in nested loops
@@ -197,7 +197,7 @@ namespace ECS
 
             _lockCounter++;
         }
-        private void Unlock()
+        public void Unlock()
         {
             _lockCounter--;
 
