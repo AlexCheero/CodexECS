@@ -1,4 +1,6 @@
 ﻿
+using System.Collections.Generic;
+
 namespace ECS
 {
     //TODO: add check that Includes and Excludes doesn't intersects
@@ -10,5 +12,18 @@ namespace ECS
 
         public virtual void Init(EcsWorld world) { }
         public abstract void Tick(EcsWorld world);
+
+
+        protected List<int> JustAddedIds;
+
+        public virtual void ReactiveTick(EcsWorld world) { }
+        protected void SubscribeOnAddToFilter(EcsWorld world, int filterId)
+        {
+            JustAddedIds = new();
+            world.SubscribeReactiveSystem(filterId,
+                (id) => JustAddedIds.Add(id),
+                ReactiveTick,
+                () => JustAddedIds.Clear());
+        }
     }
 }

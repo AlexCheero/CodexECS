@@ -53,6 +53,11 @@ namespace ECS
 
             _delayedDeleteList = new HashSet<int>();
             _enumerables = new Dictionary<int, List<Enumerable>>();
+
+            _idAddListeners = new();
+            _filtersToNotifyOnAdd = new();
+            _unlockListeners = new();
+            _cleanups = new();
         }
 
         //prealloc ctor
@@ -69,6 +74,11 @@ namespace ECS
 
             _delayedDeleteList = new HashSet<int>();
             _enumerables = new Dictionary<int, List<Enumerable>>();
+
+            _idAddListeners = new();
+            _filtersToNotifyOnAdd = new();
+            _unlockListeners = new();
+            _cleanups = new();
         }
 
         public void Copy(in EcsWorld other)
@@ -181,6 +191,7 @@ namespace ECS
 
             _lockCounter++;
         }
+
         private void Unlock()
         {
             _lockCounter--;
@@ -197,6 +208,19 @@ namespace ECS
                     Delete(id);
                 _delayedDeleteList.Clear();
             }
+
+            foreach (var id in _filtersToNotifyOnAdd)
+            {
+#if DEBUG
+                if (!_unlockListeners.ContainsKey(id))
+                    throw new EcsException("_filtersToNotifyOnAdd contains unregistered filter!");
+                if (!_cleanups.ContainsKey(id))
+                    throw new EcsException("_cleanups desynch!");
+#endif
+                _unlockListeners[id](this);
+                _cleanups[id]();
+            }
+            _filtersToNotifyOnAdd.Clear();
         }
 
         public void ManualLock(int filterId)
@@ -207,8 +231,8 @@ namespace ECS
 
         public void ManualUnlock(int filterId)
         {
-            Unlock();
             _filtersCollection[filterId].Cleanup();
+            Unlock();
         }
 
         public class Enumerable : IDisposable
@@ -333,9 +357,38 @@ namespace ECS
                 UpdateFiltersOnAdd(bit, toId);
             }
         }
-#endregion
+        #endregion
 
-#region Components methods
+        #region Reactive systems
+        private Dictionary<int, Action<int>> _idAddListeners;
+        private HashSet<int> _filtersToNotifyOnAdd;
+        private Dictionary<int, Action<EcsWorld>> _unlockListeners;
+        private Dictionary<int, Action> _cleanups;
+
+        public void SubscribeReactiveSystem(
+            int filterId,
+            Action<int> addIdCallback,
+            Action<EcsWorld> unlockCallback,
+            Action cleanupFunction)
+        {
+            if (_idAddListeners.ContainsKey(filterId))
+                _idAddListeners[filterId] += addIdCallback;
+            else
+                _idAddListeners.Add(filterId, addIdCallback);
+
+            if (_unlockListeners.ContainsKey(filterId))
+                _unlockListeners[filterId] += unlockCallback;
+            else
+                _unlockListeners.Add(filterId, unlockCallback);
+
+            if (_cleanups.ContainsKey(filterId))
+                _cleanups[filterId] += cleanupFunction;
+            else
+                _cleanups.Add(filterId, cleanupFunction);
+        }
+        #endregion
+
+        #region Components methods
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Have<T>(int id) => _masks[id].Check(ComponentMeta<T>.Id);
 
@@ -354,6 +407,12 @@ namespace ECS
                     continue;
                 //could try to add same id several times due to delayed set modification operations
                 filter.Add(id);
+
+                if (_idAddListeners.ContainsKey(filterId))
+                {
+                    _idAddListeners[filterId](id);
+                    _filtersToNotifyOnAdd.Add(filterId);
+                }
             }
         }
 
