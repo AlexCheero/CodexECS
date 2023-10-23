@@ -27,7 +27,7 @@ namespace ECS
 
         public static string ToString(this in Entity entity)
         {
-            return Convert.ToString(entity.Val, 2).PadLeft(32, '0');
+            return Convert.ToString(entity.Val, 2).PadLeft(sizeof(EntityType) * 8, '0');
         }
 #endif
 

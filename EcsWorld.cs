@@ -40,22 +40,6 @@ namespace ECS
         private HashSet<int> _delayedDeleteList;
         private readonly Dictionary<int, List<Enumerable>> _enumerables;
 
-        public delegate void OnAddRemoveHandler(EcsWorld world, int id);
-
-        interface IOnChangedHandler { }
-        public class OnChangedHandler<T> : IOnChangedHandler
-        {
-            public delegate void Handler(EcsWorld world, int id, T oldVal, T newVal);
-            private event Handler _handler;
-
-            public OnChangedHandler(Handler handler) => _handler = handler;
-
-            public void Trigger(EcsWorld world, int id, T oldVal, T newVal) =>
-                _handler.Invoke(world, id, oldVal, newVal);
-
-            public void AddCallback(Handler handler) => _handler += handler;
-        }
-
         public EcsWorld(int entitiesReserved = 32)
         {
             //TODO: ensure that _entities and masks are always have same length
