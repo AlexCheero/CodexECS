@@ -199,6 +199,18 @@ namespace ECS
             }
         }
 
+        public void ManualLock(int filterId)
+        {
+            Lock();
+            _filtersCollection[filterId].Lock();
+        }
+
+        public void ManualUnlock(int filterId)
+        {
+            Unlock();
+            _filtersCollection[filterId].Cleanup();
+        }
+
         public class Enumerable : IDisposable
         {
             private EcsWorld _world;
@@ -581,13 +593,6 @@ namespace ECS
         }
 
         public int EntitiesCount(int filterId) => _filtersCollection[filterId].Length;
-
-        public int GetFirst(int filterId)
-        {
-            foreach (var id in Enumerate(filterId))
-                return id;
-            return -1;
-        }
 
         public int GetNthEntityFromFilter(int filterId, int n)
         {
