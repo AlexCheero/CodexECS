@@ -208,7 +208,10 @@ namespace ECS
                     Delete(id);
                 _delayedDeleteList.Clear();
             }
+        }
 
+        public void CallReactiveSystems()
+        {
             foreach (var id in _filtersToNotifyOnAdd)
             {
 #if DEBUG
