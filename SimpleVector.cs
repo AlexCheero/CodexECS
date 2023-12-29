@@ -44,6 +44,7 @@ namespace ECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Remove(int idx)
         {
+            _elements[idx] = default;
             _end--;
             if (idx < _end)
                 _elements[idx] = _elements[_end];
