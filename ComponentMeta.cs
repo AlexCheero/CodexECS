@@ -2,10 +2,12 @@
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Threading;
-using Tags;
 
 namespace CodexECS
 {
+    public interface IComponent { }
+    public interface ITag { }
+
     static class ComponentIdCounter
     {
         internal static int Counter = -1;
