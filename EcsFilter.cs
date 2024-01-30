@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
 
-namespace ECS
+namespace CodexECS
 {
     public struct EcsFilter
     {

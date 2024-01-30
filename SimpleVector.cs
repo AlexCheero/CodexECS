@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Runtime.CompilerServices;
 
-namespace ECS
+namespace CodexECS
 {
     //TODO: rename to simple list to match c# style
     class SimpleVector<T>

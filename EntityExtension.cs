@@ -4,7 +4,7 @@ using System;
 using System.Runtime.CompilerServices;
 using EntityType = System.Int32;
 
-namespace ECS
+namespace CodexECS
 {
     public struct Entity
     {

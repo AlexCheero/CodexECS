@@ -2,7 +2,7 @@
 using System.Runtime.CompilerServices;
 using System.Text;
 
-namespace ECS
+namespace CodexECS
 {
     using MaskInternal = UInt32;
 

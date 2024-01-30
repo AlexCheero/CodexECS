@@ -7,7 +7,7 @@ using System.Text;
 #endif
 
 //TODO: cover with tests
-namespace ECS
+namespace CodexECS
 {
     //TODO: think about implementing dynamically counted initial size
     public static class EcsCacheSettings

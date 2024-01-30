@@ -5,7 +5,7 @@ using System.Runtime.CompilerServices;
 using System.Text;
 #endif
 
-namespace ECS
+namespace CodexECS
 {
     interface IComponentsPool
     {

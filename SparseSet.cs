@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Runtime.CompilerServices;
 
-namespace ECS
+namespace CodexECS
 {
     class SparseSet<T>
     {

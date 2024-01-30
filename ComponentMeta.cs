@@ -4,7 +4,7 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using Tags;
 
-namespace ECS
+namespace CodexECS
 {
     static class ComponentIdCounter
     {

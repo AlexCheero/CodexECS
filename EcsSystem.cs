@@ -1,7 +1,7 @@
 ﻿
 using System.Collections.Generic;
 
-namespace ECS
+namespace CodexECS
 {
     //TODO: add check that Includes and Excludes doesn't intersects
     public abstract class EcsSystem
