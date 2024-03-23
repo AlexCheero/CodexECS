@@ -533,6 +533,16 @@ namespace CodexECS
             return ref pool._values[pool._sparse[id]];
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool TryAdd<T>(int id)
+        {
+            if (Have<T>(id))
+                return false;
+            Add<T>(id);
+            return true;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ref T GetOrAddComponent<T>(int id)
         {
             if (Have<T>(id))
