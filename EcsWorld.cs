@@ -571,6 +571,8 @@ namespace CodexECS
             _componentsPools[componentId].Remove(id);
         }
 
+        public ref readonly BitMask EntityMask(int id) => ref _masks[id];
+
 #if DEBUG
         public void GetTypesForId(int id, HashSet<Type> buffer)
         {
