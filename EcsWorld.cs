@@ -484,7 +484,7 @@ namespace CodexECS
             if (id < 0)
                 throw new EcsException("negative id");
 #endif
-            var componentId = ComponentTypeToIdMapping.Mapping[type];
+            var componentId = ComponentMapping.TypeToId[type];
             UpdateFiltersOnAdd(componentId, id);
 
             var pool = GetPool(componentId);

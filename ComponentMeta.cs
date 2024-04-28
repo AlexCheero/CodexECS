@@ -13,9 +13,10 @@ namespace CodexECS
         internal static int Counter = -1;
     }
 
-    public static class ComponentTypeToIdMapping
+    public static class ComponentMapping
     {
-        public static Dictionary<Type, int> Mapping = new();
+        public static Dictionary<Type, int> TypeToId = new();
+        public static Dictionary<int, Type> IdToType = new();
     }
 
     public static class ComponentMeta<T>
@@ -32,7 +33,8 @@ namespace CodexECS
         {
             Id = Interlocked.Increment(ref ComponentIdCounter.Counter);
             var type = typeof(T);
-            ComponentTypeToIdMapping.Mapping[type] = Id;
+            ComponentMapping.TypeToId[type] = Id;
+            ComponentMapping.IdToType[Id] = type;
             IsTag = typeof(ITag).IsAssignableFrom(type);
             
             if (IsTag)
