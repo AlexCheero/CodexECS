@@ -119,7 +119,12 @@ namespace CodexECS
         public void Add(int id)
         {
             if (_lockCount.Value > 0)
-                _addSet.Add(id);
+            {
+                if (_removeSet.Contains(id))
+                    _removeSet.Remove(id);
+                else
+                    _addSet.Add(id);
+            }
             else if (!_filteredEntities.ContainsKey(id))
             {
                 _entitiesVector.Add(id);
@@ -130,7 +135,12 @@ namespace CodexECS
         public void Remove(int id)
         {
             if (_lockCount.Value > 0)
-                _removeSet.Add(id);
+            {
+                if (_addSet.Contains(id))
+                    _addSet.Remove(id);
+                else
+                    _removeSet.Add(id);    
+            }
             else if (_filteredEntities.TryGetValue(id, out int idx))
             {
                 var lastEntity = _entitiesVector._elements[_entitiesVector._end - 1];
