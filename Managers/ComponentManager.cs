@@ -14,7 +14,7 @@ namespace CodexECS
             _componentsPools = new();
         }
 
-        //slow, use Archetypes.Have instead
+        [Obsolete("slow, use Archetypes.Have instead")]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Have<T>(EntityType eid)
         {
