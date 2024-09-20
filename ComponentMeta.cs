@@ -23,11 +23,17 @@ namespace CodexECS
     {
         public static int Id
         {
-            [MethodImpl(MethodImplOptions.AggressiveInlining)] get;
-            [MethodImpl(MethodImplOptions.AggressiveInlining)] private set;
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get;
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            private set;
         }
-        
-        public static bool IsTag { get; }
+
+        public static bool IsTag
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get;
+        }
 
         static ComponentMeta()
         {
@@ -36,7 +42,7 @@ namespace CodexECS
             ComponentMapping.TypeToId[type] = Id;
             ComponentMapping.IdToType[Id] = type;
             IsTag = typeof(ITag).IsAssignableFrom(type);
-            
+
             if (IsTag)
                 PoolFactory.FactoryMethods.Add(Id, (poolSize) => new TagsPool<T>(poolSize));
             else

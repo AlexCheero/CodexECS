@@ -1,4 +1,5 @@
 ﻿using System;
+using CodexECS.Utility;
 using System.Runtime.CompilerServices;
 
 namespace CodexECS
@@ -6,10 +7,10 @@ namespace CodexECS
     class SparseSet<T>
     {
         private int[] _sparse;
-        private SimpleVector<T> _values;
+        private SimpleList<T> _values;
 
         //don't chage outside of SparseSet. made public only for manual unrolling
-        public SimpleVector<int> _dense;
+        public SimpleList<int> _dense;
 
         public int Length
         {
@@ -28,8 +29,8 @@ namespace CodexECS
             _sparse = new int[initialCapacity];
             for (int i = 0; i < initialCapacity; i++)
                 _sparse[i] = -1;
-            _values = new SimpleVector<T>(initialCapacity);
-            _dense = new SimpleVector<int>(initialCapacity);
+            _values = new SimpleList<T>(initialCapacity);
+            _dense = new SimpleList<int>(initialCapacity);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -43,10 +44,9 @@ namespace CodexECS
             if (outerIdx >= _sparse.Length)
             {
                 var oldLength = _sparse.Length;
-                var newLength = oldLength > 0 ? oldLength << 1 : 2;
-                while (outerIdx >= newLength)//TODO: probably can get rid of loop here
-                    newLength <<= 1;
-                Array.Resize(ref _sparse, newLength);
+
+                const int maxResizeDelta = 256;
+                Utils.ResizeArray(outerIdx, ref _sparse, maxResizeDelta);
                 for (int i = oldLength; i < _sparse.Length; i++)
                     _sparse[i] = -1;
             }
@@ -75,14 +75,14 @@ namespace CodexECS
         {
             var innerIndex = _sparse[outerIdx];
             _sparse[outerIdx] = -1;
-            _values.Remove(innerIndex);
-            _dense.Remove(innerIndex);
+            _values.RemoveAt(innerIndex);
+            _dense.RemoveAt(innerIndex);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Clear()
         {
-            //TODO: make proper define
+            //CODEX_TODO: make proper define
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP2_0_OR_GREATER || NET5_0_OR_GREATER
             Array.Fill(_sparse, -1);
 #else

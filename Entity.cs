@@ -37,6 +37,7 @@ namespace CodexECS
             return entity.Val & NullEntity.Val;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void SetId(this ref Entity entity, in EntityType id)
         {
 #if DEBUG
@@ -46,6 +47,7 @@ namespace CodexECS
             entity.Val = id | (entity.GetVersion() << BitSizeHalved);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void SetNullId(this ref Entity entity)
         {
             entity.Val = NullEntity.GetId() | (entity.GetVersion() << BitSizeHalved);
@@ -57,13 +59,14 @@ namespace CodexECS
             return entity.GetId() == NullEntity.GetId();
         }
 
-        //TODO: use smaller part for version
+        //CODEX_TODO: use smaller part for version
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static EntityType GetVersion(this in Entity entity)
         {
             return entity.Val >> BitSizeHalved;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void IncrementVersion(this ref Entity entity)
         {
             EntityType version = entity.GetVersion();

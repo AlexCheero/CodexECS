@@ -1,5 +1,6 @@
-﻿using System;
+﻿using CodexECS.Utility;
 using System.Runtime.CompilerServices;
+using System;
 
 #if DEBUG
 using System.Text;
@@ -7,7 +8,7 @@ using System.Text;
 
 namespace CodexECS
 {
-    interface IComponentsPool
+    public interface IComponentsPool
     {
         public int Length { get; }
         public bool Contains(int id);
@@ -31,7 +32,14 @@ namespace CodexECS
         //made public only for unrolling indexer for speeding up
         public int[] _sparse;
         private int[] _dense;
-        public SimpleVector<T> _values;
+        //CODEX_TODO: check if having plain array or at least manual unrolling of vector's indexer would speed up things
+        public SimpleList<T> _values;
+
+        public ref T this[int id]
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get => ref _values[_sparse[id]];
+        }
 
 #if DEBUG
         private void CheckArrays()
@@ -76,7 +84,7 @@ namespace CodexECS
         {
             var innerIndex = _sparse[id];
             _sparse[id] = -1;
-            _values.Remove(innerIndex);
+            _values.RemoveAt(innerIndex);
             if (innerIndex < _values.Length)
             {
                 var lastId = _dense[_values.Length];
@@ -149,13 +157,7 @@ namespace CodexECS
 #endif
             Add(to, _values[_sparse[from]]);
         }
-#endregion
-
-        //public ref T this[int id]
-        //{
-        //    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        //    get => ref _values[_sparse[id]];
-        //}
+        #endregion
 
         public ComponentsPool(int initialCapacity = 0)
         {
@@ -163,9 +165,10 @@ namespace CodexECS
             _dense = new int[initialCapacity];
             for (int i = 0; i < initialCapacity; i++)
                 _sparse[i] = -1;
-            _values = new SimpleVector<T>(initialCapacity);
+            _values = new SimpleList<T>(initialCapacity);
         }
 
+        //CODEX_TODO: excess call, rewrite
         public void AddReference(int id, object value)
         {
 #if DEBUG
@@ -181,10 +184,8 @@ namespace CodexECS
             if (id >= _sparse.Length)
             {
                 var oldLength = _sparse.Length;
-                var newLength = oldLength > 0 ? oldLength * 2 : 2;
-                while (id >= newLength)
-                    newLength *= 2;
-                Array.Resize(ref _sparse, newLength);
+                const int maxResizeDelta = 256;
+                Utils.ResizeArray(id, ref _sparse, maxResizeDelta);
                 for (int i = oldLength; i < _sparse.Length; i++)
                     _sparse[i] = -1;
             }
@@ -217,7 +218,7 @@ namespace CodexECS
         public Type GetComponentType() => typeof(T);
 #endif
 
-#region Interface implementation
+        #region Interface implementation
         public int Length
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -252,7 +253,7 @@ namespace CodexECS
 #endif
             Add(to);
         }
-#endregion
+        #endregion
 
         public TagsPool(int initialCapacity = 0)
         {

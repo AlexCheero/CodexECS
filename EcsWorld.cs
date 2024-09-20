@@ -1,136 +1,39 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using EntityType = System.Int32;//duplicated in EntityExtension
 
 #if DEBUG
 using System.Text;
 #endif
 
-//TODO: cover with tests
 namespace CodexECS
 {
-    //TODO: think about implementing dynamically counted initial size
-    public static class EcsCacheSettings
-    {
-        public static int UpdateSetSize = 4;
-        public static int PoolSize = 512;
-        public static int FilteredEntitiesSize = 128;
-        public static int PoolsCount = 16;
-    }
-
-    class EcsException : Exception
-    {
-        public EcsException(string msg) : base(msg) { }
-    }
-
     public class EcsWorld
     {
-        private SimpleVector<Entity> _entites;
-        private Entity _recycleListHead = EntityExtension.NullEntity;
+        private EntityManager _entityManager;
+        private ComponentManager _componentManager;
+        private ArchetypesManager _archetypes;
 
-        private SimpleVector<BitMask> _masks;
-
-        private SparseSet<IComponentsPool> _componentsPools;
-
-        //update sets holds indices of filters by types
-        private Dictionary<int, HashSet<int>> _includeUpdateSets;
-        private Dictionary<int, HashSet<int>> _excludeUpdateSets;
-        private FiltersCollection _filtersCollection;
-
-        private HashSet<int> _delayedDeleteList;
-        private readonly Dictionary<int, List<Enumerable>> _enumerables;
-
-        public EcsWorld(int entitiesReserved = 32)
+        public EcsWorld()
         {
-            //TODO: ensure that _entities and masks are always have same length
-            _entites = new SimpleVector<Entity>(entitiesReserved);
-            _masks = new SimpleVector<BitMask>(entitiesReserved);
-            _componentsPools = new SparseSet<IComponentsPool>(EcsCacheSettings.PoolsCount);
-            
-            _includeUpdateSets = new Dictionary<int, HashSet<int>>();
-            _excludeUpdateSets = new Dictionary<int, HashSet<int>>();
-            _filtersCollection = new FiltersCollection();
+            _entityManager = new EntityManager();
+            _componentManager = new ComponentManager();
+            _archetypes = new ArchetypesManager();
+            _delayedDeleteList = new HashSet<EntityType>();
 
-            _delayedDeleteList = new HashSet<int>();
-            _enumerables = new Dictionary<int, List<Enumerable>>();
-
-            _idAddListeners = new();
-            _filtersToNotifyOnAdd = new();
-            _unlockListeners = new();
-            _cleanups = new();
-        }
-
-        //prealloc ctor
-        public EcsWorld(EcsWorld other)
-        {
-            _entites = new SimpleVector<Entity>(other._entites.Reserved);
-            _masks = new SimpleVector<BitMask>(other._masks.Reserved);
-            _componentsPools = new SparseSet<IComponentsPool>(other._componentsPools.Length);
-
-            //update sets should be same for every copy of the world
-            _includeUpdateSets = other._includeUpdateSets;
-            _excludeUpdateSets = other._excludeUpdateSets;
-            _filtersCollection = new FiltersCollection(other._filtersCollection.Length);
-
-            _delayedDeleteList = new HashSet<int>();
-            _enumerables = new Dictionary<int, List<Enumerable>>();
-
-            _idAddListeners = new();
-            _filtersToNotifyOnAdd = new();
-            _unlockListeners = new();
-            _cleanups = new();
-        }
-
-        public void Copy(in EcsWorld other)
-        {
-            _entites.Copy(other._entites);
-            _recycleListHead = other._recycleListHead;
-            _masks.Copy(other._masks);
-
-            var length = other._componentsPools.Length;
-            var dense = other._componentsPools._dense;
-            for (int i = 0; i < length; i++)
-            {
-                var compId = dense[i];
-                var otherPool = other._componentsPools[compId];
-                if (_componentsPools.Contains(compId))
-                    _componentsPools[compId].Copy(otherPool);
-                else
-                    _componentsPools.Add(compId, otherPool.Duplicate());
-            }
-
-            if (length < _componentsPools.Length)
-            {
-                for (int i = 0; i < _componentsPools.Length; i++)
-                {
-                    var compId = _componentsPools._dense[i];
-                    if (!other._componentsPools.Contains(compId))
-                        _componentsPools[compId].Clear();
-                }
-            }
-
-            _filtersCollection.Copy(other._filtersCollection);
-        }
-
-#region Entities methods
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool IsEnitityInRange(int id) => id < _entites.Length;
-        
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private ref Entity GetRefById(int id)
-        {
-#if DEBUG
-            if (id == EntityExtension.NullEntity.GetId())
-                throw new EcsException("null entity id");
-            if (!IsEnitityInRange(id))
-                throw new EcsException("wrong entity id: " + id);
-#endif
-            return ref _entites[id];
+            _delayedAddComponentBuffer = new();
+            _delayedRemoveComponentBuffer = new();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private ref Entity GetRefById(Entity other) => ref GetRefById(other.GetId());
+        public ref Entity GetRefById(int id) => ref _entityManager.GetRefById(id);
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ref Entity GetRefById(Entity other) => ref _entityManager.GetRefById(other.GetId());
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private bool IsEntityInRange(int id) => _entityManager.IsEntityInRange(id);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Entity GetById(int id) => GetRefById(id);
@@ -158,437 +61,205 @@ namespace CodexECS
             var id = entity.GetId();
             return !IsDead(id) && entity.GetVersion() == GetById(id).GetVersion();
         }
-        
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool IsIdValid(int id) => id >= 0 && id != EntityExtension.NullEntity.GetId() && !IsDead(id);
 
-        private int GetRecycledId()
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public EntityType Create()
         {
-            ref var curr = ref _recycleListHead;
-            ref var next = ref GetRefById(curr);
-            while (!next.IsNull())
-            {
-                curr = ref next;
-                next = ref GetRefById(next);
-            }
-
-            next.SetId(curr.GetId());
-            next.IncrementVersion();
-            curr.SetNullId();
-            return next.GetId();
+            var entity = _entityManager.Create();
+            _archetypes.AddToArchetype(entity, new BitMask());
+            return entity;
         }
 
-        #region Enumerable
-        private int _lockCounter;
-        private bool IsLocked { get => _lockCounter > 0; }
-        private void Lock()
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool Have<T>(EntityType eid) => _archetypes.Have<T>(eid);
+
+        private Dictionary<EntityType, HashSet<int>> _delayedAddComponentBuffer;
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Add<T>(EntityType eid, T component = default)
         {
+            if (_lockCounter > 0)
+            {
+                if (!_delayedAddComponentBuffer.ContainsKey(eid))
+                    _delayedAddComponentBuffer[eid] = new();
+                bool added = _delayedAddComponentBuffer[eid].Add(ComponentMeta<T>.Id);
 #if DEBUG
-            //TODO: could cause problems even for single thread in nested loops
-            //if (_lockCounter > 0)
-            //    throw new EcsException("_lockCounter is positive. error only for single thread");
+                if (!added)
+                    throw new EcsException("component already added");
 #endif
 
-            _lockCounter++;
+            }
+            else
+            {
+#if DEBUG
+                if (_delayedAddComponentBuffer.Count > 0)
+                    throw new EcsException("_delayedAddComponentBuffer is not empty here");
+#endif
+                _archetypes.AddComponent<T>(eid);
+            }
+            AddInternal<T>(eid, component);
         }
 
-        private void Unlock()
+        //CODEX_TODO: is it really needed?
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void AddReference(Type type, int id, object component) => _componentManager.AddReference(type, id, component);
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void AddInternal<T>(EntityType eid, T component = default) => _componentManager.Add<T>(eid, component);
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ref T GetComponent<T>(EntityType eid) => ref _componentManager.GetComponent<T>(eid);
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool TryAdd<T>(EntityType eid)
+        {
+            if (Have<T>(eid))
+                return false;
+            Add<T>(eid);
+            return true;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ref T GetOrAddComponent<T>(EntityType eid)
+        {
+            if (!Have<T>(eid))
+                Add<T>(eid);
+            return ref GetComponent<T>(eid);
+        }
+
+        private Dictionary<EntityType, HashSet<int>> _delayedRemoveComponentBuffer;
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Remove<T>(EntityType eid)
+        {
+            if (_lockCounter > 0)
+            {
+                if (!_delayedRemoveComponentBuffer.ContainsKey(eid))
+                    _delayedRemoveComponentBuffer[eid] = new();
+                bool removed = _delayedRemoveComponentBuffer[eid].Add(ComponentMeta<T>.Id);
+#if DEBUG
+                if (!removed)
+                    throw new EcsException("component already removed");
+#endif
+            }
+            else
+            {
+#if DEBUG
+                if (_delayedRemoveComponentBuffer.Count > 0)
+                    throw new EcsException("_delayedRemoveComponentBuffer is not empty here");
+#endif
+                _archetypes.RemoveComponent<T>(eid);
+            }
+
+            _componentManager.Remove<T>(eid);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool TryRemove<T>(int eid)
+        {
+            if (!Have<T>(eid))
+                return false;
+            Remove<T>(eid);
+            return true;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public EcsFilter RegisterFilter(FilterMasks masks)
+        {
+            _archetypes.RegisterFilter(this, masks, out EcsFilter filter);
+            return filter;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public EcsFilter RegisterFilter(in BitMask includes, in BitMask excludes = default)
+        {
+            return RegisterFilter(new FilterMasks
+            {
+                Includes = includes,
+                Excludes = excludes
+            });
+        }
+
+        private uint _lockCounter;
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Lock() { _lockCounter++; }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Unlock()
         {
             _lockCounter--;
-
 #if DEBUG
             if (_lockCounter < 0)
-                throw new EcsException("world's lock counter negative");
-            else
+                throw new EcsException("negative lock counter");
 #endif
-
             if (_lockCounter == 0)
             {
-                foreach (var id in _delayedDeleteList)
-                    Delete(id);
-                _delayedDeleteList.Clear();
-            }
-        }
-
-        public void CallReactiveSystems()
-        {
-            foreach (var id in _filtersToNotifyOnAdd)
-            {
-#if DEBUG
-                if (!_unlockListeners.ContainsKey(id))
-                    throw new EcsException("_filtersToNotifyOnAdd contains unregistered filter!");
-                if (!_cleanups.ContainsKey(id))
-                    throw new EcsException("_cleanups desynch!");
-#endif
-                _unlockListeners[id](this);
-                _cleanups[id]();
-            }
-            _filtersToNotifyOnAdd.Clear();
-        }
-
-        public void ManualLock(int filterId)
-        {
-            Lock();
-            _filtersCollection[filterId].Lock();
-        }
-
-        public void ManualUnlock(int filterId)
-        {
-            _filtersCollection[filterId].Cleanup();
-            Unlock();
-        }
-
-        public class Enumerable : IDisposable
-        {
-            private EcsWorld _world;
-            private EcsFilter _filter;
-
-            public bool IsInUse { get; private set; }
-
-            public Enumerable(EcsWorld world, int filterId)
-            {
-                _world = world;
-                _filter = _world._filtersCollection[filterId];
-            }
-
-            public Enumerable GetEnumerator()
-            {
-                _filter.Lock();
-                IsInUse = true;
-                return this;
-            }
-
-            public int Current
-            {
-                get => _filter.Current;
-            }
-
-            public bool MoveNext() => _filter.MoveNext();
-
-            public void Dispose()
-            {
-                IsInUse = false;
-                _world.Unlock();
-                _filter.Cleanup();
-            }
-        }
-
-        public Enumerable Enumerate(int filterId)
-        {
-            Lock();
-            if (!_enumerables.ContainsKey(filterId))
-                _enumerables.Add(filterId, new List<Enumerable> { new Enumerable(this, filterId) });
-            foreach (var enumerable in _enumerables[filterId])
-                if (!enumerable.IsInUse)
-                    return enumerable;
-            var newEnumerable = new Enumerable(this, filterId);
-            _enumerables[filterId].Add(newEnumerable);
-
-            return newEnumerable;
-        }
-        #endregion
-
-        public void Delete(int id)
-        {
-            if (IsLocked)
-            {
-                _delayedDeleteList.Add(id);
-                return;
-            }
-
-            ref Entity entity = ref GetRefById(id);
-#if DEBUG
-            if (entity.IsNull())
-                throw new EcsException("trying to delete null entity");
-            if (IsDead(id))
-                throw new EcsException("trying to delete already dead entity");
-            if (!IsEnitityInRange(id))
-                throw new EcsException("trying to delete wrong entity");
-#endif
-            var mask = _masks[id];
-            foreach (var bit in mask)
-                Remove(bit, id);
-
-            //TODO: check if this method is really needed here (it seems that while loop above does all the work)
-            //_filtersCollection.RemoveId(id);
-
-            ref var recycleListEnd = ref _recycleListHead;
-            while (!recycleListEnd.IsNull())
-                recycleListEnd = ref GetRefById(recycleListEnd);
-            recycleListEnd.SetId(id);
-            entity.SetNullId();
-        }
-
-        public int Create()
-        {
-            if (!_recycleListHead.IsNull())
-                return GetRecycledId();
-
-            var lastEntity = new Entity(_entites.Length);
-#if DEBUG
-            if (lastEntity.Val == EntityExtension.NullEntity.Val)
-                throw new EcsException("entity limit reached");
-            if (_entites.Length < 0)
-                throw new EcsException("entities vector length overflow");
-            if (lastEntity.GetVersion() > 0)
-                throw new EcsException("lastEntity version should always be 0");
-#endif
-
-            _entites.Add(lastEntity);
-            _masks.Add(new BitMask());//TODO: precache with _registeredComponents.Count
-            return _entites.Length - 1;
-        }
-
-        //TODO: implement copying without component override
-        public void CopyComponents(Entity from, Entity to/*, bool overrideIfExists*/)
-        {
-#if DEBUG
-            if (!IsEntityValid(from))
-                throw new EcsException("trying to move components from invalid entity");
-            if (!IsEntityValid(to))
-                throw new EcsException("trying to move components to invalid entity");
-#endif
-
-            var fromId = from.GetId();
-            var toId = to.GetId();
-            var fromMask = _masks[fromId];
-            ref var toMask = ref _masks[toId];
-            foreach (var bit in fromMask)
-            {
-                _componentsPools[bit].CopyItem(fromId, toId);
-                toMask.Set(bit);
-                UpdateFiltersOnAdd(bit, toId);
-            }
-        }
-        #endregion
-
-        #region Reactive systems
-        private Dictionary<int, Action<int>> _idAddListeners;
-        private HashSet<int> _filtersToNotifyOnAdd;
-        private Dictionary<int, Action<EcsWorld>> _unlockListeners;
-        private Dictionary<int, Action> _cleanups;
-
-        public void SubscribeReactiveSystem(
-            int filterId,
-            Action<int> addIdCallback,
-            Action<EcsWorld> unlockCallback,
-            Action cleanupFunction)
-        {
-            if (_idAddListeners.ContainsKey(filterId))
-                _idAddListeners[filterId] += addIdCallback;
-            else
-                _idAddListeners.Add(filterId, addIdCallback);
-
-            if (_unlockListeners.ContainsKey(filterId))
-                _unlockListeners[filterId] += unlockCallback;
-            else
-                _unlockListeners.Add(filterId, unlockCallback);
-
-            if (_cleanups.ContainsKey(filterId))
-                _cleanups[filterId] += cleanupFunction;
-            else
-                _cleanups.Add(filterId, cleanupFunction);
-        }
-        #endregion
-
-        #region Components methods
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Have<T>(int id) => _masks[id].Check(ComponentMeta<T>.Id);
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool Have(int componentId, int id) => _masks[id].Check(componentId);
-
-        private void AddIdToFlters(int id, HashSet<int> filterIds)
-        {
-            foreach (var filterId in filterIds)
-            {
-                var filter = _filtersCollection[filterId];
-
-                var pass = _masks[id].InclusivePass(filter.Includes);
-                pass &= _masks[id].ExclusivePass(filter.Excludes);
-                if (!pass)
-                    continue;
-                //could try to add same id several times due to delayed set modification operations
-                filter.Add(id);
-
-                if (_idAddListeners.ContainsKey(filterId))
+                //CODEX_TODO: do the same for adding/deleting components
+                foreach (var eid in _delayedDeleteList)
+                    Delete_Impl(eid);
+                foreach (var (eid, addedSet) in _delayedAddComponentBuffer)
                 {
-                    _idAddListeners[filterId](id);
-                    _filtersToNotifyOnAdd.Add(filterId);
+                    foreach (var compId in addedSet)
+                        _archetypes.AddComponent(eid, compId);
+                    addedSet.Clear();
                 }
+                foreach (var (eid, removedSet) in _delayedRemoveComponentBuffer)
+                {
+                    foreach (var compId in removedSet)
+                        _archetypes.RemoveComponent(eid, compId);
+                    removedSet.Clear();
+                }
+
+                _delayedDeleteList.Clear();
+                _delayedAddComponentBuffer.Clear();
+                _delayedRemoveComponentBuffer.Clear();
             }
         }
 
-        private void RemoveIdFromFilters(int id, HashSet<int> filterIds)
+        private HashSet<EntityType> _delayedDeleteList;
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Delete(EntityType eid)
         {
-            foreach (var filterId in filterIds)
+            if (_lockCounter > 0)
             {
-                var filter = _filtersCollection[filterId];
-
-                var pass = _masks[id].InclusivePass(filter.Includes);
-                pass &= _masks[id].ExclusivePass(filter.Excludes);
-
-                if (!pass)
-                    continue;
-                //could try to remove same id several times due to delayed set modification operations
-                filter.Remove(id);
+                _delayedDeleteList.Add(eid);
             }
-        }
-
-        public bool CheckAgainstMasks(int id, BitMask includes = default, BitMask excludes = default) =>
-            _masks[id].InclusivePass(includes) && _masks[id].ExclusivePass(excludes);
-
-        private void UpdateFiltersOnAdd(int componentId, int id)
-        {
-            if (_excludeUpdateSets.ContainsKey(componentId))
-                RemoveIdFromFilters(id, _excludeUpdateSets[componentId]);
-
-            _masks[id].Set(componentId);
-
-            if (!_includeUpdateSets.ContainsKey(componentId))
-            {
-#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP2_0_OR_GREATER || NET5_0_OR_GREATER
-                _includeUpdateSets.Add(componentId, new HashSet<int>(EcsCacheSettings.UpdateSetSize));
-#else
-                _includeUpdateSets.Add(componentId, new HashSet<int>());
-#endif
-            }
-            AddIdToFlters(id, _includeUpdateSets[componentId]);
-        }
-
-        private void UpdateFiltersOnRemove(int componentId, int id)
-        {
-            RemoveIdFromFilters(id, _includeUpdateSets[componentId]);
-#if DEBUG
-            if (_masks[id].Length <= componentId)
-                throw new EcsException("there was no component ever");
-#endif
-            _masks[id].Unset(componentId);
-
-            if (!_excludeUpdateSets.ContainsKey(componentId))
-            {
-#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP2_0_OR_GREATER || NET5_0_OR_GREATER
-                _excludeUpdateSets.Add(componentId, new HashSet<int>(EcsCacheSettings.UpdateSetSize));
-#else
-                _excludeUpdateSets.Add(componentId, new HashSet<int>());
-#endif
-            }
-            AddIdToFlters(id, _excludeUpdateSets[componentId]);
-        }
-
-        public void AddReference(Type type, int id, object component)
-        {
-#if DEBUG
-            if (component is ValueType)
-                throw new EcsException("trying to add object of value type as reference");
-            if (id < 0)
-                throw new EcsException("negative id");
-#endif
-            var componentId = ComponentMapping.TypeToId[type];
-            UpdateFiltersOnAdd(componentId, id);
-
-            var pool = GetPool(componentId);
-#if DEBUG
-            if (pool == null)
-                throw new EcsException("invalid pool");
-#endif
-            pool.AddReference(id, component);
-        }
-
-        public void Add<T>(int id, T component = default)
-        {
-#if DEBUG
-            if (id < 0)
-                throw new EcsException("negative id");
-#endif
-            var componentId = ComponentMeta<T>.Id;
-            UpdateFiltersOnAdd(componentId, id);
-
-            var pool = GetPool(componentId);
-#if DEBUG
-            if (pool == null)
-                throw new EcsException("invalid pool");
-#endif
-            if (ComponentMeta<T>.IsTag)
-                ((TagsPool<T>)pool).Add(id);
             else
-                ((ComponentsPool<T>)pool).Add(id, component);
-        }
-
-        private IComponentsPool GetPool(int componentId)
-        {
-            if (!_componentsPools.Contains(componentId))
-                _componentsPools.Add(componentId, PoolFactory.FactoryMethods[componentId](EcsCacheSettings.PoolSize));
-            return _componentsPools[componentId];
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ref T GetComponent<T>(int id)
-        {
+            {
 #if DEBUG
-            if (!Have<T>(id))
-                throw new EcsException("entity have no " + typeof(T));
+                if (_delayedDeleteList.Count > 0)
+                    throw new EcsException("_delayedDeleteList is not empty here");
 #endif
-            var pool = (ComponentsPool<T>)_componentsPools[ComponentMeta<T>.Id];
-            return ref pool._values[pool._sparse[id]];
+                Delete_Impl(eid);
+            }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool TryAdd<T>(int id)
+        private void Delete_Impl(EntityType eid)
         {
-            if (Have<T>(id))
-                return false;
-            Add<T>(id);
-            return true;
+            //CODEX_TODO: check if manual mask iteration is really faster and if so, use it instead
+            //ref var mask = ref _archetypes.GetMask(eid);
+            //for (int i = mask.GetNextSetBit(0); i >= 0; i = mask.GetNextSetBit(i + 1))
+            //    _componentManager.Remove(i, eid);
+            foreach (var componentId in _archetypes.GetMask(eid))
+                _componentManager.Remove(componentId, eid);
+
+            _archetypes.Delete(eid);
+            _entityManager.Delete(eid);
         }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ref T GetOrAddComponent<T>(int id)
-        {
-            if (Have<T>(id))
-                return ref GetComponent<T>(id);
-            Add<T>(id);
-            return ref GetComponent<T>(id);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Remove<T>(int id) => Remove(ComponentMeta<T>.Id, id);
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool TryRemove<T>(int id)
-        {
-            if (!Have<T>(id))
-                return false;
-            Remove(ComponentMeta<T>.Id, id);
-            return true;
-
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void Remove(int componentId, int id)
-        {
-            UpdateFiltersOnRemove(componentId, id);
-            _componentsPools[componentId].Remove(id);
-        }
-
-        public ref readonly BitMask EntityMask(int id) => ref _masks[id];
 
 #if DEBUG
-        public void GetTypesForId(int id, HashSet<Type> buffer)
-        {
-            buffer.Clear();
-            var mask = _masks[id];
-            foreach (var bit in mask)
-                buffer.Add(_componentsPools[bit].GetComponentType());
-        }
-
-        private string DebugString(int id, int componentId) => _componentsPools[componentId].DebugString(id);
+        public void GetTypesForId(int id, HashSet<Type> buffer) =>
+            _componentManager.GetTypesByMask(_archetypes.GetMask(id), buffer);
+        
+        private string DebugString(int id, int componentId) =>
+            _componentManager.GetPool(componentId).DebugString(id);
 
         public string DebugEntity(int id)
         {
             if (id < 0)
                 return "negative entity";
-            var mask = _masks[id];
+            var mask = _archetypes.GetMask(id);
             StringBuilder sb = new StringBuilder();
             foreach (var bit in mask)
                 sb.Append("\n\t" + DebugString(id, bit));
@@ -597,9 +268,9 @@ namespace CodexECS
 
         public void DebugAll(StringBuilder sb)
         {
-            for (int i = 0; i < _entites.Length; i++)
+            for (int i = 0; i < _entityManager.EntitiesCount; i++)
             {
-                var entity = _entites[i];
+                var entity = _entityManager.GetEntity(i);
                 if (IsEntityValid(entity))
                 {
                     var id = entity.GetId();
@@ -609,72 +280,5 @@ namespace CodexECS
             }
         }
 #endif
-#endregion
-#region Filters methods
-
-        private void AddFilterToUpdateSets(in BitMask components, int filterIdx
-            , Dictionary<int, HashSet<int>> sets)
-        {
-            foreach (var bit in components)
-            {
-                if (!sets.ContainsKey(bit))
-                {
-#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP2_0_OR_GREATER || NET5_0_OR_GREATER
-                    sets.Add(nextSetBit, new HashSet<int>(EcsCacheSettings.UpdateSetSize));
-#else
-                    sets.Add(bit, new HashSet<int>());
-#endif
-                }
-
-#if DEBUG
-                if (sets[bit].Contains(filterIdx))
-                    throw new EcsException("set already contains this filter!");
-#endif
-
-                sets[bit].Add(filterIdx);
-            }
-        }
-
-        public int RegisterFilter(in BitMask includes)
-        {
-            BitMask defaultExcludes = default;
-            return RegisterFilter(in includes, in defaultExcludes);
-        }
-
-        public int RegisterFilter(in BitMask includes, in BitMask excludes)
-        {
-            int filterId;
-            if (_filtersCollection.TryAdd(in includes, in excludes, out filterId))
-            {
-                var filter = _filtersCollection[filterId];
-                AddFilterToUpdateSets(in filter.Includes, filterId, _includeUpdateSets);
-                AddFilterToUpdateSets(in filter.Excludes, filterId, _excludeUpdateSets);
-
-                for ( int i = 0; i < _entites.Length; i++ )
-                {
-                    if (!IsEntityValid(_entites[i]))
-                        continue;
-
-                    var id = _entites[i].GetId();
-                    var pass = _masks[id].InclusivePass(filter.Includes);
-                    pass &= _masks[id].ExclusivePass(filter.Excludes);
-                    if (pass)
-                        filter.Add(id);
-                }
-            }
-
-            return filterId;
-        }
-
-        public int EntitiesCount(int filterId) => _filtersCollection[filterId].Length;
-
-        public int GetNthEntityFromFilter(int filterId, int n)
-        {
-            if (filterId >= _filtersCollection.Length)
-                return -1;
-            var filter = _filtersCollection[filterId];
-            return filter.Length > n ? filter[n] : -1;
-        }
-#endregion
     }
 }

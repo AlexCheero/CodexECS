@@ -1,10 +1,11 @@
 ﻿using System;
+using CodexECS.Utility;
 using System.Runtime.CompilerServices;
 
 namespace CodexECS
 {
-    //TODO: rename to simple list to match c# style
-    class SimpleVector<T>
+    //CODEX_TODO: rename to simple list to match c# style
+    class SimpleList<T>
     {
         public T[] _elements;
         public int _end = 0;
@@ -27,13 +28,13 @@ namespace CodexECS
             get => ref _elements[i];
         }
 
-        public SimpleVector(int reserved = 0)
+        public SimpleList(int reserved = 2)
         {
             _elements = new T[reserved];
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Copy(in SimpleVector<T> other)
+        public void Copy(in SimpleList<T> other)
         {
             _end = other._end;
             if (_elements.Length < _end)
@@ -42,7 +43,7 @@ namespace CodexECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Remove(int idx)
+        public void RemoveAt(int idx)
         {
             _elements[idx] = default;
             _end--;
@@ -61,10 +62,8 @@ namespace CodexECS
         {
             if (_end >= _elements.Length)
             {
-                var newLength = _elements.Length > 0 ? _elements.Length * 2 : 2;
-                while (_end >= newLength)
-                    newLength *= 2;
-                Array.Resize(ref _elements, newLength);
+                const int maxResizeDelta = 256;
+                Utils.ResizeArray(_end, ref _elements, maxResizeDelta);
             }
             _elements[_end] = element;
             _end++;
