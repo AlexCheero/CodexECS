@@ -99,12 +99,16 @@ namespace CodexECS
 #endif
                 _archetypes.AddComponent<T>(eid);
             }
-            AddInternal<T>(eid, component);
+            AddInternal(eid, component);
         }
 
-        //CODEX_TODO: is it really needed?
+        //CODEX_TODO: probably should implement lock checks as in Add
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void AddReference(Type type, int id, object component) => _componentManager.AddReference(type, id, component);
+        public void AddReference(Type type, int id, object component)
+        {
+            _archetypes.AddComponent(id, ComponentMapping.TypeToId[type]);
+            _componentManager.AddReference(type, id, component);
+        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void AddInternal<T>(EntityType eid, T component = default) => _componentManager.Add<T>(eid, component);
