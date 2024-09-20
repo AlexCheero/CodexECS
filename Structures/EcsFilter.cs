@@ -60,7 +60,7 @@ namespace CodexECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public EntityType GetNthEntitySafe(int idx) => _entitiesArr.Length > idx ? _entitiesArr[idx] : -1;
+        public EntityType GetNthEntitySafe(int idx) => _entitiesLength > idx ? _entitiesArr[idx] : -1;
 
         public EcsFilter(EcsWorld world)
         {
@@ -92,14 +92,10 @@ namespace CodexECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void AddEntity(EntityType entityType)
         {
-#if DEBUG
+            //same entity could be added from different archetypes
             if (_entitiesMap.ContainsKey(entityType))
-            {
-                //same entity could be added from different archetypes
                 return;
-                //throw new EcsException("entity was already in filter");
-            }
-#endif
+            
             _entitiesMap[entityType] = _entitiesLength;
 
 #region Unrolled from SimpleList (Add)
@@ -116,17 +112,12 @@ namespace CodexECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void RemoveEntity(EntityType entityType)
         {
-#if DEBUG
+            //same entity could be removed from different archetypes
             if (!_entitiesMap.TryGetValue(entityType, out var index))
-            {
-                //same entity could be removed from different archetypes
                 return;
-                //throw new EcsException("entity was not in filter");
-            }
-#endif
 
             _entitiesMap.Remove(_entitiesArr[index]);
-            if (_entitiesLength > 1)//swap only if this is not the last element
+            if (_entitiesMap.Count > 1)//swap only if this is not the last element
             {
                 _entitiesArr[index] = _entitiesArr[^1];
                 _entitiesMap[_entitiesArr[index]] = index;

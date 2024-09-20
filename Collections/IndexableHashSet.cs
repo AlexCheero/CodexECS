@@ -47,7 +47,7 @@ namespace CodexECS.Utility
                 return false;
             
             _map.Remove(_arr[index]);
-            if (_arr.Length > 1)//swap only if this is not the last element
+            if (_map.Count > 1)//swap only if this is not the last element
             {
                 _arr[index] = _arr[^1];
                 _map[_arr[index]] = index;
