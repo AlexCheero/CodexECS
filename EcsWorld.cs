@@ -196,28 +196,27 @@ namespace CodexECS
             if (_lockCounter < 0)
                 throw new EcsException("negative lock counter");
 #endif
-            if (_lockCounter == 0)
+            if (_lockCounter != 0)
+                return;
+            //CODEX_TODO: do the same for adding/deleting components
+            foreach (var eid in _delayedDeleteList)
+                Delete_Impl(eid);
+            foreach (var (eid, addedSet) in _delayedAddComponentBuffer)
             {
-                //CODEX_TODO: do the same for adding/deleting components
-                foreach (var eid in _delayedDeleteList)
-                    Delete_Impl(eid);
-                foreach (var (eid, addedSet) in _delayedAddComponentBuffer)
-                {
-                    foreach (var compId in addedSet)
-                        _archetypes.AddComponent(eid, compId);
-                    addedSet.Clear();
-                }
-                foreach (var (eid, removedSet) in _delayedRemoveComponentBuffer)
-                {
-                    foreach (var compId in removedSet)
-                        _archetypes.RemoveComponent(eid, compId);
-                    removedSet.Clear();
-                }
-
-                _delayedDeleteList.Clear();
-                _delayedAddComponentBuffer.Clear();
-                _delayedRemoveComponentBuffer.Clear();
+                foreach (var compId in addedSet)
+                    _archetypes.AddComponent(eid, compId);
+                addedSet.Clear();
             }
+            foreach (var (eid, removedSet) in _delayedRemoveComponentBuffer)
+            {
+                foreach (var compId in removedSet)
+                    _archetypes.RemoveComponent(eid, compId);
+                removedSet.Clear();
+            }
+
+            _delayedDeleteList.Clear();
+            _delayedAddComponentBuffer.Clear();
+            _delayedRemoveComponentBuffer.Clear();
         }
 
         private HashSet<EntityType> _delayedDeleteList;

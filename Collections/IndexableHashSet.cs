@@ -38,6 +38,11 @@ namespace CodexECS.Utility
             _map[value] = _arr.Length;
             _arr.Add(value);
             return true;
+            
+#if DEBUG
+            if (!CheckSynch())
+                throw new EcsException("IdexableHashSet desynch.");
+#endif
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -46,15 +51,33 @@ namespace CodexECS.Utility
             if (!_map.TryGetValue(value, out var index))
                 return false;
             
+            _arr[index] = _arr[^1];
+            _map[_arr[index]] = index;
+            
             _map.Remove(_arr[index]);
-            if (_map.Count > 1)//swap only if this is not the last element
-            {
-                _arr[index] = _arr[^1];
-                _map[_arr[index]] = index;
-            }
             _arr.RemoveAt(_arr.Length - 1);
+            
+#if DEBUG
+            if (!CheckSynch())
+                throw new EcsException("IdexableHashSet desynch.");
+#endif
             
             return true;
         }
+        
+#if DEBUG
+        private bool CheckSynch()
+        {
+            if (_arr.Length != _map.Count)
+                return false;
+            for (int i = 0; i < _arr.Length; i++)
+            {
+                if (_map[_arr[i]] != i)
+                    return false;
+            }
+
+            return true;
+        }
+#endif
     }
 }

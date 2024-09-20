@@ -107,6 +107,11 @@ namespace CodexECS
             _entitiesArr[_entitiesLength] = entityType;
             _entitiesLength++;
 #endregion
+
+#if DEBUG
+            if (!CheckEntitiesSynch())
+                throw new EcsException("Entities desynched!");
+#endif
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -116,21 +121,31 @@ namespace CodexECS
             if (!_entitiesMap.TryGetValue(entityType, out var index))
                 return;
 
-            _entitiesMap.Remove(_entitiesArr[index]);
-            if (_entitiesMap.Count > 1)//swap only if this is not the last element
+            _entitiesLength--;
+            _entitiesArr[index] = _entitiesArr[_entitiesLength];
+            _entitiesMap[_entitiesArr[index]] = index;
+            _entitiesMap.Remove(entityType);
+
+#if DEBUG
+            if (!CheckEntitiesSynch())
+                throw new EcsException("Entities desynched!");
+#endif
+        }
+
+#if DEBUG
+        private bool CheckEntitiesSynch()
+        {
+            if (_entitiesLength != _entitiesMap.Count)
+                return false;
+            for (int i = 0; i < _entitiesLength; i++)
             {
-                _entitiesArr[index] = _entitiesArr[^1];
-                _entitiesMap[_entitiesArr[index]] = index;
+                if (_entitiesMap[_entitiesArr[i]] != i)
+                    return false;
             }
 
-#region Unrolled from SimpleList (Remove)
-            var removeIdx = _entitiesLength - 1;
-            _entitiesArr[removeIdx] = default;
-            _entitiesLength--;
-            if (removeIdx < _entitiesLength)
-                _entitiesArr[removeIdx] = _entitiesArr[_entitiesLength];
-#endregion
+            return true;
         }
+#endif
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public View GetEnumerator()
@@ -139,11 +154,10 @@ namespace CodexECS
             //CODEX_TODO: swap views in order to have first or last view always free
             foreach (View view in _views)
             {
-                if (!view.IsInUse)
-                {
-                    view.Use();
-                    return view;
-                }
+                if (view.IsInUse)
+                    continue;
+                view.Use();
+                return view;
             }
             _views.Add(new View(_world, this));
             _views[^1].Use();
