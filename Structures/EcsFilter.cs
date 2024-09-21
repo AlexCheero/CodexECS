@@ -90,13 +90,20 @@ namespace CodexECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void AddEntity(EntityType entityType)
+        private void AddEntity(EntityType eid)
         {
             //same entity could be added from different archetypes
-            if (_entitiesMap.ContainsKey(entityType))
+            if (_entitiesMap.ContainsKey(eid))
                 return;
             
-            _entitiesMap[entityType] = _entitiesLength;
+            if (_lockCounter > 0)
+            {
+                _entitiesMap[eid] = default;
+                _dirty = true;
+                return;
+            }
+            
+            _entitiesMap[eid] = _entitiesLength;
 
 #region Unrolled from SimpleList (Add)
             if (_entitiesLength >= _entitiesArr.Length)
@@ -104,31 +111,42 @@ namespace CodexECS
                 const int maxResizeDelta = 256;
                 Utils.ResizeArray(_entitiesLength, ref _entitiesArr, maxResizeDelta);
             }
-            _entitiesArr[_entitiesLength] = entityType;
+            _entitiesArr[_entitiesLength] = eid;
             _entitiesLength++;
 #endregion
 
 #if DEBUG
             if (!CheckEntitiesSynch())
                 throw new EcsException("Entities desynched!");
+            if (!CheckUniqueness())
+                throw new EcsException("Entities not unique!");
 #endif
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void RemoveEntity(EntityType entityType)
+        private void RemoveEntity(EntityType eid)
         {
             //same entity could be removed from different archetypes
-            if (!_entitiesMap.TryGetValue(entityType, out var index))
+            if (!_entitiesMap.TryGetValue(eid, out var index))
                 return;
+
+            if (_lockCounter > 0)
+            {
+                _entitiesMap.Remove(eid);
+                _dirty = true;
+                return;
+            }
 
             _entitiesLength--;
             _entitiesArr[index] = _entitiesArr[_entitiesLength];
             _entitiesMap[_entitiesArr[index]] = index;
-            _entitiesMap.Remove(entityType);
+            _entitiesMap.Remove(eid);
 
 #if DEBUG
             if (!CheckEntitiesSynch())
                 throw new EcsException("Entities desynched!");
+            if (!CheckUniqueness())
+                throw new EcsException("Entities not unique!");
 #endif
         }
 
@@ -146,12 +164,69 @@ namespace CodexECS
 
             return true;
         }
+
+        private bool CheckUniqueness()
+        {
+            for (int i = 0; i < _entitiesLength; i++)
+            {
+                for (int j = 0; j < _entitiesLength; j++)
+                {
+                    if (i == j)
+                        continue;
+                    if (_entitiesArr[i] == _entitiesArr[j])
+                        return false;
+                }
+            }
+
+            return true;
+        }
 #endif
+
+        private bool _dirty;
+        private int _lockCounter;
+        private void Lock() => _lockCounter++;
+        private void Unlock()
+        {
+            _lockCounter--;
+#if DEBUG
+            if (_lockCounter < 0)
+                throw new EcsException("negative lock counter");
+#endif
+            if (_lockCounter != 0 || !_dirty)
+                return;
+
+            _entitiesLength = _entitiesMap.Count;
+            if (_entitiesLength > _entitiesArr.Length)
+            {
+                const int maxResizeDelta = 256;
+                Utils.ResizeArray(_entitiesLength, ref _entitiesArr, maxResizeDelta);
+            }
+            
+            //CODEX_TODO: two loops. try to do it in a single loop
+            var arrIdx = 0;
+            foreach (var (eid, idx) in _entitiesMap)
+            {
+                _entitiesArr[arrIdx] = eid;
+                arrIdx++;
+            }
+            for (int i = 0; i < _entitiesLength; i++)
+                _entitiesMap[_entitiesArr[i]] = i;
+
+            _dirty = false;
+            
+#if DEBUG
+            if (!CheckEntitiesSynch())
+                throw new EcsException("Entities desynched!");
+            if (!CheckUniqueness())
+                throw new EcsException("Entities not unique!");
+#endif
+        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public View GetEnumerator()
         {
             _world.Lock();
+            Lock();
             //CODEX_TODO: swap views in order to have first or last view always free
             foreach (View view in _views)
             {
@@ -215,6 +290,7 @@ namespace CodexECS
             public void Dispose()
             {
                 _world.Unlock();
+                _filter.Unlock();
                 Reset();
             }
         }
