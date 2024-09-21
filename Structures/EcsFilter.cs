@@ -139,7 +139,8 @@ namespace CodexECS
                 return false;
             for (int i = 0; i < _entitiesLength; i++)
             {
-                if (_entitiesMap[_entitiesArr[i]] != i)
+                var eid = _entitiesArr[i];
+                if (!_entitiesMap.ContainsKey(eid) || _entitiesMap[eid] != i)
                     return false;
             }
 

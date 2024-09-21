@@ -54,7 +54,7 @@ namespace CodexECS.Utility
             _arr[index] = _arr[^1];
             _map[_arr[index]] = index;
             
-            _map.Remove(_arr[index]);
+            _map.Remove(value);
             _arr.RemoveAt(_arr.Length - 1);
             
 #if DEBUG
