@@ -34,9 +34,9 @@ namespace CodexECS
         private int[] _dense;
         public T[] _values;
 #if DEBUG
-        public int ValuesLength;
-#else
         public int ValuesLength { get; private set; }
+#else
+        public int ValuesLength;
 #endif
 
         public ref T this[int id]
