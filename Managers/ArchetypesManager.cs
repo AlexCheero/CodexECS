@@ -3,6 +3,10 @@ using CodexECS.Utility;
 using System.Runtime.CompilerServices;
 using EntityType = System.Int32;//duplicated in EntityExtension
 
+#if DEBUG
+using System.Linq;
+#endif
+
 namespace CodexECS
 {
     class ArchetypesManager
@@ -28,11 +32,22 @@ namespace CodexECS
         {
             for (int i = 0; i < _eToACount; i++)
             {
-                if (_eToA[i] != null && !_mToA.ContainsKey(_eToA[i].Mask))
+                var archetype = _eToA[i];
+                if (archetype == null)
+                    continue;
+                if (!_mToA.ContainsKey(archetype.Mask))
+                    return false;
+                if (!_mToA[archetype.Mask].Mask.MasksEquals(archetype.Mask))
                     return false;
             }
 
-            //CODEX_TODO: check synch in the other direction (_mToA to _eToA)
+            foreach (var (_, archetype) in _mToA)
+            {
+                if (archetype == null)
+                    return false;
+                if (archetype.Entities.Count > 0 && !_eToA.Contains(archetype))
+                    return false;
+            }
 
             return true;
         }
@@ -154,9 +169,7 @@ namespace CodexECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Delete(EntityType eid)
         {
-            var archetype = _eToA[eid];
-            _mToA.Remove(archetype.Mask);
-            archetype.RemoveEntity(eid);
+            _eToA[eid].RemoveEntity(eid);
             _eToA[eid] = null;
         }
     }
