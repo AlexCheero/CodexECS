@@ -6,7 +6,7 @@ using CodexECS.Utility;
 
 namespace CodexECS
 {
-    using MaskInternal = Int32;
+    using MaskInternal = UInt32;
 
     public struct BitMask
     {
@@ -25,11 +25,11 @@ namespace CodexECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public int GetMaskHash()
         {
-            int hash = 17 * 23 * _m1;
+            int hash = (int)(17 * 23 * _m1);
             if (_mn != null && _mn.Length > 0)
             {
                 for (int i = 0; i < _mn.Length; ++i)
-                    hash = hash * 23 + _mn[i];
+                    hash = hash * 23 + (int)_mn[i];
             }
             return hash;
         }
