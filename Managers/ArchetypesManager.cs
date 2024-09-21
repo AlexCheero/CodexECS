@@ -3,7 +3,7 @@ using CodexECS.Utility;
 using System.Runtime.CompilerServices;
 using EntityType = System.Int32;//duplicated in EntityExtension
 
-#if DEBUG
+#if HEAVY_ECS_DEBUG
 using System.Linq;
 #endif
 
@@ -27,7 +27,7 @@ namespace CodexECS
             _filters = new Dictionary<FilterMasks, EcsFilter>(FilterMasks.MasksComparer);
         }
 
-#if DEBUG
+#if HEAVY_ECS_DEBUG
         private bool CheckMappingSynch()
         {
             for (int i = 0; i < _eToACount; i++)
@@ -86,7 +86,7 @@ namespace CodexECS
             //looks smelly but for now I don't know how to rewrite it better
             _eToA[eid] = _mToA[mask];
 
-#if DEBUG
+#if HEAVY_ECS_DEBUG
             if (!CheckMappingSynch())
                 throw new EcsException("mappings desynch");
 #endif
@@ -124,7 +124,9 @@ namespace CodexECS
                 throw new EcsException("archetypes have no such eid");
             if (!_mToA.ContainsKey(_eToA[eid].Mask))
                 throw new EcsException("mappings desynch");
-
+#endif
+            
+#if HEAVY_ECS_DEBUG
             if (!CheckMappingSynch())
                 throw new EcsException("mappings desynch");
 #endif

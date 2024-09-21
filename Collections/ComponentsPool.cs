@@ -41,7 +41,7 @@ namespace CodexECS
             get => ref _values[_sparse[id]];
         }
 
-#if DEBUG
+#if HEAVY_ECS_DEBUG
         private void CheckArrays()
         {
             for (int i = 0; i < _values.Length; i++)
@@ -52,7 +52,9 @@ namespace CodexECS
                     throw new EcsException("indices mismatch 2");
             }
         }
+#endif
 
+#if DEBUG
         public string DebugString(int id)
         {
             StringBuilder sb = new StringBuilder();
@@ -94,7 +96,7 @@ namespace CodexECS
                 //_values[innerIndex] = _values[_values.Length];
             }
 
-#if DEBUG
+#if HEAVY_ECS_DEBUG
             CheckArrays();
 #endif
         }
@@ -136,7 +138,7 @@ namespace CodexECS
 
             _values.Copy(otherPool._values);
 
-#if DEBUG
+#if HEAVY_ECS_DEBUG
             CheckArrays();
 #endif
         }
@@ -201,7 +203,7 @@ namespace CodexECS
                 Array.Resize(ref _dense, _values._elements.Length);
             _dense[_sparse[id]] = id;
 
-#if DEBUG
+#if HEAVY_ECS_DEBUG
             CheckArrays();
 #endif
 

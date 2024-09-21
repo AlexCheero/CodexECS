@@ -39,7 +39,7 @@ namespace CodexECS.Utility
             _arr.Add(value);
             return true;
             
-#if DEBUG
+#if HEAVY_ECS_DEBUG
             if (!CheckSynch())
                 throw new EcsException("IdexableHashSet desynch.");
 #endif
@@ -57,7 +57,7 @@ namespace CodexECS.Utility
             _map.Remove(value);
             _arr.RemoveAt(_arr.Length - 1);
             
-#if DEBUG
+#if HEAVY_ECS_DEBUG
             if (!CheckSynch())
                 throw new EcsException("IdexableHashSet desynch.");
 #endif
@@ -65,7 +65,7 @@ namespace CodexECS.Utility
             return true;
         }
         
-#if DEBUG
+#if HEAVY_ECS_DEBUG
         private bool CheckSynch()
         {
             if (_arr.Length != _map.Count)

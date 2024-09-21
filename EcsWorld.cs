@@ -81,7 +81,7 @@ namespace CodexECS
             _archetypes.AddComponent<T>(eid);
             _componentManager.Add<T>(eid, component);
             
-#if DEBUG
+#if HEAVY_ECS_DEBUG
             if (!ExistenceSynched<T>(eid))
                 throw new EcsException("Components and archetypes not synched");
 #endif
@@ -125,7 +125,7 @@ namespace CodexECS
             _archetypes.RemoveComponent<T>(eid);
             _componentManager.Remove<T>(eid);
             
-#if DEBUG
+#if HEAVY_ECS_DEBUG
             if (!ExistenceSynched<T>(eid))
                 throw new EcsException("Components and archetypes not synched");
 #endif
@@ -206,7 +206,7 @@ namespace CodexECS
             _archetypes.Delete(eid);
             _entityManager.Delete(eid);
         }
-
+        
 #if DEBUG
         public void GetTypesForId(int id, HashSet<Type> buffer) =>
             _componentManager.GetTypesByMask(_archetypes.GetMask(id), buffer);
@@ -238,7 +238,9 @@ namespace CodexECS
                 }
             }
         }
+#endif
         
+#if HEAVY_ECS_DEBUG
         private bool ExistenceSynched<T>(int eid) => _archetypes.Have<T>(eid) == _componentManager.Have<T>(eid);
         private bool ExistenceSynched(int componentId, int eid) =>
             _archetypes.Have(componentId, eid) == _componentManager.Have(componentId, eid);

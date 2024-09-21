@@ -30,10 +30,7 @@ namespace CodexECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void AddEntity(EntityType eid)
         {
-#if DEBUG
-            bool added =
-#endif
-            Entities.Add(eid);
+            bool added = Entities.Add(eid);
 #if DEBUG
             if (!added)
                 throw new EcsException("entity was already in archetype");
@@ -45,10 +42,7 @@ namespace CodexECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void RemoveEntity(EntityType eid)
         {
-#if DEBUG
-            bool removed =
-#endif
-            Entities.Remove(eid);
+            bool removed = Entities.Remove(eid);
 #if DEBUG
             if (!removed)
                 throw new EcsException("entity was not in archetype");

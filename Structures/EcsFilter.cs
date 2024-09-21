@@ -115,7 +115,7 @@ namespace CodexECS
             _entitiesLength++;
 #endregion
 
-#if DEBUG
+#if HEAVY_ECS_DEBUG
             if (!CheckEntitiesSynch())
                 throw new EcsException("Entities desynched!");
             if (!CheckUniqueness())
@@ -142,7 +142,7 @@ namespace CodexECS
             _entitiesMap[_entitiesArr[index]] = index;
             _entitiesMap.Remove(eid);
 
-#if DEBUG
+#if HEAVY_ECS_DEBUG
             if (!CheckEntitiesSynch())
                 throw new EcsException("Entities desynched!");
             if (!CheckUniqueness())
@@ -150,7 +150,7 @@ namespace CodexECS
 #endif
         }
 
-#if DEBUG
+#if HEAVY_ECS_DEBUG
         private bool CheckEntitiesSynch()
         {
             if (_entitiesLength != _entitiesMap.Count)
@@ -214,7 +214,7 @@ namespace CodexECS
 
             _dirty = false;
             
-#if DEBUG
+#if HEAVY_ECS_DEBUG
             if (!CheckEntitiesSynch())
                 throw new EcsException("Entities desynched!");
             if (!CheckUniqueness())
