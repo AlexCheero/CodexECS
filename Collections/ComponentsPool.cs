@@ -32,8 +32,12 @@ namespace CodexECS
         //made public only for unrolling indexer for speeding up
         public int[] _sparse;
         private int[] _dense;
-        //CODEX_TODO: check if having plain array or at least manual unrolling of vector's indexer would speed up things
-        public SimpleList<T> _values;
+        public T[] _values;
+#if DEBUG
+        public int ValuesLength;
+#else
+        public int ValuesLength { get; private set; }
+#endif
 
         public ref T this[int id]
         {
@@ -44,7 +48,7 @@ namespace CodexECS
 #if HEAVY_ECS_DEBUG
         private void CheckArrays()
         {
-            for (int i = 0; i < _values.Length; i++)
+            for (int i = 0; i < ValuesLength; i++)
             {
                 var outer = _dense[i];
                 var inner = _sparse[outer];
@@ -75,7 +79,7 @@ namespace CodexECS
         public int Length
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get => _values.Length;
+            get => ValuesLength;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -86,12 +90,24 @@ namespace CodexECS
         {
             var innerIndex = _sparse[id];
             _sparse[id] = -1;
-            _values.RemoveAt(innerIndex);
-            if (innerIndex < _values.Length)
+
+#region Unrolled SimpleList.RemoveAt
+
+            _values[innerIndex] = default;
+            ValuesLength--;
+            if (innerIndex < ValuesLength)
+                _values[innerIndex] = _values[ValuesLength];
+
+#endregion
+            
+            
+            if (innerIndex < ValuesLength)
             {
-                var lastId = _dense[_values.Length];
+                var lastId = _dense[ValuesLength];
                 _sparse[lastId] = innerIndex;
-                _dense[innerIndex] = _dense[_values.Length];
+                _dense[innerIndex] = _dense[ValuesLength];
+                
+                //TODO: ???
                 //_sparse[id] = _dense[innerIndex];
                 //_values[innerIndex] = _values[_values.Length];
             }
@@ -111,7 +127,13 @@ namespace CodexECS
                 _sparse[i] = -1;
 #endif
 
-            _values.Clear();
+#region Unrolled SimpleList.Clear
+
+            ValuesLength = 0;
+
+#endregion
+            
+            
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -136,7 +158,16 @@ namespace CodexECS
                 Array.Resize(ref _dense, otherPool._dense.Length);
             Array.Copy(otherPool._dense, _dense, otherPool._dense.Length);
 
-            _values.Copy(otherPool._values);
+#region Unrolled SimpleList.Copy
+
+            ValuesLength = otherPool.ValuesLength;
+            if (_values.Length < ValuesLength)
+                Array.Resize(ref _values, otherPool._values.Length);
+            Array.Copy(otherPool._values, _values, ValuesLength);
+
+#endregion
+            
+            
 
 #if HEAVY_ECS_DEBUG
             CheckArrays();
@@ -161,13 +192,13 @@ namespace CodexECS
         }
         #endregion
 
-        public ComponentsPool(int initialCapacity = 0)
+        public ComponentsPool(int initialCapacity = 2)
         {
             _sparse = new int[initialCapacity];
             _dense = new int[initialCapacity];
             for (int i = 0; i < initialCapacity; i++)
                 _sparse[i] = -1;
-            _values = new SimpleList<T>(initialCapacity);
+            _values = new T[initialCapacity];
         }
 
         //CODEX_TODO: excess call, rewrite
@@ -197,10 +228,23 @@ namespace CodexECS
                 throw new EcsException(typeof(T) + " sparse set already have element at this index");
 #endif
 
-            _sparse[id] = _values.Length;
-            _values.Add(value);
-            if (_dense.Length < _values._elements.Length)
-                Array.Resize(ref _dense, _values._elements.Length);
+            _sparse[id] = ValuesLength;
+            
+#region Unrolled SimpleList.Add
+
+            if (ValuesLength >= _values.Length)
+            {
+                const int maxResizeDelta = 256;
+                Utils.ResizeArray(ValuesLength, ref _values, maxResizeDelta);
+            }
+            _values[ValuesLength] = value;
+            ValuesLength++;
+
+#endregion
+            
+            
+            if (_dense.Length < _values.Length)
+                Array.Resize(ref _dense, _values.Length);
             _dense[_sparse[id]] = id;
 
 #if HEAVY_ECS_DEBUG
