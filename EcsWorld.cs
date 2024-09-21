@@ -21,9 +21,6 @@ namespace CodexECS
             _componentManager = new ComponentManager();
             _archetypes = new ArchetypesManager();
             _delayedDeleteList = new HashSet<EntityType>();
-
-            _delayedAddComponentBuffer = new();
-            _delayedRemoveComponentBuffer = new();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -45,13 +42,8 @@ namespace CodexECS
         public bool IsNull(int id) => id == EntityExtension.NullEntity.GetId();
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Equals(int entity1, int entity2)
-        {
-            if (entity1 == entity2)
-                return GetById(entity1).GetVersion() == GetById(entity2).GetVersion();
-            else
-                return false;
-        }
+        public bool Equals(int entity1, int entity2) =>
+            entity1 == entity2 && GetById(entity1).GetVersion() == GetById(entity2).GetVersion();
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool IsEntityValid(Entity entity)
@@ -74,44 +66,38 @@ namespace CodexECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Have<T>(EntityType eid) => _archetypes.Have<T>(eid);
+        public bool Have<T>(EntityType eid)
+        {
+#if DEBUG
+            if (_archetypes.Have<T>(eid) != _componentManager.Have<T>(eid))
+                throw new EcsException("Components and archetypes desynch");
+#endif
+            return _archetypes.Have<T>(eid);
+        }
 
-        private Dictionary<EntityType, HashSet<int>> _delayedAddComponentBuffer;
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Add<T>(EntityType eid, T component = default)
         {
-            if (_lockCounter > 0)
-            {
-                if (!_delayedAddComponentBuffer.ContainsKey(eid))
-                    _delayedAddComponentBuffer[eid] = new();
-                bool added = _delayedAddComponentBuffer[eid].Add(ComponentMeta<T>.Id);
+            _archetypes.AddComponent<T>(eid);
+            _componentManager.Add<T>(eid, component);
+            
 #if DEBUG
-                if (!added)
-                    throw new EcsException("component already added");
+            if (!ExistenceSynched<T>(eid))
+                throw new EcsException("Components and archetypes not synched");
 #endif
-
-            }
-            else
-            {
-#if DEBUG
-                if (_delayedAddComponentBuffer.Count > 0)
-                    throw new EcsException("_delayedAddComponentBuffer is not empty here");
-#endif
-                _archetypes.AddComponent<T>(eid);
-            }
-            AddInternal(eid, component);
         }
 
         //CODEX_TODO: probably should implement lock checks as in Add
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void AddReference(Type type, int id, object component)
         {
+// #if DEBUG
+//             if (_lockCounter > 0)
+//                 throw new EcsException("shouldn't add reference while world is locked");
+// #endif
             _archetypes.AddComponent(id, ComponentMapping.TypeToId[type]);
             _componentManager.AddReference(type, id, component);
         }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void AddInternal<T>(EntityType eid, T component = default) => _componentManager.Add<T>(eid, component);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ref T GetComponent<T>(EntityType eid) => ref _componentManager.GetComponent<T>(eid);
@@ -124,7 +110,7 @@ namespace CodexECS
             Add<T>(eid);
             return true;
         }
-
+        
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ref T GetOrAddComponent<T>(EntityType eid)
         {
@@ -133,30 +119,16 @@ namespace CodexECS
             return ref GetComponent<T>(eid);
         }
 
-        private Dictionary<EntityType, HashSet<int>> _delayedRemoveComponentBuffer;
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Remove<T>(EntityType eid)
         {
-            if (_lockCounter > 0)
-            {
-                if (!_delayedRemoveComponentBuffer.ContainsKey(eid))
-                    _delayedRemoveComponentBuffer[eid] = new();
-                bool removed = _delayedRemoveComponentBuffer[eid].Add(ComponentMeta<T>.Id);
-#if DEBUG
-                if (!removed)
-                    throw new EcsException("component already removed");
-#endif
-            }
-            else
-            {
-#if DEBUG
-                if (_delayedRemoveComponentBuffer.Count > 0)
-                    throw new EcsException("_delayedRemoveComponentBuffer is not empty here");
-#endif
-                _archetypes.RemoveComponent<T>(eid);
-            }
-
+            _archetypes.RemoveComponent<T>(eid);
             _componentManager.Remove<T>(eid);
+            
+#if DEBUG
+            if (!ExistenceSynched<T>(eid))
+                throw new EcsException("Components and archetypes not synched");
+#endif
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -185,7 +157,7 @@ namespace CodexECS
             });
         }
 
-        private uint _lockCounter;
+        private int _lockCounter;
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Lock() { _lockCounter++; }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -198,25 +170,9 @@ namespace CodexECS
 #endif
             if (_lockCounter != 0)
                 return;
-            //CODEX_TODO: do the same for adding/deleting components
             foreach (var eid in _delayedDeleteList)
                 Delete_Impl(eid);
-            foreach (var (eid, addedSet) in _delayedAddComponentBuffer)
-            {
-                foreach (var compId in addedSet)
-                    _archetypes.AddComponent(eid, compId);
-                addedSet.Clear();
-            }
-            foreach (var (eid, removedSet) in _delayedRemoveComponentBuffer)
-            {
-                foreach (var compId in removedSet)
-                    _archetypes.RemoveComponent(eid, compId);
-                removedSet.Clear();
-            }
-
             _delayedDeleteList.Clear();
-            _delayedAddComponentBuffer.Clear();
-            _delayedRemoveComponentBuffer.Clear();
         }
 
         private HashSet<EntityType> _delayedDeleteList;
@@ -282,6 +238,10 @@ namespace CodexECS
                 }
             }
         }
+        
+        private bool ExistenceSynched<T>(int eid) => _archetypes.Have<T>(eid) == _componentManager.Have<T>(eid);
+        private bool ExistenceSynched(int componentId, int eid) =>
+            _archetypes.Have(componentId, eid) == _componentManager.Have(componentId, eid);
 #endif
     }
 }
