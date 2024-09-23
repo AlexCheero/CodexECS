@@ -51,7 +51,7 @@ namespace CodexECS
                     _sparse[i] = -1;
             }
 
-#if DEBUG
+#if DEBUG && !ECS_PERF_TEST
             if (_sparse[outerIdx] > -1)
                 throw new EcsException("sparse set already have element at this index");
 #endif
@@ -60,7 +60,7 @@ namespace CodexECS
             _values.Add(value);
             _dense.Add(outerIdx);
 
-#if DEBUG
+#if DEBUG && !ECS_PERF_TEST
             if (_values.Length != _dense.Length)
                 throw new EcsException("_values.Length != _dense.Length");
             if (_dense[_sparse[outerIdx]] != outerIdx)

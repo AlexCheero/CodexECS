@@ -68,7 +68,7 @@ namespace CodexECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Have<T>(EntityType eid)
         {
-#if DEBUG
+#if DEBUG && !ECS_PERF_TEST
             if (_archetypes.Have<T>(eid) != _componentManager.Have<T>(eid))
                 throw new EcsException("Components and archetypes desynch");
 #endif
@@ -91,7 +91,7 @@ namespace CodexECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void AddReference(Type type, int id, object component)
         {
-// #if DEBUG
+// #if DEBUG && !ECS_PERF_TEST
 //             if (_lockCounter > 0)
 //                 throw new EcsException("shouldn't add reference while world is locked");
 // #endif
@@ -164,7 +164,7 @@ namespace CodexECS
         public void Unlock()
         {
             _lockCounter--;
-#if DEBUG
+#if DEBUG && !ECS_PERF_TEST
             if (_lockCounter < 0)
                 throw new EcsException("negative lock counter");
 #endif
@@ -185,7 +185,7 @@ namespace CodexECS
             }
             else
             {
-#if DEBUG
+#if DEBUG && !ECS_PERF_TEST
                 if (_delayedDeleteList.Count > 0)
                     throw new EcsException("_delayedDeleteList is not empty here");
 #endif

@@ -33,7 +33,7 @@ namespace CodexECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ref Entity GetRefById(EntityType eid)
         {
-#if DEBUG
+#if DEBUG && !ECS_PERF_TEST
             if (eid == EntityExtension.NullEntity.GetId())
                 throw new EcsException("null entity id");
             if (!IsEntityInRange(eid))
@@ -68,7 +68,7 @@ namespace CodexECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private EntityType GetRecycledId()
         {
-#if DEBUG
+#if DEBUG && !ECS_PERF_TEST
             if (_recycleListHead.IsNull())
                 throw new EcsException("recycle list head is null");
 #endif
@@ -96,7 +96,7 @@ namespace CodexECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Delete(EntityType eid)
         {
-#if DEBUG
+#if DEBUG && !ECS_PERF_TEST
             if (GetRefById(eid).IsNull())
                 throw new EcsException("trying to delete null entity");
             if (IsDead(eid))
@@ -121,7 +121,7 @@ namespace CodexECS
                 return GetRecycledId();
 
             Entity lastEntity = new Entity(_entities.Length);
-#if DEBUG
+#if DEBUG && !ECS_PERF_TEST
             if (lastEntity.Val == EntityExtension.NullEntity.Val)
                 throw new EcsException("entity limit reached");
             if (_entities.Length < 0)

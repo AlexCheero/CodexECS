@@ -31,7 +31,7 @@ namespace CodexECS
         public void AddEntity(EntityType eid)
         {
             bool added = Entities.Add(eid);
-#if DEBUG
+#if DEBUG && !ECS_PERF_TEST
             if (!added)
                 throw new EcsException("entity was already in archetype");
 #endif
@@ -43,7 +43,7 @@ namespace CodexECS
         public void RemoveEntity(EntityType eid)
         {
             bool removed = Entities.Remove(eid);
-#if DEBUG
+#if DEBUG && !ECS_PERF_TEST
             if (!removed)
                 throw new EcsException("entity was not in archetype");
 #endif

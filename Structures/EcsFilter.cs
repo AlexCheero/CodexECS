@@ -64,7 +64,7 @@ namespace CodexECS
 
         public EcsFilter(EcsWorld world)
         {
-#if DEBUG
+#if DEBUG && !ECS_PERF_TEST
             _archetypes = new();
 #endif
             _entitiesMap = new();
@@ -83,7 +83,7 @@ namespace CodexECS
             for (int i = 0; i < archetype.Entities.Count; i++)
                 AddEntity(archetype.Entities[i]);
 
-#if DEBUG
+#if DEBUG && !ECS_PERF_TEST
             if (!_archetypes.Add(archetype))
                 throw new EcsException("filter already have this archetype");
 #endif
@@ -92,7 +92,7 @@ namespace CodexECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void AddEntity(EntityType eid)
         {
-#if DEBUG
+#if DEBUG && !ECS_PERF_TEST
             if (_entitiesMap.ContainsKey(eid))
                 throw new EcsException("filter already have this entity");
 #endif
@@ -127,8 +127,8 @@ namespace CodexECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void RemoveEntity(EntityType eid)
         {
-#if DEBUG
-            if (!_entitiesMap.TryGetValue(eid, out var index))
+#if DEBUG && !ECS_PERF_TEST
+            if (!_entitiesMap.ContainsKey(eid))
                 throw new EcsException("filter have no this entity");
 #endif
             
@@ -140,6 +140,7 @@ namespace CodexECS
             }
 
             _entitiesLength--;
+            var index = _entitiesMap[eid];
             _entitiesArr[index] = _entitiesArr[_entitiesLength];
             _entitiesMap[_entitiesArr[index]] = index;
             _entitiesMap.Remove(eid);
@@ -196,7 +197,7 @@ namespace CodexECS
         {
             _world.Unlock();
             _lockCounter--;
-#if DEBUG
+#if DEBUG && !ECS_PERF_TEST
             if (_lockCounter < 0)
                 throw new EcsException("negative lock counter");
 #endif

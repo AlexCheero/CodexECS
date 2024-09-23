@@ -184,7 +184,7 @@ namespace CodexECS
 
         public void CopyItem(int from, int to)
         {
-#if DEBUG
+#if DEBUG && !ECS_PERF_TEST
             if (!Contains(from))
                 throw new EcsException("trying to copy non existent component");
 #endif
@@ -204,7 +204,7 @@ namespace CodexECS
         //CODEX_TODO: excess call, rewrite
         public void AddReference(int id, object value)
         {
-#if DEBUG
+#if DEBUG && !ECS_PERF_TEST
             if (value is ValueType)
                 throw new EcsException("trying to add object of value type as reference");
 #endif
@@ -223,7 +223,7 @@ namespace CodexECS
                     _sparse[i] = -1;
             }
 
-#if DEBUG
+#if DEBUG && !ECS_PERF_TEST
             if (_sparse[id] > -1)
                 throw new EcsException(typeof(T) + " sparse set already have element at this index");
 #endif
@@ -293,7 +293,7 @@ namespace CodexECS
 
         public void CopyItem(int from, int to)
         {
-#if DEBUG
+#if DEBUG && !ECS_PERF_TEST
             if (!Contains(from))
                 throw new EcsException("trying to copy non existent component");
 #endif

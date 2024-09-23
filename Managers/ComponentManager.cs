@@ -27,7 +27,7 @@ namespace CodexECS
         {
             var pool = GetPool<T>();
 
-#if DEBUG
+#if DEBUG && !ECS_PERF_TEST
             if (eid < 0)
                 throw new EcsException("negative id");
             if (pool == null)
@@ -43,7 +43,7 @@ namespace CodexECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void AddReference(Type type, int id, object component)
         {
-#if DEBUG
+#if DEBUG && !ECS_PERF_TEST
             if (component is ValueType)
                 throw new EcsException("trying to add object of value type as reference");
             if (id < 0)
@@ -52,7 +52,7 @@ namespace CodexECS
             var componentId = ComponentMapping.TypeToId[type];
 
             var pool = GetPool(componentId);
-#if DEBUG
+#if DEBUG && !ECS_PERF_TEST
             if (pool == null)
                 throw new EcsException("invalid pool");
 #endif
@@ -62,7 +62,7 @@ namespace CodexECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ref T GetComponent<T>(EntityType eid)
         {
-#if DEBUG
+#if DEBUG && !ECS_PERF_TEST
             if (ComponentMeta<T>.IsTag)
                 throw new EcsException(typeof(T) + " is tag component");
             if (!Have<T>(eid))

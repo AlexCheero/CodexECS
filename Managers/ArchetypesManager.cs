@@ -71,7 +71,7 @@ namespace CodexECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void AddArchetype(BitMask mask)
         {
-#if DEBUG
+#if DEBUG && !ECS_PERF_TEST
             if (_mToA.ContainsKey(mask))
                 throw new EcsException("Archetype already added");
 #endif
@@ -125,7 +125,7 @@ namespace CodexECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void MoveBetweenArchetypes(EntityType eid, int componentId, bool isAdd)
         {
-#if DEBUG
+#if DEBUG && !ECS_PERF_TEST
             if (!HaveEntity(eid))
                 throw new EcsException("archetypes have no such eid");
             if (!_mToA.ContainsKey(_eToA[eid].Mask))

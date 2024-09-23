@@ -371,7 +371,7 @@ namespace CodexECS
             return true;
         }
 
-#if DEBUG
+#if DEBUG && !ECS_PERF_TEST
         public override string ToString()
         {
             var sb = new StringBuilder();
