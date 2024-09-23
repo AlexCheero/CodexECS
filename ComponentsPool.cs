@@ -86,7 +86,7 @@ namespace CodexECS
                 //_values[innerIndex] = _values[_values.Length];
             }
 
-#if DEBUG
+#if DEBUG && !ECS_PERF_TEST
             CheckArrays();
 #endif
         }
@@ -128,7 +128,7 @@ namespace CodexECS
 
             _values.Copy(otherPool._values);
 
-#if DEBUG
+#if DEBUG && !ECS_PERF_TEST
             CheckArrays();
 #endif
         }
@@ -143,7 +143,7 @@ namespace CodexECS
 
         public void CopyItem(int from, int to)
         {
-#if DEBUG
+#if DEBUG && !ECS_PERF_TEST
             if (!Contains(from))
                 throw new EcsException("trying to copy non existent component");
 #endif
@@ -168,7 +168,7 @@ namespace CodexECS
 
         public void AddReference(int id, object value)
         {
-#if DEBUG
+#if DEBUG && !ECS_PERF_TEST
             if (value is ValueType)
                 throw new EcsException("trying to add object of value type as reference");
 #endif
@@ -189,7 +189,7 @@ namespace CodexECS
                     _sparse[i] = -1;
             }
 
-#if DEBUG
+#if DEBUG && !ECS_PERF_TEST
             if (_sparse[id] > -1)
                 throw new EcsException(typeof(T) + " sparse set already have element at this index");
 #endif
@@ -200,7 +200,7 @@ namespace CodexECS
                 Array.Resize(ref _dense, _values._elements.Length);
             _dense[_sparse[id]] = id;
 
-#if DEBUG
+#if DEBUG && !ECS_PERF_TEST
             CheckArrays();
 #endif
 
@@ -246,7 +246,7 @@ namespace CodexECS
 
         public void CopyItem(int from, int to)
         {
-#if DEBUG
+#if DEBUG && !ECS_PERF_TEST
             if (!Contains(from))
                 throw new EcsException("trying to copy non existent component");
 #endif

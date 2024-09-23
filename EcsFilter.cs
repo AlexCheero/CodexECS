@@ -78,7 +78,7 @@ namespace CodexECS
         {
             currentEntityIndex = -1;
             _lockCount.Value--;
-#if DEBUG
+#if DEBUG && !ECS_PERF_TEST
             if (_lockCount.Value < 0)
                 throw new EcsException("_lockCount shouldn't be negative");
             else

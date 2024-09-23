@@ -31,7 +31,7 @@ namespace CodexECS
         {
             get
             {
-#if DEBUG
+#if DEBUG && !ECS_PERF_TEST
                 if (i >= _list.Count)
                     throw new EcsException("wrong filter index");
 #endif
@@ -66,7 +66,7 @@ namespace CodexECS
                 _list.Add(newFilter);
                 idx = _list.Count - 1;
 
-#if DEBUG
+#if DEBUG && !ECS_PERF_TEST
                 if (_list.Count != _set.Count)
                     throw new EcsException("FiltersCollection.TryAdd _set _list desynch");
 #endif
@@ -115,7 +115,7 @@ namespace CodexECS
             }
 #endregion
 
-#if DEBUG
+#if DEBUG && !ECS_PERF_TEST
             if (_list.Count != other._list.Count)
                 throw new EcsException("FiltersCollection lists should have same size");
 #endif

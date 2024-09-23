@@ -120,7 +120,7 @@ namespace CodexECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private ref Entity GetRefById(int id)
         {
-#if DEBUG
+#if DEBUG && !ECS_PERF_TEST
             if (id == EntityExtension.NullEntity.GetId())
                 throw new EcsException("null entity id");
             if (!IsEnitityInRange(id))
@@ -183,7 +183,7 @@ namespace CodexECS
         private bool IsLocked { get => _lockCounter > 0; }
         private void Lock()
         {
-#if DEBUG
+#if DEBUG && !ECS_PERF_TEST
             //TODO: could cause problems even for single thread in nested loops
             //if (_lockCounter > 0)
             //    throw new EcsException("_lockCounter is positive. error only for single thread");
@@ -196,7 +196,7 @@ namespace CodexECS
         {
             _lockCounter--;
 
-#if DEBUG
+#if DEBUG && !ECS_PERF_TEST
             if (_lockCounter < 0)
                 throw new EcsException("world's lock counter negative");
             else
@@ -214,7 +214,7 @@ namespace CodexECS
         {
             foreach (var id in _filtersToNotifyOnAdd)
             {
-#if DEBUG
+#if DEBUG && !ECS_PERF_TEST
                 if (!_unlockListeners.ContainsKey(id))
                     throw new EcsException("_filtersToNotifyOnAdd contains unregistered filter!");
                 if (!_cleanups.ContainsKey(id))
@@ -297,7 +297,7 @@ namespace CodexECS
             }
 
             ref Entity entity = ref GetRefById(id);
-#if DEBUG
+#if DEBUG && !ECS_PERF_TEST
             if (entity.IsNull())
                 throw new EcsException("trying to delete null entity");
             if (IsDead(id))
@@ -325,7 +325,7 @@ namespace CodexECS
                 return GetRecycledId();
 
             var lastEntity = new Entity(_entites.Length);
-#if DEBUG
+#if DEBUG && !ECS_PERF_TEST
             if (lastEntity.Val == EntityExtension.NullEntity.Val)
                 throw new EcsException("entity limit reached");
             if (_entites.Length < 0)
@@ -342,7 +342,7 @@ namespace CodexECS
         //TODO: implement copying without component override
         public void CopyComponents(Entity from, Entity to/*, bool overrideIfExists*/)
         {
-#if DEBUG
+#if DEBUG && !ECS_PERF_TEST
             if (!IsEntityValid(from))
                 throw new EcsException("trying to move components from invalid entity");
             if (!IsEntityValid(to))
@@ -459,7 +459,7 @@ namespace CodexECS
         private void UpdateFiltersOnRemove(int componentId, int id)
         {
             RemoveIdFromFilters(id, _includeUpdateSets[componentId]);
-#if DEBUG
+#if DEBUG && !ECS_PERF_TEST
             if (_masks[id].Length <= componentId)
                 throw new EcsException("there was no component ever");
 #endif
@@ -478,7 +478,7 @@ namespace CodexECS
 
         public void AddReference(Type type, int id, object component)
         {
-#if DEBUG
+#if DEBUG && !ECS_PERF_TEST
             if (component is ValueType)
                 throw new EcsException("trying to add object of value type as reference");
             if (id < 0)
@@ -488,7 +488,7 @@ namespace CodexECS
             UpdateFiltersOnAdd(componentId, id);
 
             var pool = GetPool(componentId);
-#if DEBUG
+#if DEBUG && !ECS_PERF_TEST
             if (pool == null)
                 throw new EcsException("invalid pool");
 #endif
@@ -497,7 +497,7 @@ namespace CodexECS
 
         public void Add<T>(int id, T component = default)
         {
-#if DEBUG
+#if DEBUG && !ECS_PERF_TEST
             if (id < 0)
                 throw new EcsException("negative id");
 #endif
@@ -505,7 +505,7 @@ namespace CodexECS
             UpdateFiltersOnAdd(componentId, id);
 
             var pool = GetPool(componentId);
-#if DEBUG
+#if DEBUG && !ECS_PERF_TEST
             if (pool == null)
                 throw new EcsException("invalid pool");
 #endif
@@ -525,7 +525,7 @@ namespace CodexECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ref T GetComponent<T>(int id)
         {
-#if DEBUG
+#if DEBUG && !ECS_PERF_TEST
             if (!Have<T>(id))
                 throw new EcsException("entity have no " + typeof(T));
 #endif
@@ -626,7 +626,7 @@ namespace CodexECS
 #endif
                 }
 
-#if DEBUG
+#if DEBUG && !ECS_PERF_TEST
                 if (sets[bit].Contains(filterIdx))
                     throw new EcsException("set already contains this filter!");
 #endif

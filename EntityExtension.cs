@@ -39,7 +39,7 @@ namespace CodexECS
 
         public static void SetId(this ref Entity entity, in EntityType id)
         {
-#if DEBUG
+#if DEBUG && !ECS_PERF_TEST
             if (id >= NullEntity.Val)
                 throw new EcsException("set overflow id");
 #endif
