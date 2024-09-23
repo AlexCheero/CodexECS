@@ -69,7 +69,7 @@ namespace CodexECS
 #endif
             _entitiesMap = new();
             _entitiesArr = new EntityType[2];
-            _views = new() { new View(world, this) };
+            _views = new() { new View(this) };
             _world = world;
         }
 
@@ -243,14 +243,13 @@ namespace CodexECS
                 view.Use();
                 return view;
             }
-            _views.Add(new View(_world, this));
+            _views.Add(new View(this));
             _views[^1].Use();
             return _views[^1];
         }
 
         public class View : IDisposable
         {
-            private EcsWorld _world;
             private EcsFilter _filter;
 
             private int _entityIndex;
@@ -267,9 +266,8 @@ namespace CodexECS
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void Use() => IsInUse = true;
 
-            public View(EcsWorld world, EcsFilter filter)
+            public View(EcsFilter filter)
             {
-                _world = world;
                 _filter = filter;
                 _entityIndex = -1;
             }
