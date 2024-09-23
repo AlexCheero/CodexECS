@@ -25,6 +25,10 @@ namespace CodexECS
             _eToACount = 0;
             _mToA = new Dictionary<BitMask, Archetype>(BitMask.MaskComparer);
             _filters = new Dictionary<FilterMasks, EcsFilter>(FilterMasks.MasksComparer);
+            
+            //create empty archetype
+            var emptyMask = new BitMask();
+            _mToA[emptyMask] = new Archetype(emptyMask);
         }
 
 #if HEAVY_ECS_DEBUG
@@ -65,39 +69,41 @@ namespace CodexECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private Archetype GetOrAddArchetype(EntityType eid, BitMask mask)
+        private void AddArchetype(BitMask mask)
         {
-            if (!_mToA.ContainsKey(mask))
-            {
-                _mToA[mask] = new Archetype(mask);
-                foreach (var maskFilterPair in _filters)
-                    TryAddArchetypeToFilter(_mToA[mask], maskFilterPair.Key, maskFilterPair.Value);
-            }
-
-            if (_eToA.Length <= eid)
-            {
-                //CODEX_TODO: use this in every place where resize is needed
-                const int maxResizeDelta = 64;
-                Utils.ResizeArray(eid, ref _eToA, maxResizeDelta);
-            }
-            if (_eToACount <= eid)
-                _eToACount = eid + 1;
-            //CODEX_TODO: changing each call even if it already has right archetype
-            //looks smelly but for now I don't know how to rewrite it better
-            _eToA[eid] = _mToA[mask];
-
-#if HEAVY_ECS_DEBUG
-            if (!CheckMappingSynch())
-                throw new EcsException("mappings desynch");
+#if DEBUG
+            if (_mToA.ContainsKey(mask))
+                throw new EcsException("Archetype already added");
 #endif
-
-            return _mToA[mask];
+            var newArchetype = new Archetype(mask);
+            _mToA[mask] = newArchetype;
+            foreach (var maskFilterPair in _filters)
+                TryAddArchetypeToFilter(newArchetype, maskFilterPair.Key, maskFilterPair.Value);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void AddToArchetype(EntityType eid, BitMask mask)
+        private void UpdateArchetype(EntityType eid, BitMask mask)
         {
-            GetOrAddArchetype(eid, mask).AddEntity(eid);
+            if (_eToACount <= eid)
+            {
+                if (_eToA.Length <= eid)
+                {
+                    const int maxResizeDelta = 64;
+                    Utils.ResizeArray(eid, ref _eToA, maxResizeDelta);
+                }
+                _eToACount = eid + 1;
+            }
+            
+            if (_eToA[eid] == null || !_eToA[eid].Mask.MasksEquals(mask))
+                _eToA[eid] = _mToA[mask];
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void AddToEmptyArchetype(EntityType eid)
+        {
+            var emptyMask = new BitMask();
+            _mToA[emptyMask].AddEntity(eid);
+            UpdateArchetype(eid, emptyMask);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -125,11 +131,6 @@ namespace CodexECS
             if (!_mToA.ContainsKey(_eToA[eid].Mask))
                 throw new EcsException("mappings desynch");
 #endif
-            
-#if HEAVY_ECS_DEBUG
-            if (!CheckMappingSynch())
-                throw new EcsException("mappings desynch");
-#endif
 
             Archetype archetype = _eToA[eid];
             archetype.RemoveEntity(eid);
@@ -138,9 +139,16 @@ namespace CodexECS
                 nextMask.Set(componentId);
             else
                 nextMask.Unset(componentId);
-            Archetype newArchetype = GetOrAddArchetype(eid, nextMask);
-            newArchetype.AddEntity(eid);
-            _eToA[eid] = newArchetype;
+
+            if (!_mToA.ContainsKey(nextMask))
+                AddArchetype(nextMask);
+            UpdateArchetype(eid, nextMask);
+            _eToA[eid].AddEntity(eid);
+            
+#if HEAVY_ECS_DEBUG
+            if (!CheckMappingSynch())
+                throw new EcsException("mappings desynch");
+#endif
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

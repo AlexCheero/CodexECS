@@ -61,7 +61,7 @@ namespace CodexECS
         public EntityType Create()
         {
             var entity = _entityManager.Create();
-            _archetypes.AddToArchetype(entity, new BitMask());
+            _archetypes.AddToEmptyArchetype(entity);
             return entity;
         }
 
