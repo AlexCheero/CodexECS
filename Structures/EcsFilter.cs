@@ -92,9 +92,10 @@ namespace CodexECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void AddEntity(EntityType eid)
         {
-            //same entity could be added from different archetypes
+#if DEBUG
             if (_entitiesMap.ContainsKey(eid))
-                return;
+                throw new EcsException("filter already have this entity");
+#endif
             
             if (_lockCounter > 0)
             {
@@ -126,10 +127,11 @@ namespace CodexECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void RemoveEntity(EntityType eid)
         {
-            //same entity could be removed from different archetypes
+#if DEBUG
             if (!_entitiesMap.TryGetValue(eid, out var index))
-                return;
-
+                throw new EcsException("filter have no this entity");
+#endif
+            
             if (_lockCounter > 0)
             {
                 _entitiesMap.Remove(eid);
@@ -141,7 +143,7 @@ namespace CodexECS
             _entitiesArr[index] = _entitiesArr[_entitiesLength];
             _entitiesMap[_entitiesArr[index]] = index;
             _entitiesMap.Remove(eid);
-
+            
 #if HEAVY_ECS_DEBUG
             if (!CheckEntitiesSynch())
                 throw new EcsException("Entities desynched!");
@@ -184,9 +186,15 @@ namespace CodexECS
 
         private bool _dirty;
         private int _lockCounter;
-        private void Lock() => _lockCounter++;
-        private void Unlock()
+        public void Lock()
         {
+            _world.Lock();
+            _lockCounter++;
+        }
+
+        public void Unlock()
+        {
+            _world.Unlock();
             _lockCounter--;
 #if DEBUG
             if (_lockCounter < 0)
@@ -225,7 +233,6 @@ namespace CodexECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public View GetEnumerator()
         {
-            _world.Lock();
             Lock();
             //CODEX_TODO: swap views in order to have first or last view always free
             foreach (View view in _views)
@@ -289,7 +296,6 @@ namespace CodexECS
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void Dispose()
             {
-                _world.Unlock();
                 _filter.Unlock();
                 Reset();
             }
