@@ -7,7 +7,7 @@ namespace CodexECS
 {
     public class ComponentManager
     {
-        private Dictionary<int, IComponentsPool> _componentsPools;
+        private SparseSet<IComponentsPool> _componentsPools;
 
         public ComponentManager()
         {
@@ -20,7 +20,8 @@ namespace CodexECS
 
         [Obsolete("slow, use Archetypes.Have instead")]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Have(int componentId, EntityType eid) => _componentsPools.ContainsKey(componentId) && _componentsPools[componentId].Contains(eid);
+        public bool Have(int componentId, EntityType eid) =>
+            _componentsPools.ContainsIdx(componentId) && _componentsPools[componentId].Contains(eid);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Add<T>(EntityType eid, T component = default)
@@ -82,8 +83,8 @@ namespace CodexECS
         private IComponentsPool GetPool<T>()
         {
             var componentId = ComponentMeta<T>.Id;
-            if (_componentsPools.TryGetValue(componentId, out var pool))
-                return pool;
+            if (_componentsPools.ContainsIdx(componentId))
+                return _componentsPools[componentId];
             if (ComponentMeta<T>.IsTag)
                 _componentsPools[componentId] = new TagsPool<T>();
             else
@@ -94,7 +95,7 @@ namespace CodexECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public IComponentsPool GetPool(int componentId)
         {
-            if (!_componentsPools.ContainsKey(componentId))
+            if (!_componentsPools.ContainsIdx(componentId))
                 _componentsPools.Add(componentId, PoolFactory.FactoryMethods[componentId](/*EcsCacheSettings.PoolSize*/32));
             return _componentsPools[componentId];
         }

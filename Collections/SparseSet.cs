@@ -34,10 +34,7 @@ namespace CodexECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Contains(int outerIdx)
-        {
-            return outerIdx < _sparse.Length && _sparse[outerIdx] > -1;
-        }
+        public bool ContainsIdx(int outerIdx) => outerIdx < _sparse.Length && _sparse[outerIdx] > -1;
 
         public ref T Add(int outerIdx, T value)
         {
