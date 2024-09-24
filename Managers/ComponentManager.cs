@@ -86,9 +86,9 @@ namespace CodexECS
             if (_componentsPools.ContainsIdx(componentId))
                 return _componentsPools[componentId];
             if (ComponentMeta<T>.IsTag)
-                _componentsPools[componentId] = new TagsPool<T>();
+                _componentsPools.Add(componentId, new TagsPool<T>());
             else
-                _componentsPools[componentId] = new ComponentsPool<T>();
+                _componentsPools.Add(componentId, new ComponentsPool<T>());
             return _componentsPools[componentId];
         }
 
