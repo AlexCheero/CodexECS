@@ -49,7 +49,7 @@ namespace CodexECS
             {
                 if (archetype == null)
                     return false;
-                if (archetype.Entities.Count > 0 && !_eToA.Contains(archetype))
+                if (archetype.EntitiesArrEnd > 0 && !_eToA.Contains(archetype))
                     return false;
             }
 
