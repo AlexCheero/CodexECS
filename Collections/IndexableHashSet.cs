@@ -37,12 +37,13 @@ namespace CodexECS.Utility
                 return false;
             _map[value] = _arr.Length;
             _arr.Add(value);
-            return true;
             
 #if HEAVY_ECS_DEBUG
             if (!CheckSynch())
                 throw new EcsException("IdexableHashSet desynch.");
 #endif
+            
+            return true;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

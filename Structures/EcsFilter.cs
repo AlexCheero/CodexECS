@@ -79,9 +79,8 @@ namespace CodexECS
             archetype.OnEntityAdded += AddEntity;
             archetype.OnEntityRemoved += RemoveEntity;
 
-            //CODEX_TODO: optimize
-            for (int i = 0; i < archetype.Entities.Count; i++)
-                AddEntity(archetype.Entities[i]);
+            for (int i = 0; i < archetype.EntitiesArrEnd; i++)
+                AddEntity(archetype.EntitiesArr[i]);
 
 #if DEBUG && !ECS_PERF_TEST
             if (!_archetypes.Add(archetype))

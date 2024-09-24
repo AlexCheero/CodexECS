@@ -5,7 +5,7 @@ using System.Runtime.CompilerServices;
 namespace CodexECS
 {
     //CODEX_TODO: rename to simple list to match c# style
-    class SimpleList<T>
+    public class SimpleList<T>
     {
         public T[] _elements;
         public int _end = 0;

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using CodexECS.Utility;
 using System.Runtime.CompilerServices;
 using EntityType = System.Int32;//duplicated in EntityExtension
@@ -18,23 +19,38 @@ namespace CodexECS
             get => ref _mask;
         }
 
-        //CODEX_TODO: public field smells
-        public IndexableHashSet<EntityType> Entities;
+        //previously Entities was indexable hash set
+        //used instead of dictionary
+        //key was EntityType, now it is assumed to be outer index
+        private readonly SparseSet<int> _entitiesMaping;
+        //public SimpleList<EntityType> EntitiesArr;
+        public EntityType[] EntitiesArr;
+        public int EntitiesArrEnd;
 
         public Archetype(BitMask mask)
         {
             _mask = mask;
-            Entities = new();
+            _entitiesMaping = new (2);
+            EntitiesArr = new EntityType[2];
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void AddEntity(EntityType eid)
         {
-            bool added = Entities.Add(eid);
 #if DEBUG && !ECS_PERF_TEST
-            if (!added)
+            if (_entitiesMaping.ContainsIdx(eid))
                 throw new EcsException("entity was already in archetype");
 #endif
+            _entitiesMaping.Add(eid, EntitiesArrEnd);
+            //EntitiesArr.Add(eid);
+            if (EntitiesArrEnd >= EntitiesArr.Length)
+            {
+                const int maxResizeDelta = 256;
+                Utils.ResizeArray(EntitiesArrEnd, ref EntitiesArr, maxResizeDelta);
+            }
+            EntitiesArr[EntitiesArrEnd] = eid;
+            EntitiesArrEnd++;
+            
             OnEntityAdded?.Invoke(eid);
 
         }
@@ -42,11 +58,22 @@ namespace CodexECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void RemoveEntity(EntityType eid)
         {
-            bool removed = Entities.Remove(eid);
 #if DEBUG && !ECS_PERF_TEST
-            if (!removed)
+            if (!_entitiesMaping.ContainsIdx(eid))
                 throw new EcsException("entity was not in archetype");
 #endif
+            var index = _entitiesMaping[eid];
+            var removeIdx = EntitiesArrEnd - 1;
+            EntitiesArr[index] = EntitiesArr[removeIdx];
+            _entitiesMaping[EntitiesArr[index]] = index;
+            
+            _entitiesMaping.RemoveAt(eid);
+            // EntitiesArr.RemoveAt(EntitiesArrEnd - 1);
+            EntitiesArr[removeIdx] = default;
+            EntitiesArrEnd--;
+            if (removeIdx < EntitiesArrEnd)
+                EntitiesArr[removeIdx] = EntitiesArr[EntitiesArrEnd];
+            
             OnEntityRemoved?.Invoke(eid);
         }
     }

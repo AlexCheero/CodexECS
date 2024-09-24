@@ -4,13 +4,14 @@ using System.Runtime.CompilerServices;
 
 namespace CodexECS
 {
-    class SparseSet<T>
+    public class SparseSet<T>
     {
         private int[] _sparse;
         private SimpleList<T> _values;
 
-        //don't chage outside of SparseSet. made public only for manual unrolling
-        public SimpleList<int> _dense;
+#if DEBUG && !ECS_PERF_TEST
+        private SimpleList<int> _dense;
+#endif
 
         public int Length
         {
@@ -24,13 +25,15 @@ namespace CodexECS
             get => ref _values[_sparse[i]];
         }
 
-        public SparseSet(int initialCapacity = 0)
+        public SparseSet(int initialCapacity = 2)
         {
             _sparse = new int[initialCapacity];
             for (int i = 0; i < initialCapacity; i++)
                 _sparse[i] = -1;
             _values = new SimpleList<T>(initialCapacity);
+#if DEBUG && !ECS_PERF_TEST
             _dense = new SimpleList<int>(initialCapacity);
+#endif
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -55,9 +58,10 @@ namespace CodexECS
 
             _sparse[outerIdx] = _values.Length;
             _values.Add(value);
+            
+#if DEBUG && !ECS_PERF_TEST
             _dense.Add(outerIdx);
 
-#if DEBUG && !ECS_PERF_TEST
             if (_values.Length != _dense.Length)
                 throw new EcsException("_values.Length != _dense.Length");
             if (_dense[_sparse[outerIdx]] != outerIdx)
@@ -68,12 +72,14 @@ namespace CodexECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Remove(int outerIdx)
+        public void RemoveAt(int outerIdx)
         {
             var innerIndex = _sparse[outerIdx];
             _sparse[outerIdx] = -1;
             _values.RemoveAt(innerIndex);
+#if DEBUG && !ECS_PERF_TEST
             _dense.RemoveAt(innerIndex);
+#endif
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -88,7 +94,9 @@ namespace CodexECS
 #endif
 
             _values.Clear();
+#if DEBUG && !ECS_PERF_TEST
             _dense.Clear();
+#endif
         }
 
         public void Copy(in SparseSet<T> other)
@@ -107,7 +115,9 @@ namespace CodexECS
             Array.Copy(other._sparse, _sparse, other._sparse.Length);
 
             _values.Copy(other._values);
+#if DEBUG && !ECS_PERF_TEST
             _dense.Copy(other._dense);
+#endif
         }
     }
 }
