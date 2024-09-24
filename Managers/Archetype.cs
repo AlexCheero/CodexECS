@@ -64,8 +64,12 @@ namespace CodexECS
 #endif
             var index = _entitiesMaping[eid];
             var removeIdx = EntitiesArrEnd - 1;
-            EntitiesArr[index] = EntitiesArr[removeIdx];
-            _entitiesMaping[EntitiesArr[index]] = index;
+            var lastEntity = EntitiesArr[removeIdx];
+            EntitiesArr[index] = lastEntity;
+            if (!_entitiesMaping.ContainsIdx(lastEntity))
+                _entitiesMaping.Add(lastEntity, index);
+            else
+                _entitiesMaping[lastEntity] = index;
             
             _entitiesMaping.RemoveAt(eid);
             // EntitiesArr.RemoveAt(EntitiesArrEnd - 1);
