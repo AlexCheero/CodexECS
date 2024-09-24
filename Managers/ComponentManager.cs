@@ -10,7 +10,7 @@ namespace CodexECS
     {
         //private SparseSet<IComponentsPool> _componentsPools;
         private int[] _poolsIndices;
-        private SimpleList<IComponentsPool> _pools;
+        private readonly SimpleList<IComponentsPool> _pools;
 
         public ComponentManager()
         {
