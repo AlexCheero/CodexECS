@@ -1,5 +1,6 @@
-﻿using System;
+﻿using CodexECS.Utility;
 using System.Runtime.CompilerServices;
+using System;
 
 #if DEBUG
 using System.Text;
@@ -7,7 +8,7 @@ using System.Text;
 
 namespace CodexECS
 {
-    interface IComponentsPool
+    public interface IComponentsPool
     {
         public int Length { get; }
         public bool Contains(int id);
@@ -31,12 +32,23 @@ namespace CodexECS
         //made public only for unrolling indexer for speeding up
         public int[] _sparse;
         private int[] _dense;
-        public SimpleVector<T> _values;
-
+        public T[] _values;
 #if DEBUG
+        public int ValuesLength { get; private set; }
+#else
+        public int ValuesLength;
+#endif
+
+        public ref T this[int id]
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get => ref _values[_sparse[id]];
+        }
+
+#if HEAVY_ECS_DEBUG
         private void CheckArrays()
         {
-            for (int i = 0; i < _values.Length; i++)
+            for (int i = 0; i < ValuesLength; i++)
             {
                 var outer = _dense[i];
                 var inner = _sparse[outer];
@@ -44,7 +56,9 @@ namespace CodexECS
                     throw new EcsException("indices mismatch 2");
             }
         }
+#endif
 
+#if DEBUG
         public string DebugString(int id)
         {
             StringBuilder sb = new StringBuilder();
@@ -65,7 +79,7 @@ namespace CodexECS
         public int Length
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get => _values.Length;
+            get => ValuesLength;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -76,17 +90,29 @@ namespace CodexECS
         {
             var innerIndex = _sparse[id];
             _sparse[id] = -1;
-            _values.Remove(innerIndex);
-            if (innerIndex < _values.Length)
+
+#region Unrolled SimpleList.RemoveAt
+
+            _values[innerIndex] = default;
+            ValuesLength--;
+            if (innerIndex < ValuesLength)
+                _values[innerIndex] = _values[ValuesLength];
+
+#endregion
+            
+            
+            if (innerIndex < ValuesLength)
             {
-                var lastId = _dense[_values.Length];
+                var lastId = _dense[ValuesLength];
                 _sparse[lastId] = innerIndex;
-                _dense[innerIndex] = _dense[_values.Length];
+                _dense[innerIndex] = _dense[ValuesLength];
+                
+                //TODO: ???
                 //_sparse[id] = _dense[innerIndex];
                 //_values[innerIndex] = _values[_values.Length];
             }
 
-#if DEBUG && !ECS_PERF_TEST
+#if HEAVY_ECS_DEBUG
             CheckArrays();
 #endif
         }
@@ -101,7 +127,13 @@ namespace CodexECS
                 _sparse[i] = -1;
 #endif
 
-            _values.Clear();
+#region Unrolled SimpleList.Clear
+
+            ValuesLength = 0;
+
+#endregion
+            
+            
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -126,9 +158,18 @@ namespace CodexECS
                 Array.Resize(ref _dense, otherPool._dense.Length);
             Array.Copy(otherPool._dense, _dense, otherPool._dense.Length);
 
-            _values.Copy(otherPool._values);
+#region Unrolled SimpleList.Copy
 
-#if DEBUG && !ECS_PERF_TEST
+            ValuesLength = otherPool.ValuesLength;
+            if (_values.Length < ValuesLength)
+                Array.Resize(ref _values, otherPool._values.Length);
+            Array.Copy(otherPool._values, _values, ValuesLength);
+
+#endregion
+            
+            
+
+#if HEAVY_ECS_DEBUG
             CheckArrays();
 #endif
         }
@@ -149,23 +190,18 @@ namespace CodexECS
 #endif
             Add(to, _values[_sparse[from]]);
         }
-#endregion
+        #endregion
 
-        //public ref T this[int id]
-        //{
-        //    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        //    get => ref _values[_sparse[id]];
-        //}
-
-        public ComponentsPool(int initialCapacity = 0)
+        public ComponentsPool(int initialCapacity = 2)
         {
             _sparse = new int[initialCapacity];
             _dense = new int[initialCapacity];
             for (int i = 0; i < initialCapacity; i++)
                 _sparse[i] = -1;
-            _values = new SimpleVector<T>(initialCapacity);
+            _values = new T[initialCapacity];
         }
 
+        //CODEX_TODO: excess call, rewrite
         public void AddReference(int id, object value)
         {
 #if DEBUG && !ECS_PERF_TEST
@@ -181,10 +217,8 @@ namespace CodexECS
             if (id >= _sparse.Length)
             {
                 var oldLength = _sparse.Length;
-                var newLength = oldLength > 0 ? oldLength * 2 : 2;
-                while (id >= newLength)
-                    newLength *= 2;
-                Array.Resize(ref _sparse, newLength);
+                const int maxResizeDelta = 256;
+                Utils.ResizeArray(id, ref _sparse, maxResizeDelta);
                 for (int i = oldLength; i < _sparse.Length; i++)
                     _sparse[i] = -1;
             }
@@ -194,13 +228,26 @@ namespace CodexECS
                 throw new EcsException(typeof(T) + " sparse set already have element at this index");
 #endif
 
-            _sparse[id] = _values.Length;
-            _values.Add(value);
-            if (_dense.Length < _values._elements.Length)
-                Array.Resize(ref _dense, _values._elements.Length);
+            _sparse[id] = ValuesLength;
+            
+#region Unrolled SimpleList.Add
+
+            if (ValuesLength >= _values.Length)
+            {
+                const int maxResizeDelta = 256;
+                Utils.ResizeArray(ValuesLength, ref _values, maxResizeDelta);
+            }
+            _values[ValuesLength] = value;
+            ValuesLength++;
+
+#endregion
+            
+            
+            if (_dense.Length < _values.Length)
+                Array.Resize(ref _dense, _values.Length);
             _dense[_sparse[id]] = id;
 
-#if DEBUG && !ECS_PERF_TEST
+#if HEAVY_ECS_DEBUG
             CheckArrays();
 #endif
 
@@ -217,7 +264,7 @@ namespace CodexECS
         public Type GetComponentType() => typeof(T);
 #endif
 
-#region Interface implementation
+        #region Interface implementation
         public int Length
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -252,7 +299,7 @@ namespace CodexECS
 #endif
             Add(to);
         }
-#endregion
+        #endregion
 
         public TagsPool(int initialCapacity = 0)
         {

@@ -1,6 +1,8 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Text;
+using CodexECS.Utility;
 
 namespace CodexECS
 {
@@ -8,6 +10,30 @@ namespace CodexECS
 
     public struct BitMask
     {
+        public class EqualityComparer : IEqualityComparer<BitMask>
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public bool Equals(BitMask x, BitMask y) => x.MasksEquals(y);
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public int GetHashCode(BitMask obj) => obj.GetMaskHash();
+        }
+
+        public static readonly EqualityComparer MaskComparer;
+        static BitMask() => MaskComparer = new();
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public int GetMaskHash()
+        {
+            int hash = (int)(17 * 23 * _m1);
+            if (_mn != null && _mn.Length > 0)
+            {
+                for (int i = 0; i < _mn.Length; ++i)
+                    hash = hash * 23 + (int)_mn[i];
+            }
+            return hash;
+        }
+
         public const int SizeOfPartInBits = sizeof(MaskInternal) * 8;
         private MaskInternal _m1;
         private MaskInternal[] _mn;
@@ -18,13 +44,6 @@ namespace CodexECS
             get;
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             private set;
-        }
-
-        public BitMask(MaskInternal m1 = 0, MaskInternal[] mn = null)
-        {
-            _m1 = m1;
-            _mn = mn;
-            Length = 0;
         }
 
         public BitMask(params int[] positions)
@@ -88,13 +107,8 @@ namespace CodexECS
                 //resize if needed
                 if (_mn == null || _mn.Length <= chunkIdx)
                 {
-                    var newChunksLength = 2;
-                    while (newChunksLength < chunkIdx + 1)
-                        newChunksLength <<= 1;
-                    if (_mn == null)
-                        _mn = new MaskInternal[newChunksLength];
-                    else
-                        Array.Resize(ref _mn, newChunksLength);
+                    const int maxResizeDelta = 8;
+                    Utils.ResizeArray(chunkIdx, ref _mn, maxResizeDelta);
                 }
                 m = ref _mn[chunkIdx];
             }
@@ -112,7 +126,7 @@ namespace CodexECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public BitMask And(int i)
         {
-            var mask = this;
+            var mask = Duplicate();
             mask.Set(i);
             return mask;
         }
@@ -120,7 +134,7 @@ namespace CodexECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public BitMask And(params int[] positions)
         {
-            var mask = this;
+            var mask = Duplicate();
             for (int i = 0; i < positions.Length; i++)
                 mask.Set(positions[i]);
             return mask;
@@ -129,7 +143,7 @@ namespace CodexECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public BitMask AndNot(int i)
         {
-            var mask = this;
+            var mask = Duplicate();
             mask.Unset(i);
             return mask;
         }
@@ -137,10 +151,30 @@ namespace CodexECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public BitMask AndNot(params int[] positions)
         {
-            var mask = this;
+            var mask = Duplicate();
             for (int i = 0; i < positions.Length; i++)
                 mask.Unset(positions[i]);
             return mask;
+        }
+        
+        public bool Intersects(in BitMask otherMask)
+        {
+            var intersects = _m1 & otherMask._m1;
+            if (_mn == null || otherMask._mn == null)
+                return intersects > 0;
+
+            if (_mn.Length < otherMask._mn.Length)
+            {
+                for (int i = 0; i < _mn.Length; ++i)
+                    intersects &= _mn[i] & otherMask._mn[i];
+            }
+            else
+            {
+                for (int i = 0; i < otherMask._mn.Length; ++i)
+                    intersects &= otherMask._mn[i] & _mn[i];
+            }
+
+            return intersects > 0;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -207,7 +241,30 @@ namespace CodexECS
             return (m & (1 << position)) != 0;
         }
 
+        public int GetNextSetBit(int fromPosition)
+        {
+            for (int i = fromPosition; i < Length; i++)
+            {
+                int chunkIdx = i / SizeOfPartInBits;
+                if (CheckChunkIdx(chunkIdx))
+                    return -1;
+
+                var m = _m1;
+                if (chunkIdx > 0)
+                    m = _mn[chunkIdx - 1];
+
+                for (int j = i % SizeOfPartInBits; j < SizeOfPartInBits; j++)
+                {
+                    if ((m & (1 << j)) != 0)
+                        return j + (chunkIdx * SizeOfPartInBits);
+                }
+            }
+
+            return -1;
+        }
+
         #region Enumerable
+        //CODEX_TODO: possible optimization on for iteration instead of foreach
         public struct Enumerator
         {
             private int _nextSetBit;
@@ -224,37 +281,15 @@ namespace CodexECS
             public bool MoveNext()
             {
                 if (_nextSetBit == -1)
-                    _nextSetBit = GetNextSetBit(0);
+                    _nextSetBit = _bitMask.GetNextSetBit(0);
                 else
-                    _nextSetBit = GetNextSetBit(_nextSetBit + 1);
+                    _nextSetBit = _bitMask.GetNextSetBit(_nextSetBit + 1);
 
                 return _nextSetBit != -1;
             }
-
-            private int GetNextSetBit(int fromPosition)
-            {
-                for (int i = fromPosition; i < _bitMask.Length; i++)
-                {
-                    int chunkIdx = i / SizeOfPartInBits;
-                    if (_bitMask.CheckChunkIdx(chunkIdx))
-                        return -1;
-
-                    var m = _bitMask._m1;
-                    if (chunkIdx > 0)
-                        m = _bitMask._mn[chunkIdx - 1];
-
-                    for (int j = i % SizeOfPartInBits; j < SizeOfPartInBits; j++)
-                    {
-                        if ((m & (1 << j)) != 0)
-                            return j + (chunkIdx * SizeOfPartInBits);
-                    }
-                }
-
-                return -1;
-            }
         }
 
-        public Enumerator GetEnumerator() => new Enumerator(this);
+        public Enumerator GetEnumerator() => new(this);
         
         #endregion
 
@@ -269,15 +304,16 @@ namespace CodexECS
             }
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool InclusivePass_Internal(MaskInternal value, MaskInternal filter) => (filter & (value ^ filter)) == 0;
+        //[MethodImpl(MethodImplOptions.AggressiveInlining)]
+        //private bool InclusivePass_Internal(MaskInternal value, MaskInternal filter) => (filter & (value ^ filter)) == 0;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool InclusivePass(in BitMask filter)
         {
             if (filter.Length > Length)
                 return false;
-            if (!InclusivePass_Internal(_m1, filter._m1))
+            if ((filter._m1 & (_m1 ^ filter._m1)) != 0)
+            //if (!InclusivePass_Internal(_m1, filter._m1))
                 return false;
 
             var chunksCount = GetDynamicChunksLength(filter.Length);
@@ -287,7 +323,8 @@ namespace CodexECS
                 if (filterChunk == 0)
                     continue;
 
-                if (!InclusivePass_Internal(_mn[i], filterChunk))
+                if ((filterChunk & (_mn[i] ^ filterChunk)) != 0)
+                //if (!InclusivePass_Internal(_mn[i], filterChunk))
                     return false;
             }
 
@@ -313,7 +350,7 @@ namespace CodexECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Equals(in BitMask other)
+        public bool MasksEquals(in BitMask other)
         {
             if (Length != other.Length)
                 return false;
@@ -334,7 +371,7 @@ namespace CodexECS
             return true;
         }
 
-#if DEBUG
+#if DEBUG && !ECS_PERF_TEST
         public override string ToString()
         {
             var sb = new StringBuilder();
@@ -353,8 +390,10 @@ namespace CodexECS
         {
             int j = 0;
             for (int i = bits.Length - 1; i >= 0; i--, j++)
+            {
                 if (bits[i] != 0)
                     Set(j);
+            }
         }
 #endif
     }
