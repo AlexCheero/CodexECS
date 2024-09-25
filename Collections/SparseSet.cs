@@ -8,7 +8,7 @@ namespace CodexECS
     {
         private int[] _sparse;
         private T[] _values;
-        private int[] _dense;
+        public int[] _dense;
         private int _valuesEnd;
 
         public int Length
