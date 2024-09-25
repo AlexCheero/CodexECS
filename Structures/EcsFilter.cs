@@ -39,8 +39,7 @@ namespace CodexECS
 #endif
 
 #region Unrolled from IndexableHashSet
-        // private Dictionary<EntityType, int> _entitiesMap;
-        private SparseSet<int> _entitiesMapping;
+        private Dictionary<EntityType, int> _entitiesMap;
         private EntityType[] _entitiesArr;
         private int _entitiesLength;
 #endregion
@@ -68,7 +67,7 @@ namespace CodexECS
 #if DEBUG && !ECS_PERF_TEST
             _archetypes = new();
 #endif
-            _entitiesMapping = new();
+            _entitiesMap = new();
             _entitiesArr = new EntityType[2];
             _views = new() { new View(this) };
             _world = world;
@@ -93,16 +92,18 @@ namespace CodexECS
         private void AddEntity(EntityType eid)
         {
 #if DEBUG && !ECS_PERF_TEST
-            if (_entitiesMapping.ContainsIdx(eid))
+            if (_entitiesMap.ContainsKey(eid))
                 throw new EcsException("filter already have this entity");
 #endif
             
-            _entitiesMapping.Add(eid, _entitiesLength);
             if (_lockCounter > 0)
             {
+                _entitiesMap[eid] = default;
                 _dirty = true;
                 return;
             }
+            
+            _entitiesMap[eid] = _entitiesLength;
 
 #region Unrolled from SimpleList (Add)
             if (_entitiesLength >= _entitiesArr.Length)
@@ -126,22 +127,22 @@ namespace CodexECS
         private void RemoveEntity(EntityType eid)
         {
 #if DEBUG && !ECS_PERF_TEST
-            if (!_entitiesMapping.ContainsIdx(eid))
+            if (!_entitiesMap.ContainsKey(eid))
                 throw new EcsException("filter have no this entity");
 #endif
             
             if (_lockCounter > 0)
             {
-                _entitiesMapping.RemoveAt(eid);
+                _entitiesMap.Remove(eid);
                 _dirty = true;
                 return;
             }
 
             _entitiesLength--;
-            var index = _entitiesMapping[eid];
+            var index = _entitiesMap[eid];
             _entitiesArr[index] = _entitiesArr[_entitiesLength];
-            _entitiesMapping[_entitiesArr[index]] = index;
-            _entitiesMapping.RemoveAt(eid);
+            _entitiesMap[_entitiesArr[index]] = index;
+            _entitiesMap.Remove(eid);
             
 #if HEAVY_ECS_DEBUG
             if (!CheckEntitiesSynch())
@@ -154,12 +155,12 @@ namespace CodexECS
 #if HEAVY_ECS_DEBUG
         private bool CheckEntitiesSynch()
         {
-            if (_entitiesLength != _entitiesMapping.Length)
+            if (_entitiesLength != _entitiesMap.Count)
                 return false;
             for (int i = 0; i < _entitiesLength; i++)
             {
                 var eid = _entitiesArr[i];
-                if (!_entitiesMapping.ContainsIdx(eid) || _entitiesMapping[eid] != i)
+                if (!_entitiesMap.ContainsKey(eid) || _entitiesMap[eid] != i)
                     return false;
             }
 
@@ -202,7 +203,7 @@ namespace CodexECS
             if (_lockCounter != 0 || !_dirty)
                 return;
 
-            _entitiesLength = _entitiesMapping.Length;
+            _entitiesLength = _entitiesMap.Count;
             if (_entitiesLength > _entitiesArr.Length)
             {
                 const int maxResizeDelta = 256;
@@ -210,20 +211,14 @@ namespace CodexECS
             }
             
             //CODEX_TODO: two loops. try to do it in a single loop
-            // var arrIdx = 0;
-            // foreach (var (eid, idx) in _entitiesMapping)
-            // {
-            //     _entitiesArr[arrIdx] = eid;
-            //     arrIdx++;
-            // }
-            // for (int i = 0; i < _entitiesLength; i++)
-            //     _entitiesMapping[_entitiesArr[i]] = i;
-
-            for (int i = 0; i < _entitiesMapping.Length; i++)
+            var arrIdx = 0;
+            foreach (var (eid, idx) in _entitiesMap)
             {
-                _entitiesArr[i] = _entitiesMapping._dense[i];
-                _entitiesMapping[_entitiesArr[i]] = i;
+                _entitiesArr[arrIdx] = eid;
+                arrIdx++;
             }
+            for (int i = 0; i < _entitiesLength; i++)
+                _entitiesMap[_entitiesArr[i]] = i;
 
             _dirty = false;
             
