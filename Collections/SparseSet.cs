@@ -8,10 +8,7 @@ namespace CodexECS
     {
         private int[] _sparse;
         private SimpleList<T> _values;
-
-#if DEBUG && !ECS_PERF_TEST
         private SimpleList<int> _dense;
-#endif
 
         public int Length
         {
@@ -31,9 +28,7 @@ namespace CodexECS
             for (int i = 0; i < initialCapacity; i++)
                 _sparse[i] = -1;
             _values = new SimpleList<T>(initialCapacity);
-#if DEBUG && !ECS_PERF_TEST
             _dense = new SimpleList<int>(initialCapacity);
-#endif
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -58,10 +53,9 @@ namespace CodexECS
 
             _sparse[outerIdx] = _values.Length;
             _values.Add(value);
-            
-#if DEBUG && !ECS_PERF_TEST
             _dense.Add(outerIdx);
 
+#if DEBUG && !ECS_PERF_TEST
             if (_values.Length != _dense.Length)
                 throw new EcsException("_values.Length != _dense.Length");
             if (_dense[_sparse[outerIdx]] != outerIdx)
@@ -76,10 +70,11 @@ namespace CodexECS
         {
             var innerIndex = _sparse[outerIdx];
             _sparse[outerIdx] = -1;
-            _values.RemoveAt(innerIndex);
-#if DEBUG && !ECS_PERF_TEST
-            _dense.RemoveAt(innerIndex);
-#endif
+            //backswap using _dense
+            if (innerIndex < _dense.Length - 1) //TODO: probably get rid of this check
+                _sparse[_dense[_dense.Length - 1]] = innerIndex;//TODO: try implement implicit delete list similar to entity manager
+            _values.SwapRemoveAt(innerIndex);
+            _dense.SwapRemoveAt(innerIndex);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -94,9 +89,7 @@ namespace CodexECS
 #endif
 
             _values.Clear();
-#if DEBUG && !ECS_PERF_TEST
             _dense.Clear();
-#endif
         }
 
         public void Copy(in SparseSet<T> other)
@@ -115,9 +108,28 @@ namespace CodexECS
             Array.Copy(other._sparse, _sparse, other._sparse.Length);
 
             _values.Copy(other._values);
-#if DEBUG && !ECS_PERF_TEST
             _dense.Copy(other._dense);
-#endif
         }
+
+#if HEAVY_ECS_DEBUG
+        public bool CheckInvariant()
+        {
+            for (int i = 0; i < _sparse.Length; i++)
+            {
+                if (_sparse[i] == -1)
+                    continue;
+                for (int j = 0; j < _sparse.Length; j++)
+                {
+                    if (i == j)
+                        continue;
+
+                    if (_sparse[i] == _sparse[j])
+                        return false;
+                }
+            }
+
+            return true;
+        }
+#endif
     }
 }

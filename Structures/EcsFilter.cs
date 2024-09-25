@@ -79,7 +79,7 @@ namespace CodexECS
             archetype.OnEntityAdded += AddEntity;
             archetype.OnEntityRemoved += RemoveEntity;
 
-            for (int i = 0; i < archetype.EntitiesArrEnd; i++)
+            for (int i = 0; i < archetype.EntitiesEnd; i++)
                 AddEntity(archetype.EntitiesArr[i]);
 
 #if DEBUG && !ECS_PERF_TEST

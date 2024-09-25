@@ -43,7 +43,7 @@ namespace CodexECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void RemoveAt(int idx)
+        public void SwapRemoveAt(int idx)
         {
             _elements[idx] = default;
             _end--;

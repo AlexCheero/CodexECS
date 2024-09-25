@@ -56,7 +56,7 @@ namespace CodexECS.Utility
             _map[_arr[index]] = index;
             
             _map.Remove(value);
-            _arr.RemoveAt(_arr.Length - 1);
+            _arr.SwapRemoveAt(_arr.Length - 1);
             
 #if HEAVY_ECS_DEBUG
             if (!CheckSynch())
