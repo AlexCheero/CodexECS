@@ -45,10 +45,14 @@ namespace CodexECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void SwapRemoveAt(int idx)
         {
+#if DEBUG && !ECS_PERF_TEST
+            if (idx >= _end)
+                throw new EcsException("idx should be smaller than _end");
+#endif
+            //needed to cleanup reference types even if this is the last element in collection
             _elements[idx] = default;
             _end--;
-            if (idx < _end)
-                _elements[idx] = _elements[_end];
+            _elements[idx] = _elements[_end];
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

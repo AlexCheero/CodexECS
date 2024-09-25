@@ -70,9 +70,15 @@ namespace CodexECS
         {
             var innerIndex = _sparse[outerIdx];
             _sparse[outerIdx] = -1;
+            
+#if DEBUG && !ECS_PERF_TEST
+            if (innerIndex >= _dense.Length)
+                throw new EcsException("innerIndex should be smaller than _dense.Length");
+#endif
+            
             //backswap using _dense
-            if (innerIndex < _dense.Length - 1) //TODO: probably get rid of this check
-                _sparse[_dense[_dense.Length - 1]] = innerIndex;//TODO: try implement implicit delete list similar to entity manager
+            if (innerIndex < _dense.Length - 1)
+                _sparse[_dense[_dense.Length - 1]] = innerIndex;
             _values.SwapRemoveAt(innerIndex);
             _dense.SwapRemoveAt(innerIndex);
         }
