@@ -7,13 +7,14 @@ namespace CodexECS
     public class SparseSet<T>
     {
         private int[] _sparse;
-        private SimpleList<T> _values;
-        private SimpleList<int> _dense;
+        private T[] _values;
+        private int[] _dense;
+        private int _valuesEnd;
 
         public int Length
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get => _values.Length;
+            get => _valuesEnd;
         }
 
         public ref T this[int i]
@@ -27,8 +28,8 @@ namespace CodexECS
             _sparse = new int[initialCapacity];
             for (int i = 0; i < initialCapacity; i++)
                 _sparse[i] = -1;
-            _values = new SimpleList<T>(initialCapacity);
-            _dense = new SimpleList<int>(initialCapacity);
+            _values = new T[initialCapacity];
+            _dense = new int[initialCapacity];
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -49,15 +50,24 @@ namespace CodexECS
 #if DEBUG && !ECS_PERF_TEST
             if (_sparse[outerIdx] > -1)
                 throw new EcsException("sparse set already have element at this index");
+            if (_values.Length != _dense.Length)
+                throw new EcsException("_values _dense desynch");
 #endif
 
-            _sparse[outerIdx] = _values.Length;
-            _values.Add(value);
-            _dense.Add(outerIdx);
+            _sparse[outerIdx] = _valuesEnd;
+            // _values.Add(value);
+            // _dense.Add(outerIdx);
+            if (_valuesEnd >= _values.Length)
+            {
+                const int maxResizeDelta = 256;
+                Utils.ResizeArray(_valuesEnd, ref _values, maxResizeDelta);
+                Utils.ResizeArray(_valuesEnd, ref _dense, maxResizeDelta);
+            }
+            _values[_valuesEnd] = value;
+            _dense[_valuesEnd] = outerIdx;
+            _valuesEnd++;
 
 #if DEBUG && !ECS_PERF_TEST
-            if (_values.Length != _dense.Length)
-                throw new EcsException("_values.Length != _dense.Length");
             if (_dense[_sparse[outerIdx]] != outerIdx)
                 throw new EcsException("wrong sparse set idices");
 #endif
@@ -72,15 +82,23 @@ namespace CodexECS
             _sparse[outerIdx] = -1;
             
 #if DEBUG && !ECS_PERF_TEST
-            if (innerIndex >= _dense.Length)
-                throw new EcsException("innerIndex should be smaller than _dense.Length");
+            if (innerIndex >= _valuesEnd)
+                throw new EcsException("innerIndex should be smaller than _valuesEnd");
+            if (_values.Length != _dense.Length)
+                throw new EcsException("_values _dense desynch");
 #endif
             
             //backswap using _dense
-            if (innerIndex < _dense.Length - 1)
-                _sparse[_dense[_dense.Length - 1]] = innerIndex;
-            _values.SwapRemoveAt(innerIndex);
-            _dense.SwapRemoveAt(innerIndex);
+            var lastIdx = _valuesEnd - 1;
+            if (innerIndex < lastIdx)
+                _sparse[_dense[lastIdx]] = innerIndex;
+            // _values.SwapRemoveAt(innerIndex);
+            // _dense.SwapRemoveAt(innerIndex);
+            _values[innerIndex] = default;
+            _dense[innerIndex] = -1;
+            _valuesEnd--;
+            _values[innerIndex] = _values[_valuesEnd];
+            _dense[innerIndex] = _dense[_valuesEnd];
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -94,8 +112,9 @@ namespace CodexECS
                 _sparse[i] = -1;
 #endif
 
-            _values.Clear();
-            _dense.Clear();
+            // _values.Clear();
+            // _dense.Clear();
+            _valuesEnd = 0;
         }
 
         public void Copy(in SparseSet<T> other)
@@ -113,8 +132,20 @@ namespace CodexECS
             }
             Array.Copy(other._sparse, _sparse, other._sparse.Length);
 
-            _values.Copy(other._values);
-            _dense.Copy(other._dense);
+            // _values.Copy(other._values);
+            // _dense.Copy(other._dense);
+#if DEBUG && !ECS_PERF_TEST
+            if (_values.Length != _dense.Length)
+                throw new EcsException("_values _dense desynch");
+#endif
+            _valuesEnd = other._valuesEnd;
+            if (_values.Length < _valuesEnd)
+            {
+                Array.Resize(ref _values, other._values.Length);
+                Array.Resize(ref _dense, other._dense.Length);
+            }
+            Array.Copy(other._values, _values, _valuesEnd);
+            Array.Copy(other._dense, _dense, _valuesEnd);
         }
 
 #if HEAVY_ECS_DEBUG
