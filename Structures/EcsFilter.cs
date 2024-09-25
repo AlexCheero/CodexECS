@@ -39,13 +39,13 @@ namespace CodexECS
 #endif
 
 #region Unrolled from IndexableHashSet
-        private Dictionary<EntityType, int> _entitiesMap;
+        private readonly Dictionary<EntityType, int> _entitiesMap;
         private EntityType[] _entitiesArr;
         private int _entitiesLength;
 #endregion
 
-        private List<View> _views;
-        private EcsWorld _world;
+        private readonly List<View> _views;
+        private readonly EcsWorld _world;
 
         public int EntitiesCount
         {
