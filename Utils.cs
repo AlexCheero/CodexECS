@@ -52,9 +52,17 @@ namespace CodexECS.Utility
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void ResizeArray<T>(int lastIdx, ref T[] arr, int maxResizeDelta)
         {
-            int newLength = arr == null || arr.Length < maxResizeDelta ?
-                1 << (BITSize(lastIdx) + 1) :
-                arr.Length + maxResizeDelta;
+            int newLength;
+            if (arr == null || arr.Length < maxResizeDelta || arr.Length + maxResizeDelta <= lastIdx)
+                newLength = 1 << (BITSize(lastIdx) + 1);
+            else
+                newLength = arr.Length + maxResizeDelta;
+
+#if DEBUG
+            if (newLength <= lastIdx)
+                throw new IndexOutOfRangeException(
+                    $"newLength ({newLength}) for array with length ({arr?.Length ?? 0}) is still smaller than lastIdx ({lastIdx}). maxResizeDelta ({maxResizeDelta})");
+#endif
             
             if (arr == null)
                 arr = new T[newLength];
