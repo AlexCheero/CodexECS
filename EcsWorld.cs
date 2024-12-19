@@ -76,7 +76,9 @@ namespace CodexECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Add<T>(EntityType eid, T component = default)
+        public void Add<T>(EntityType eid) => Add(eid, ComponentMeta<T>.DefaultValue);
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Add<T>(EntityType eid, T component)
         {
             _archetypes.AddComponent<T>(eid);
             _componentManager.Add<T>(eid, component);

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Threading;
 
@@ -33,6 +34,16 @@ namespace CodexECS
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get;
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            private set;
+        }
+        
+        public static T DefaultValue
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get;
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            private set;
         }
 
         static ComponentMeta()
@@ -42,6 +53,12 @@ namespace CodexECS
             ComponentMapping.TypeToId[type] = Id;
             ComponentMapping.IdToType[Id] = type;
             IsTag = typeof(ITag).IsAssignableFrom(type);
+            var defaultValueGetter = type.GetProperty("DefaultValue",
+                BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+            if (defaultValueGetter != null)
+                DefaultValue = (T)defaultValueGetter.GetValue(null);
+            else
+                DefaultValue = default;
 
             if (IsTag)
                 PoolFactory.FactoryMethods.Add(Id, (poolSize) => new TagsPool<T>(poolSize));
