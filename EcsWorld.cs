@@ -88,8 +88,7 @@ namespace CodexECS
         public void SubscribeOnAdd<T>(Action<EcsWorld> callback)
         {
 #if DEBUG && !ECS_PERF_TEST
-            var gtd = Utils.GetGenericTypeDefinition<T>();
-            if (gtd == typeof(AddReact<>))
+            if (IsReactWrapperType<T>())
                 throw new EcsException("Cannot subscribe on reactive wrappers manually");
 #endif
             
@@ -106,8 +105,7 @@ namespace CodexECS
         public void Add<T>(EntityType eid, T component)
         {
 #if DEBUG && !ECS_PERF_TEST
-            var gtd = Utils.GetGenericTypeDefinition<T>();
-            if (gtd == typeof(AddReact<>))
+            if (IsReactWrapperType<T>())
                 throw new EcsException("Cannot add reactive wrappers manually");
 #endif
             
@@ -130,6 +128,16 @@ namespace CodexECS
                 throw new EcsException("Components and archetypes not synched");
 #endif
         }
+        
+#if DEBUG
+        private bool IsReactWrapperType<T>() => IsReactWrapperType(ComponentMeta<T>.Id);
+
+        private bool IsReactWrapperType(int componentId)
+        {
+            var gtd = Utils.GetGenericTypeDefinition(ComponentMapping.IdToType[componentId]);
+            return gtd == typeof(AddReact<>) || gtd == typeof(RemoveReact<>);
+        }
+#endif
 
         //CODEX_TODO: probably should implement lock checks as in Add
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -167,8 +175,7 @@ namespace CodexECS
         public void Remove<T>(EntityType eid)
         {
 #if DEBUG && !ECS_PERF_TEST
-            var gtd = Utils.GetGenericTypeDefinition<T>();
-            if (gtd == typeof(AddReact<>))
+            if (IsReactWrapperType<T>())
                 throw new EcsException("Cannot remove reactive wrappers manually");
 #endif
             
@@ -188,8 +195,7 @@ namespace CodexECS
         public void RemoveAll(int componentId)
         {
 #if DEBUG && !ECS_PERF_TEST
-            var gtd = Utils.GetGenericTypeDefinition(ComponentMapping.IdToType[componentId]);
-            if (gtd == typeof(AddReact<>))
+            if (IsReactWrapperType(componentId))
                 throw new EcsException("Cannot remove reactive wrappers manually");
 #endif
             
