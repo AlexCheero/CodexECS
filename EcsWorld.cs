@@ -18,9 +18,12 @@ namespace CodexECS
         private readonly ArchetypesManager _archetypes;
         
         private readonly SparseSet<Action<EcsWorld>> _onAddCallbacks;
+        private readonly SparseSet<Action<EcsWorld>> _onRemoveCallbacks;
         private BitMask _dirtyAddMask;
         //TODO: rename BitMask.Length into capacity, implement BitMask.Count and use it instead of this flag
         private bool _addDirty;
+        private BitMask _dirtyRemoveMask;
+        private bool _removeDirty;
 
         public EcsWorld()
         {
@@ -30,7 +33,9 @@ namespace CodexECS
             _delayedDeleteList = new HashSet<EntityType>();
             
             _onAddCallbacks = new();
+            _onRemoveCallbacks = new();
             _dirtyAddMask = new();
+            _dirtyRemoveMask = new();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -91,12 +96,30 @@ namespace CodexECS
             if (IsReactWrapperType<T>())
                 throw new EcsException("Cannot subscribe on reactive wrappers manually");
 #endif
+            SubscribeOnExistenceChange<AddReact<T>>(_onAddCallbacks, callback);
+        }
+        
+        public void SubscribeOnRemove<T>(Action<EcsWorld> callback)
+        {
+#if DEBUG && !ECS_PERF_TEST
+            if (IsReactWrapperType<T>())
+                throw new EcsException("Cannot subscribe on reactive wrappers manually");
+#endif
+            SubscribeOnExistenceChange<RemoveReact<T>>(_onRemoveCallbacks, callback);
+        }
+        
+        private void SubscribeOnExistenceChange<T>(SparseSet<Action<EcsWorld>> callbacks, Action<EcsWorld> callback)
+        {
+#if DEBUG && !ECS_PERF_TEST
+            if (!IsReactWrapperType<T>())
+                throw new EcsException("Subscription on the direct type instead of reactive wrapper");
+#endif
             
-            var reactWrapperId = ComponentMeta<AddReact<T>>.Id;
-            if (!_onAddCallbacks.ContainsIdx(reactWrapperId))
-                _onAddCallbacks.Add(reactWrapperId, callback);
+            var reactWrapperId = ComponentMeta<T>.Id;
+            if (!callbacks.ContainsIdx(reactWrapperId))
+                callbacks.Add(reactWrapperId, callback);
             else
-                _onAddCallbacks[reactWrapperId] += callback;
+                callbacks[reactWrapperId] += callback;
         }
         
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -179,6 +202,19 @@ namespace CodexECS
                 throw new EcsException("Cannot remove reactive wrappers manually");
 #endif
             
+            var reactWrapperId = ComponentMeta<RemoveReact<T>>.Id;
+            if (_onRemoveCallbacks.ContainsIdx(reactWrapperId))
+            {
+                _archetypes.AddComponent<RemoveReact<T>>(eid);
+                _componentManager.Add(eid, new RemoveReact<T>
+                {
+                    removingComponent = ComponentMeta<T>.IsTag ? default : GetComponent<T>(eid)
+                });
+                
+                _dirtyRemoveMask.Set(reactWrapperId);
+                _removeDirty = true;
+            }
+            
             _archetypes.RemoveComponent<T>(eid);
             _componentManager.Remove<T>(eid);
             
@@ -201,6 +237,14 @@ namespace CodexECS
             
             if (!_componentManager.IsTypeRegistered(componentId))
                 return;
+
+            //TODO: RemoveAll for reactive types not implemented
+            //TODO: _onRemoveCallbacks contains Ids for wrappers, not for components itself 
+            // if (_onRemoveCallbacks.ContainsIdx(componentId))
+            // {
+            //     throw new NotImplementedException("RemoveAll for reactive components not implemented");
+            // }
+            
             _archetypes.RemoveAll(componentId);
             _componentManager.RemoveAll(componentId);
         }
@@ -249,16 +293,18 @@ namespace CodexECS
             _delayedDeleteList.Clear();
 
             if (_addDirty)
-                ReactOnAddRemove(ref _dirtyAddMask, ref _addDirty);
+                ReactOnAddRemove(ref _dirtyAddMask, ref _addDirty, _onAddCallbacks);
+            if (_removeDirty)
+                ReactOnAddRemove(ref _dirtyRemoveMask, ref _removeDirty, _onRemoveCallbacks);
         }
 
-        private void ReactOnAddRemove(ref BitMask dirtyMask, ref bool dirtyFlag)
+        private void ReactOnAddRemove(ref BitMask dirtyMask, ref bool dirtyFlag, SparseSet<Action<EcsWorld>> callbacks)
         {
             Lock();
                 
             foreach (var reactWrapperId in dirtyMask)
             {
-                var callback = _onAddCallbacks[reactWrapperId];
+                var callback = callbacks[reactWrapperId];
 #if DEBUG && !ECS_PERF_TEST
                 if (callback == null)
                     throw new EcsException("no registered on add callback for type " + ComponentMapping.IdToType[reactWrapperId]);

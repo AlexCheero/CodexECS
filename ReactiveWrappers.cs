@@ -1,5 +1,9 @@
 ﻿namespace CodexECS
 {
-    public struct AddReact<T> {}
-    public struct RemoveReact<T> {}
+    public struct AddReact<T> : ITag {}
+
+    public struct RemoveReact<T> : IComponent
+    {
+        public T removingComponent;
+    }
 }
