@@ -7,6 +7,7 @@ namespace CodexECS.Utility
     public static class Utils
     {
         public static Type GetGenericTypeDefinition<T>() => typeof(T).IsGenericType ? typeof(T).GetGenericTypeDefinition() : null;
+        public static Type GetGenericTypeDefinition(Type type) => type.IsGenericType ? type.GetGenericTypeDefinition() : null;
 
         private static readonly int[] BITPatternToLog2 =
         {

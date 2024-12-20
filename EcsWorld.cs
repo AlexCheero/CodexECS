@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using UnityEngine;
 using EntityType = System.Int32;//duplicated in EntityExtension
 
 #if DEBUG
@@ -17,7 +18,9 @@ namespace CodexECS
         private readonly ArchetypesManager _archetypes;
         
         private readonly SparseSet<Action<EcsWorld>> _onAddCallbacks;
-        private readonly HashSet<int> _dirtyAddWrapperIds;
+        private BitMask _dirtyAddMask;
+        //TODO: rename BitMask.Length into capacity, implement BitMask.Count and use it instead of this flag
+        private bool _addDirty;
 
         public EcsWorld()
         {
@@ -27,7 +30,7 @@ namespace CodexECS
             _delayedDeleteList = new HashSet<EntityType>();
             
             _onAddCallbacks = new();
-            _dirtyAddWrapperIds = new();
+            _dirtyAddMask = new();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -114,11 +117,12 @@ namespace CodexECS
             var reactWrapperId = ComponentMeta<AddReact<T>>.Id;
             if (_onAddCallbacks.ContainsIdx(reactWrapperId))
             {
-                // Add<AddReact<T>>(eid);
+                //unrolled Add<AddReact<T>>(eid); without wrapper check
                 _archetypes.AddComponent<AddReact<T>>(eid);
                 _componentManager.Add<AddReact<T>>(eid);
                 
-                _dirtyAddWrapperIds.Add(reactWrapperId);
+                _dirtyAddMask.Set(reactWrapperId);
+                _addDirty = true;
             }
             
 #if HEAVY_ECS_DEBUG
@@ -162,6 +166,12 @@ namespace CodexECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Remove<T>(EntityType eid)
         {
+#if DEBUG && !ECS_PERF_TEST
+            var gtd = Utils.GetGenericTypeDefinition<T>();
+            if (gtd == typeof(AddReact<>))
+                throw new EcsException("Cannot remove reactive wrappers manually");
+#endif
+            
             _archetypes.RemoveComponent<T>(eid);
             _componentManager.Remove<T>(eid);
             
@@ -177,6 +187,12 @@ namespace CodexECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void RemoveAll(int componentId)
         {
+#if DEBUG && !ECS_PERF_TEST
+            var gtd = Utils.GetGenericTypeDefinition(ComponentMapping.IdToType[componentId]);
+            if (gtd == typeof(AddReact<>))
+                throw new EcsException("Cannot remove reactive wrappers manually");
+#endif
+            
             if (!_componentManager.IsTypeRegistered(componentId))
                 return;
             _archetypes.RemoveAll(componentId);
@@ -226,24 +242,32 @@ namespace CodexECS
                 Delete_Impl(eid);
             _delayedDeleteList.Clear();
 
-            if (_dirtyAddWrapperIds.Count > 0)
+            if (_addDirty)
+                ReactOnAddRemove(ref _dirtyAddMask, ref _addDirty);
+        }
+
+        private void ReactOnAddRemove(ref BitMask dirtyMask, ref bool dirtyFlag)
+        {
+            Lock();
+                
+            foreach (var reactWrapperId in dirtyMask)
             {
-                Lock();
-                
-                foreach (var reactWrapperId in _dirtyAddWrapperIds)
-                {
-                    var callback = _onAddCallbacks[reactWrapperId];
+                var callback = _onAddCallbacks[reactWrapperId];
 #if DEBUG && !ECS_PERF_TEST
-                    if (callback == null)
-                        throw new EcsException("no registered on add callback for type " + ComponentMapping.IdToType[reactWrapperId]);
+                if (callback == null)
+                    throw new EcsException("no registered on add callback for type " + ComponentMapping.IdToType[reactWrapperId]);
 #endif
-                    callback(this);
-                    RemoveAll(reactWrapperId);
-                }
-                _dirtyAddWrapperIds.Clear();
-                
-                Unlock();
+                callback(this);
+                //unrolled RemoveAll(reactWrapperId); without wrapper check
+                //MUST already be registered!
+                // if (!_componentManager.IsTypeRegistered(reactWrapperId)) continue;
+                _archetypes.RemoveAll(reactWrapperId);
+                _componentManager.RemoveAll(reactWrapperId);
             }
+            dirtyMask.Clear();
+            dirtyFlag = false;
+                
+            Unlock();
         }
 
         private HashSet<EntityType> _delayedDeleteList;
