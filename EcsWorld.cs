@@ -5,15 +5,19 @@ using EntityType = System.Int32;//duplicated in EntityExtension
 
 #if DEBUG
 using System.Text;
+using CodexECS.Utility;
 #endif
 
 namespace CodexECS
 {
     public class EcsWorld
     {
-        private EntityManager _entityManager;
-        private ComponentManager _componentManager;
-        private ArchetypesManager _archetypes;
+        private readonly EntityManager _entityManager;
+        private readonly ComponentManager _componentManager;
+        private readonly ArchetypesManager _archetypes;
+        
+        private readonly SparseSet<Action<EcsWorld>> _onAddCallbacks;
+        private readonly HashSet<int> _dirtyAddWrapperIds;
 
         public EcsWorld()
         {
@@ -21,6 +25,9 @@ namespace CodexECS
             _componentManager = new ComponentManager();
             _archetypes = new ArchetypesManager();
             _delayedDeleteList = new HashSet<EntityType>();
+            
+            _onAddCallbacks = new();
+            _dirtyAddWrapperIds = new();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -75,13 +82,44 @@ namespace CodexECS
             return _archetypes.Have<T>(eid);
         }
 
+        public void SubscribeOnAdd<T>(Action<EcsWorld> callback)
+        {
+#if DEBUG && !ECS_PERF_TEST
+            var gtd = Utils.GetGenericTypeDefinition<T>();
+            if (gtd == typeof(AddReact<>))
+                throw new EcsException("Cannot subscribe on reactive wrappers manually");
+#endif
+            
+            var reactWrapperId = ComponentMeta<AddReact<T>>.Id;
+            if (!_onAddCallbacks.ContainsIdx(reactWrapperId))
+                _onAddCallbacks.Add(reactWrapperId, callback);
+            else
+                _onAddCallbacks[reactWrapperId] += callback;
+        }
+        
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Add<T>(EntityType eid) => Add(eid, ComponentMeta<T>.DefaultValue);
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Add<T>(EntityType eid, T component)
         {
+#if DEBUG && !ECS_PERF_TEST
+            var gtd = Utils.GetGenericTypeDefinition<T>();
+            if (gtd == typeof(AddReact<>))
+                throw new EcsException("Cannot add reactive wrappers manually");
+#endif
+            
             _archetypes.AddComponent<T>(eid);
             _componentManager.Add<T>(eid, component);
+
+            var reactWrapperId = ComponentMeta<AddReact<T>>.Id;
+            if (_onAddCallbacks.ContainsIdx(reactWrapperId))
+            {
+                // Add<AddReact<T>>(eid);
+                _archetypes.AddComponent<AddReact<T>>(eid);
+                _componentManager.Add<AddReact<T>>(eid);
+                
+                _dirtyAddWrapperIds.Add(reactWrapperId);
+            }
             
 #if HEAVY_ECS_DEBUG
             if (!ExistenceSynched<T>(eid))
@@ -134,6 +172,18 @@ namespace CodexECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void RemoveAll<T>() => RemoveAll(ComponentMeta<T>.Id);
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void RemoveAll(int componentId)
+        {
+            if (!_componentManager.IsTypeRegistered(componentId))
+                return;
+            _archetypes.RemoveAll(componentId);
+            _componentManager.RemoveAll(componentId);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool TryRemove<T>(int eid)
         {
             if (!Have<T>(eid))
@@ -175,6 +225,25 @@ namespace CodexECS
             foreach (var eid in _delayedDeleteList)
                 Delete_Impl(eid);
             _delayedDeleteList.Clear();
+
+            if (_dirtyAddWrapperIds.Count > 0)
+            {
+                Lock();
+                
+                foreach (var reactWrapperId in _dirtyAddWrapperIds)
+                {
+                    var callback = _onAddCallbacks[reactWrapperId];
+#if DEBUG && !ECS_PERF_TEST
+                    if (callback == null)
+                        throw new EcsException("no registered on add callback for type " + ComponentMapping.IdToType[reactWrapperId]);
+#endif
+                    callback(this);
+                    RemoveAll(reactWrapperId);
+                }
+                _dirtyAddWrapperIds.Clear();
+                
+                Unlock();
+            }
         }
 
         private HashSet<EntityType> _delayedDeleteList;

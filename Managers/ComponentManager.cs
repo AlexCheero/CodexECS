@@ -17,6 +17,13 @@ namespace CodexECS
             _poolsIndices = new[] { -1, -1 };
             _pools = new(2);
         }
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool IsTypeRegistered<T>() => IsTypeRegistered(ComponentMeta<T>.Id);
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool IsTypeRegistered(int componentId) =>
+            componentId < _poolsIndices.Length && _poolsIndices[componentId] > -1;
 
         [Obsolete("slow, use Archetypes.Have instead")]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -87,6 +94,12 @@ namespace CodexECS
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Remove(int componentId, EntityType eid) => _pools[_poolsIndices[componentId]].Remove(eid);
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void RemoveAll<T>() => _pools[_poolsIndices[ComponentMeta<T>.Id]].Clear();
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void RemoveAll(int componentId) => _pools[_poolsIndices[componentId]].Clear();
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private IComponentsPool GetPool<T>()

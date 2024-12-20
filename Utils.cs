@@ -6,6 +6,8 @@ namespace CodexECS.Utility
 {
     public static class Utils
     {
+        public static Type GetGenericTypeDefinition<T>() => typeof(T).IsGenericType ? typeof(T).GetGenericTypeDefinition() : null;
+
         private static readonly int[] BITPatternToLog2 =
         {
             0, // change to 1 if you want bitSize(0) = 1

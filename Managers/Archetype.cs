@@ -64,11 +64,7 @@ namespace CodexECS
             var lastEntity = EntitiesArr[lastEntityIdx];
             EntitiesArr[index] = lastEntity;
             
-            if (_entitiesMapping.ContainsIdx(lastEntity))
-                _entitiesMapping[lastEntity] = index;
-            else
-                _entitiesMapping.Add(lastEntity, index);
-            
+            _entitiesMapping[lastEntity] = index;
             _entitiesMapping.RemoveAt(eid);
             
             // EntitiesArr.SwapRemoveAt(lastEntityIdx);
@@ -80,6 +76,19 @@ namespace CodexECS
             EntitiesArr[lastEntityIdx] = EntitiesArr[EntitiesEnd];
             
             OnEntityRemoved?.Invoke(eid);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Clear()
+        {
+            if (OnEntityRemoved != null)
+            {
+                for (int i = 0; i < EntitiesEnd; i++)
+                    OnEntityRemoved.Invoke(EntitiesArr[i]);
+            }
+
+            EntitiesEnd = 0;
+            _entitiesMapping.Clear();
         }
     }
 }

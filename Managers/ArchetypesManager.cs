@@ -11,7 +11,8 @@ namespace CodexECS
 {
     class ArchetypesManager
     {
-        private Archetype[] _eToA; //entity to archerype mapping
+        private Archetype[] _eToA; //entity to archetype mapping
+        private SparseSet<List<Archetype>> _cToA; //component id to archetype mapping
         private EntityType _eToACount;
         private Dictionary<BitMask, Archetype> _mToA; //mask to archetype mapping
         private Dictionary<FilterMasks, EcsFilter> _filters;
@@ -22,6 +23,7 @@ namespace CodexECS
         public ArchetypesManager()
         {
             _eToA = new Archetype[2];
+            _cToA = new ();
             _eToACount = 0;
             _mToA = new Dictionary<BitMask, Archetype>(BitMask.MaskComparer);
             _filters = new Dictionary<FilterMasks, EcsFilter>(FilterMasks.MasksComparer);
@@ -79,6 +81,19 @@ namespace CodexECS
             _mToA[mask] = newArchetype;
             foreach (var maskFilterPair in _filters)
                 TryAddArchetypeToFilter(newArchetype, maskFilterPair.Key, maskFilterPair.Value);
+            foreach (var componentId in mask)
+            {
+                if (!_cToA.ContainsIdx(componentId))
+                    _cToA.Add(componentId, new List<Archetype>());
+#if DEBUG && !ECS_PERF_TEST
+                for (var i = 0; i < _cToA[componentId].Count; i++)
+                {
+                    if (_cToA[componentId][i].Mask.MasksEquals(mask))
+                        throw new EcsException("component id to archetype mapping already contains such archetype");
+                }
+#endif
+                _cToA[componentId].Add(newArchetype);
+            }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -94,8 +109,7 @@ namespace CodexECS
                 _eToACount = eid + 1;
             }
             
-            if (_eToA[eid] == null || !_eToA[eid].Mask.MasksEquals(mask))
-                _eToA[eid] = _mToA[mask];
+            _eToA[eid] = _mToA[mask];
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -120,6 +134,37 @@ namespace CodexECS
         public void RemoveComponent(EntityType eid, int componentId)
         {
             MoveBetweenArchetypes(eid, componentId, false);
+        }
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void RemoveAll<T>() { RemoveAll(ComponentMeta<T>.Id); }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void RemoveAll(int componentId)
+        {
+            for (var i = 0; i < _cToA[componentId].Count; i++)
+            {
+                var archetype = _cToA[componentId][i];
+
+                var nextMask = archetype.Mask.AndNot(componentId);
+                if (!_mToA.ContainsKey(nextMask))
+                    AddArchetype(nextMask);
+                var nextArchetype = _mToA[nextMask];
+                //hack. we store EntitiesEnd and then clear archetype, before iterating its entities in order for the filters to update
+                //in fact the array of entities is not cleared and it is just EntitiesEnd which is reset to 0
+                var entitiesEnd = archetype.EntitiesEnd;
+                archetype.Clear();
+                for (int j = 0; j < entitiesEnd; j++)
+                {
+                    var eid = archetype.EntitiesArr[j];
+                    UpdateArchetype(eid, nextMask);
+                    nextArchetype.AddEntity(eid);
+                }
+            }
+
+#if HEAVY_ECS_DEBUG
+            if (!CheckMappingSynch())
+                throw new EcsException("mappings desynch");
+#endif
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
