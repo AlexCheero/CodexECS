@@ -8,7 +8,6 @@
         public virtual bool IsPausable => true;
 
         public virtual void Init(EcsWorld world) { }
-        public virtual void Subscribe(EcsWorld world) { }
         public abstract void Tick(EcsWorld world);
     }
 }
