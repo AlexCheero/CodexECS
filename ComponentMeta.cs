@@ -46,8 +46,13 @@ namespace CodexECS
             return defaultValue;
         }
 
-        private delegate void InitDelegate(ref T instance);
-        private static readonly InitDelegate Init = delegate {};
+        public delegate void InitDelegate(ref T instance);
+        public static InitDelegate Init{
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get;
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            private set;
+        } = delegate {};
 
         static ComponentMeta()
         {
