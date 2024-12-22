@@ -123,7 +123,7 @@ namespace CodexECS
         }
         
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Add<T>(EntityType eid) => Add(eid, ComponentMeta<T>.DefaultValue);
+        public void Add<T>(EntityType eid) => Add(eid, ComponentMeta<T>.GetDefault());
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Add<T>(EntityType eid, T component)
         {

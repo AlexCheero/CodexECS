@@ -37,14 +37,17 @@ namespace CodexECS
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             private set;
         }
-        
-        public static T DefaultValue
+
+        private static readonly T Default;
+        public static T GetDefault()
         {
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get;
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            private set;
+            var defaultValue = Default;
+            Init(ref defaultValue);
+            return defaultValue;
         }
+
+        private delegate void InitDelegate(ref T instance);
+        private static readonly InitDelegate Init = delegate {};
 
         static ComponentMeta()
         {
@@ -53,12 +56,16 @@ namespace CodexECS
             ComponentMapping.TypeToId[type] = Id;
             ComponentMapping.IdToType[Id] = type;
             IsTag = typeof(ITag).IsAssignableFrom(type);
-            var defaultValueGetter = type.GetProperty("DefaultValue",
+            var defaultValueGetter = type.GetProperty("Default",
                 BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
             if (defaultValueGetter != null)
-                DefaultValue = (T)defaultValueGetter.GetValue(null);
+                Default = (T)defaultValueGetter.GetValue(null);
             else
-                DefaultValue = default;
+                Default = default;
+
+            var initMethod = type.GetMethod("Init", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+            if (initMethod != null)
+                Init = (InitDelegate)Delegate.CreateDelegate(typeof(InitDelegate), initMethod);
 
             if (IsTag)
                 PoolFactory.FactoryMethods.Add(Id, (poolSize) => new TagsPool<T>(poolSize));
