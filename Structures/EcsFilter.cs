@@ -38,9 +38,9 @@ namespace CodexECS
         private HashSet<Archetype> _archetypes;
 #endif
 
-        private SparseSet<EntityType> _entitiesSet = new();
-        private HashSet<EntityType> _pendingAdd = new();
-        private HashSet<EntityType> _pendingDelete = new();
+        private SparseSet<EntityType> _entitiesSet;
+        private HashSet<EntityType> _pendingAdd;
+        private HashSet<EntityType> _pendingDelete;
 
         private readonly List<View> _views;
         private readonly EcsWorld _world;
@@ -65,6 +65,10 @@ namespace CodexECS
 #if DEBUG && !ECS_PERF_TEST
             _archetypes = new();
 #endif
+            _entitiesSet = new();
+            _pendingAdd = new();
+            _pendingDelete = new();
+            
             _views = new() { new View(this) };
             _world = world;
         }
