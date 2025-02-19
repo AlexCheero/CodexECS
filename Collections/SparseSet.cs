@@ -6,9 +6,9 @@ namespace CodexECS
 {
     public class SparseSet<T>
     {
-        public int[] _sparse;
-        public T[] _values;
-        public int[] _dense;
+        private int[] _sparse;
+        private T[] _values;
+        private int[] _dense;
         private int _valuesEnd;
 
         public int Length
@@ -104,7 +104,6 @@ namespace CodexECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Clear()
         {
-            //CODEX_TODO: make proper define
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP2_0_OR_GREATER || NET5_0_OR_GREATER
             Array.Fill(_sparse, -1);
 #else

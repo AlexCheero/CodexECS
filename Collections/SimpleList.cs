@@ -4,7 +4,6 @@ using System.Runtime.CompilerServices;
 
 namespace CodexECS
 {
-    //CODEX_TODO: rename to simple list to match c# style
     public class SimpleList<T>
     {
         public T[] _elements;
