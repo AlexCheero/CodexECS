@@ -38,11 +38,9 @@ namespace CodexECS
         private HashSet<Archetype> _archetypes;
 #endif
 
-#region Unrolled from IndexableHashSet
-        private readonly Dictionary<EntityType, int> _entitiesMap;
-        private EntityType[] _entitiesArr;
-        private int _entitiesLength;
-#endregion
+        private SparseSet<EntityType> _entitiesSet = new();
+        private HashSet<EntityType> _pendingAdd = new();
+        private HashSet<EntityType> _pendingDelete = new();
 
         private readonly List<View> _views;
         private readonly EcsWorld _world;
@@ -50,25 +48,23 @@ namespace CodexECS
         public int EntitiesCount
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get => _entitiesLength;
+            get => _entitiesSet.Length;
         }
 
         public EntityType this[int idx]
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get => _entitiesArr[idx];
+            get => _entitiesSet._values[idx];
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public EntityType GetNthEntitySafe(int idx) => _entitiesLength > idx ? _entitiesArr[idx] : -1;
+        public EntityType GetNthEntitySafe(int idx) => _entitiesSet.Length > idx ? _entitiesSet._values[idx] : -1;
 
         public EcsFilter(EcsWorld world)
         {
 #if DEBUG && !ECS_PERF_TEST
             _archetypes = new();
 #endif
-            _entitiesMap = new();
-            _entitiesArr = new EntityType[2];
             _views = new() { new View(this) };
             _world = world;
         }
@@ -92,28 +88,26 @@ namespace CodexECS
         private void AddEntity(EntityType eid)
         {
 #if DEBUG && !ECS_PERF_TEST
-            if (_entitiesMap.ContainsKey(eid))
+            if (!_pendingDelete.Contains(eid) && _entitiesSet.ContainsIdx(eid))
                 throw new EcsException("filter already have this entity");
 #endif
             
             if (_lockCounter > 0)
             {
-                _entitiesMap[eid] = default;
-                _dirty = true;
+                if (_pendingDelete.Contains(eid))
+                {
+                    _pendingDelete.Remove(eid);
+                }
+                else
+                {
+                    _pendingAdd.Add(eid);
+                    _dirty = true;
+                }
+                
                 return;
             }
             
-            _entitiesMap[eid] = _entitiesLength;
-
-#region Unrolled from SimpleList (Add)
-            if (_entitiesLength >= _entitiesArr.Length)
-            {
-                const int maxResizeDelta = 256;
-                Utils.ResizeArray(_entitiesLength, ref _entitiesArr, maxResizeDelta);
-            }
-            _entitiesArr[_entitiesLength] = eid;
-            _entitiesLength++;
-#endregion
+            _entitiesSet.Add(eid, eid);
 
 #if HEAVY_ECS_DEBUG
             if (!CheckEntitiesSynch())
@@ -127,22 +121,26 @@ namespace CodexECS
         private void RemoveEntity(EntityType eid)
         {
 #if DEBUG && !ECS_PERF_TEST
-            if (!_entitiesMap.ContainsKey(eid))
+            if (!_pendingAdd.Contains(eid) && !_entitiesSet.ContainsIdx(eid))
                 throw new EcsException("filter have no this entity");
 #endif
             
             if (_lockCounter > 0)
             {
-                _entitiesMap.Remove(eid);
-                _dirty = true;
+                if (_pendingAdd.Contains(eid))
+                {
+                    _pendingAdd.Remove(eid);
+                }
+                else
+                {
+                    _pendingDelete.Add(eid);
+                    _dirty = true;
+                }
+                
                 return;
             }
 
-            _entitiesLength--;
-            var index = _entitiesMap[eid];
-            _entitiesArr[index] = _entitiesArr[_entitiesLength];
-            _entitiesMap[_entitiesArr[index]] = index;
-            _entitiesMap.Remove(eid);
+            _entitiesSet.RemoveAt(eid);
             
 #if HEAVY_ECS_DEBUG
             if (!CheckEntitiesSynch())
@@ -155,27 +153,26 @@ namespace CodexECS
 #if HEAVY_ECS_DEBUG
         private bool CheckEntitiesSynch()
         {
-            if (_entitiesLength != _entitiesMap.Count)
-                return false;
-            for (int i = 0; i < _entitiesLength; i++)
+            var dense = _entitiesSet._dense;
+            for (int i = 0; i < _entitiesSet.Length; i++)
             {
-                var eid = _entitiesArr[i];
-                if (!_entitiesMap.ContainsKey(eid) || _entitiesMap[eid] != i)
+                var outerIdx = dense[i];
+                if (outerIdx != _entitiesSet[outerIdx])
                     return false;
             }
 
             return true;
         }
-
+        
         private bool CheckUniqueness()
         {
-            for (int i = 0; i < _entitiesLength; i++)
+            for (int i = 0; i < _entitiesSet.Length; i++)
             {
-                for (int j = 0; j < _entitiesLength; j++)
+                for (int j = 0; j < _entitiesSet.Length; j++)
                 {
                     if (i == j)
                         continue;
-                    if (_entitiesArr[i] == _entitiesArr[j])
+                    if (_entitiesSet._values[i] == _entitiesSet._values[j])
                         return false;
                 }
             }
@@ -203,22 +200,18 @@ namespace CodexECS
             if (_lockCounter != 0 || !_dirty)
                 return;
 
-            _entitiesLength = _entitiesMap.Count;
-            if (_entitiesLength > _entitiesArr.Length)
+            foreach (var eid in _pendingAdd)
+                _entitiesSet.Add(eid, eid);
+            _pendingAdd.Clear();
+            foreach (var eid in _pendingDelete)
             {
-                const int maxResizeDelta = 256;
-                Utils.ResizeArray(_entitiesLength, ref _entitiesArr, maxResizeDelta);
+                if (eid == 19)
+                {
+                    int a = 0;
+                }
+                _entitiesSet.RemoveAt(eid);
             }
-            
-            //CODEX_TODO: two loops. try to do it in a single loop
-            var arrIdx = 0;
-            foreach (var (eid, idx) in _entitiesMap)
-            {
-                _entitiesArr[arrIdx] = eid;
-                arrIdx++;
-            }
-            for (int i = 0; i < _entitiesLength; i++)
-                _entitiesMap[_entitiesArr[i]] = i;
+            _pendingDelete.Clear();
 
             _dirty = false;
             
@@ -275,7 +268,7 @@ namespace CodexECS
             public bool MoveNext()
             {
                 _entityIndex++;
-                return _entityIndex < _filter._entitiesLength;
+                return _entityIndex < _filter._entitiesSet.Length;
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -288,7 +281,7 @@ namespace CodexECS
             public EntityType Current
             {
                 [MethodImpl(MethodImplOptions.AggressiveInlining)]
-                get => _filter._entitiesArr[_entityIndex];
+                get => _filter._entitiesSet._values[_entityIndex];
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]

@@ -6,9 +6,9 @@ namespace CodexECS
 {
     public class SparseSet<T>
     {
-        private int[] _sparse;
-        private T[] _values;
-        private int[] _dense;
+        public int[] _sparse;
+        public T[] _values;
+        public int[] _dense;
         private int _valuesEnd;
 
         public int Length
