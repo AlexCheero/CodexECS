@@ -8,14 +8,14 @@ namespace CodexECS
 {
     public class ComponentManager
     {
-        //private SparseSet<IComponentsPool> _componentsPools;
-        private int[] _poolsIndices;
-        private readonly SimpleList<IComponentsPool> _pools;
+        private IComponentsPool[] _pools;
+        private int _poolsEnd;
+        private struct DummyStruct { }
+        private static readonly IComponentsPool DummyPool = new ComponentsPool<DummyStruct>();
 
         public ComponentManager()
         {
-            _poolsIndices = new[] { -1, -1 };
-            _pools = new(2);
+            _pools = new[] { DummyPool, DummyPool };
         }
         
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -23,7 +23,7 @@ namespace CodexECS
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool IsTypeRegistered(int componentId) =>
-            componentId < _poolsIndices.Length && _poolsIndices[componentId] > -1;
+            componentId < _poolsEnd && _pools[componentId] != DummyPool;
 
         [Obsolete("slow, use Archetypes.Have instead")]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -31,12 +31,7 @@ namespace CodexECS
 
         [Obsolete("slow, use Archetypes.Have instead")]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Have(int componentId, EntityType eid)
-        {
-            //return _componentsPools.ContainsIdx(componentId) && _componentsPools[componentId].Contains(eid);
-            return (componentId < _poolsIndices.Length && _poolsIndices[componentId] > -1) &&
-                   (_pools[_poolsIndices[componentId]]).Contains(eid);
-        }
+        public bool Have(int componentId, EntityType eid) => componentId < _poolsEnd && _pools[componentId] != DummyPool && _pools[componentId].Contains(eid);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Add<T>(EntityType eid, T component = default)
@@ -85,64 +80,65 @@ namespace CodexECS
                 throw new EcsException("entity have no " + typeof(T));
 #endif
             //var pool = (ComponentsPool<T>)_componentsPools[ComponentMeta<T>.Id];
-            var pool = (ComponentsPool<T>)_pools[_poolsIndices[ComponentMeta<T>.Id]];
+            var pool = (ComponentsPool<T>)_pools[ComponentMeta<T>.Id];
             return ref pool._values[pool._sparse[eid]];
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Remove<T>(EntityType eid) => _pools[_poolsIndices[ComponentMeta<T>.Id]].Remove(eid);
+        public void Remove<T>(EntityType eid) => _pools[ComponentMeta<T>.Id].Remove(eid);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Remove(int componentId, EntityType eid) => _pools[_poolsIndices[componentId]].Remove(eid);
+        public void Remove(int componentId, EntityType eid) => _pools[componentId].Remove(eid);
         
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void RemoveAll<T>() => _pools[_poolsIndices[ComponentMeta<T>.Id]].Clear();
+        public void RemoveAll<T>() => _pools[ComponentMeta<T>.Id].Clear();
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void RemoveAll(int componentId) => _pools[_poolsIndices[componentId]].Clear();
+        public void RemoveAll(int componentId) => _pools[componentId].Clear();
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private IComponentsPool GetPool<T>()
         {
             var componentId = ComponentMeta<T>.Id;
             //if (_componentsPools.ContainsIdx(componentId))
-            if (componentId < _poolsIndices.Length && _poolsIndices[componentId] > -1)
-                return _pools[_poolsIndices[componentId]];
+            if (componentId < _poolsEnd && _pools[componentId] != DummyPool)
+                return _pools[componentId];
             if (ComponentMeta<T>.IsTag)
                 AddPool(componentId, new TagsPool<T>());
             else
                 AddPool(componentId, new ComponentsPool<T>());
-            return _pools[_poolsIndices[componentId]];
+            return _pools[componentId];
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public IComponentsPool GetPool(int componentId)
         {
-            if (!(componentId < _poolsIndices.Length && _poolsIndices[componentId] > -1))
+            if (!(componentId < _poolsEnd && _pools[componentId] != DummyPool))
                 AddPool(componentId, PoolFactory.FactoryMethods[componentId](/*EcsCacheSettings.PoolSize*/32));
-            return _pools[_poolsIndices[componentId]];
+            return _pools[componentId];
         }
         
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void AddPool(int outerIdx, IComponentsPool pool)
+        private void AddPool(int idx, IComponentsPool pool)
         {
-            if (outerIdx >= _poolsIndices.Length)
+            if (idx >= _pools.Length)
             {
-                var oldLength = _poolsIndices.Length;
+                var oldLength = _pools.Length;
 
                 const int maxResizeDelta = 256;
-                Utils.ResizeArray(outerIdx, ref _poolsIndices, maxResizeDelta);
-                for (int i = oldLength; i < _poolsIndices.Length; i++)
-                    _poolsIndices[i] = -1;
+                Utils.ResizeArray(idx, ref _pools, maxResizeDelta);
+                for (int i = oldLength; i < _pools.Length; i++)
+                    _pools[i] = DummyPool;
             }
 
 #if DEBUG && !ECS_PERF_TEST
-            if (_poolsIndices[outerIdx] > -1)
+            if (_pools[idx] != DummyPool)
                 throw new EcsException("already have pool at this index");
 #endif
 
-            _poolsIndices[outerIdx] = _pools.Length;
-            _pools.Add(pool);
+            _pools[idx] = pool;
+            if (_poolsEnd <= idx)
+                _poolsEnd = idx + 1;
         }
 
 #if DEBUG
@@ -150,7 +146,7 @@ namespace CodexECS
         {
             buffer.Clear();
             foreach (var bit in mask)
-                buffer.Add(_pools[_poolsIndices[bit]].GetComponentType());
+                buffer.Add(_pools[bit].GetComponentType());
         }
 #endif
     }
