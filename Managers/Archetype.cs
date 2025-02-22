@@ -10,13 +10,7 @@ namespace CodexECS
         public event Action<EntityType> OnEntityAdded;
         public event Action<EntityType> OnEntityRemoved;
 
-        private BitMask _mask;
-
-        public ref BitMask Mask
-        {
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get => ref _mask;
-        }
+        public BitMask Mask;
 
         //public IndexableHashSet<EntityType> Entities;
         private readonly SparseSet<int> _entitiesMapping;
@@ -26,7 +20,7 @@ namespace CodexECS
 
         public Archetype(BitMask mask)
         {
-            _mask = mask;
+            Mask = mask;
             _entitiesMapping = new(2);
             EntitiesArr = new EntityType[2];
         }
