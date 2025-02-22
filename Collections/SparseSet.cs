@@ -22,6 +22,12 @@ namespace CodexECS
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get => ref _values[_sparse[i]];
         }
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ref T GetNthValue(int n) => ref _values[n];
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public int GetIdx(int num) => _sparse[_dense[num]];
 
         public SparseSet(int initialCapacity = 2)
         {
