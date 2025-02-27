@@ -354,25 +354,32 @@ namespace CodexECS
             _entityManager.Delete(eid);
         }
         
-#if DEBUG
+#region Debug methods
         public void GetTypesForId(int id, HashSet<Type> buffer) =>
             _componentManager.GetTypesByMask(_archetypes.GetMask(id), buffer);
         
-        private string DebugString(int id, int componentId) =>
-            _componentManager.GetPool(componentId).DebugString(id);
+        private string DebugString(int id, int componentId, bool printFields) =>
+            _componentManager.GetPool(componentId).DebugString(id, printFields);
 
-        public string DebugEntity(int id)
+        private StringBuilder _debugEntityStringBuilder;
+        public string DebugEntity(int id, bool printFields)
         {
+            if (id == EntityExtension.NullEntity.GetId())
+                return "null entity";
+            if (IsDead(id))
+                return "dead entity";
             if (id < 0)
                 return "negative entity";
             var mask = _archetypes.GetMask(id);
-            StringBuilder sb = new StringBuilder();
+            _debugEntityStringBuilder ??= new StringBuilder();
             foreach (var bit in mask)
-                sb.Append("\n\t" + DebugString(id, bit));
-            return sb.ToString();
+                _debugEntityStringBuilder.Append(DebugString(id, bit, printFields)).Append("\n");
+            var result = _debugEntityStringBuilder.ToString();
+            _debugEntityStringBuilder.Clear();
+            return result;
         }
 
-        public void DebugAll(StringBuilder sb)
+        public void DebugAll(StringBuilder sb, bool printFields)
         {
             for (int i = 0; i < _entityManager.EntitiesCount; i++)
             {
@@ -380,12 +387,12 @@ namespace CodexECS
                 if (IsEntityValid(entity))
                 {
                     var id = entity.GetId();
-                    sb.Append(id + ": " + DebugEntity(id));
+                    sb.Append(id + ": " + DebugEntity(id, printFields));
                     sb.Append('\n');
                 }
             }
         }
-#endif
+#endregion
         
 #if HEAVY_ECS_DEBUG
         private bool ExistenceSynched<T>(int eid) => _archetypes.Have<T>(eid) == _componentManager.Have<T>(eid);

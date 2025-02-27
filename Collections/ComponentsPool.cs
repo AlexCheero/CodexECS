@@ -21,10 +21,8 @@ namespace CodexECS
 
         public void AddReference(int id, object value);
 
-#if DEBUG
-        public string DebugString(int id);
+        public string DebugString(int id, bool printFields);
         public Type GetComponentType();
-#endif
     }
 
     class ComponentsPool<T> : IComponentsPool
@@ -58,22 +56,34 @@ namespace CodexECS
         }
 #endif
 
-#if DEBUG
-        public string DebugString(int id)
+        private StringBuilder _debugStringBuilder;
+        public string DebugString(int id, bool printFields)
         {
-            StringBuilder sb = new StringBuilder();
-            sb.Append(typeof(T).ToString() + ". ");
-
-            var props = _values[_sparse[id]].GetType().GetFields();
-            foreach (var p in props)
-                sb.Append(p.Name + ": " + p.GetValue(_values[_sparse[id]]) + ", ");
-            sb.Remove(sb.Length - 2, 2);//remove last comma
-
-            return sb.ToString();
+            _debugStringBuilder ??= new StringBuilder();
+            _debugStringBuilder.Append(typeof(T).Name);
+            if (printFields)
+            {
+                var props = _values[_sparse[id]].GetType().GetFields();
+                if (props.Length > 0)
+                    _debugStringBuilder.Append(':');
+                else
+                    _debugStringBuilder.Append(" {}");
+                foreach (var p in props)
+                {
+                    var value = p.GetValue(_values[_sparse[id]]);
+                    var valueString = value != null ? value.ToString() : "null";
+                    _debugStringBuilder.Append("\n\t").Append(p.Name).Append(": ").Append(valueString).Append(", ");
+                }
+                if (props.Length > 0)
+                    _debugStringBuilder.Remove(_debugStringBuilder.Length - 2, 2);//remove last comma
+            }
+            
+            var result = _debugStringBuilder.ToString();
+            _debugStringBuilder.Clear();
+            return result;
         }
 
         public Type GetComponentType() => typeof(T);
-#endif
 
         #region Interface implementation
         public int Length
@@ -258,11 +268,10 @@ namespace CodexECS
     class TagsPool<T> : IComponentsPool
     {
         private BitMask _tags;
+        
+        public string DebugString(int id, bool printFields) => typeof(T).Name;
 
-#if DEBUG
-        public string DebugString(int id) => typeof(T).ToString();
         public Type GetComponentType() => typeof(T);
-#endif
 
         #region Interface implementation
         public int Length
