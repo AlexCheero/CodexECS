@@ -141,13 +141,11 @@ namespace CodexECS
                 _poolsEnd = idx + 1;
         }
 
-#if DEBUG
         public void GetTypesByMask(in BitMask mask, HashSet<Type> buffer)
         {
             buffer.Clear();
             foreach (var bit in mask)
                 buffer.Add(_pools[bit].GetComponentType());
         }
-#endif
     }
 }

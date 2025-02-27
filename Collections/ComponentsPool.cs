@@ -1,10 +1,7 @@
 ﻿using CodexECS.Utility;
 using System.Runtime.CompilerServices;
 using System;
-
-#if DEBUG
 using System.Text;
-#endif
 
 namespace CodexECS
 {

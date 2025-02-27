@@ -1,11 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
-using UnityEngine;
+using System.Text;
 using EntityType = System.Int32;//duplicated in EntityExtension
 
 #if DEBUG
-using System.Text;
 using CodexECS.Utility;
 #endif
 
