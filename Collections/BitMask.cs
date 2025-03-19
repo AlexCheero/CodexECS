@@ -375,11 +375,13 @@ namespace CodexECS
         public override string ToString()
         {
             var sb = new StringBuilder();
-            if (_mn != null)
-                for (int i = _mn.Length - 1; i > -1; i--)
-                    sb.Append(Convert.ToString(_mn[i], 2).PadLeft(SizeOfPartInBits, '0'));
-            sb.Append(Convert.ToString(_m1, 2).PadLeft(SizeOfPartInBits, '0'));
-            sb.Append(". Length: " + Length);
+            foreach (var bit in this)
+                sb.Append(bit).Append(", ");
+            // if (_mn != null)
+            //     for (int i = _mn.Length - 1; i > -1; i--)
+            //         sb.Append(Convert.ToString(_mn[i], 2).PadLeft(SizeOfPartInBits, '0'));
+            // sb.Append(Convert.ToString(_m1, 2).PadLeft(SizeOfPartInBits, '0'));
+            // sb.Append(". Length: " + Length);
 
             return sb.ToString();
         }
