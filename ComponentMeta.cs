@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Threading;
@@ -16,8 +17,52 @@ namespace CodexECS
 
     public static class ComponentMapping
     {
-        public static Dictionary<Type, int> TypeToId = new();
-        public static Dictionary<int, Type> IdToType = new();
+        private static Dictionary<Type, int> TypeToId = new();
+        private static Dictionary<int, Type> IdToType = new();
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static int GetIdForType(Type type) => TypeToId[type];
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static Type GetTypeForId(int id) => IdToType[id];
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static bool HaveType(Type type) => TypeToId.ContainsKey(type);
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static bool HaveId(int id) => IdToType.ContainsKey(id);
+        
+        public static void Add(Type type, int id)
+        {
+#if DEBUG && !ECS_PERF_TEST
+            if (TypeToId.ContainsKey(type))
+                throw new EcsException($"Components mapping desynch. TypeToId already contains {type.FullName}");
+            if (IdToType.ContainsKey(id))
+                throw new EcsException($"Components mapping desynch. IdToType already contains {id}");
+#endif
+            
+            TypeToId[type] = id;
+            IdToType[id] = type;
+
+#if DEBUG && !ECS_PERF_TEST
+            foreach (var pair in TypeToId)
+            {
+                if (!IdToType.ContainsKey(pair.Value))
+                    throw new EcsException($"Components mapping desynch");
+            }
+            
+            foreach (var pair in IdToType)
+            {
+                if (!TypeToId.ContainsKey(pair.Value))
+                    throw new EcsException($"Components mapping desynch");
+            }
+            
+            if (TypeToId.GroupBy(kv => kv.Value).Any(g => g.Count() > 1))
+                throw new EcsException($"Components mapping desynch");
+            if (IdToType.GroupBy(kv => kv.Value).Any(g => g.Count() > 1))
+                throw new EcsException($"Components mapping desynch");
+#endif
+        }
     }
 
     public static class ComponentMeta<T>
@@ -56,10 +101,15 @@ namespace CodexECS
 
         static ComponentMeta()
         {
-            Id = Interlocked.Increment(ref ComponentIdCounter.Counter);
             var type = typeof(T);
-            ComponentMapping.TypeToId[type] = Id;
-            ComponentMapping.IdToType[Id] = type;
+            if (ComponentMapping.HaveType(type))
+            {
+                //CODEX_TODO: for some reason at adding unity components from EntityView this could happen twice
+                return;
+            }
+            
+            Id = Interlocked.Increment(ref ComponentIdCounter.Counter);
+            ComponentMapping.Add(type, Id);
             IsTag = typeof(ITag).IsAssignableFrom(type);
             var defaultValueGetter = type.GetProperty("Default",
                 BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);

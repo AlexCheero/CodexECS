@@ -156,7 +156,7 @@ namespace CodexECS
 
         private bool IsReactWrapperType(int componentId)
         {
-            var gtd = Utils.GetGenericTypeDefinition(ComponentMapping.IdToType[componentId]);
+            var gtd = Utils.GetGenericTypeDefinition(ComponentMapping.GetTypeForId(componentId));
             return gtd == typeof(AddReact<>) || gtd == typeof(RemoveReact<>);
         }
 #endif
@@ -169,7 +169,7 @@ namespace CodexECS
 //             if (_lockCounter > 0)
 //                 throw new EcsException("shouldn't add reference while world is locked");
 // #endif
-            _archetypes.AddComponent(id, ComponentMapping.TypeToId[type]);
+            _archetypes.AddComponent(id, ComponentMapping.GetIdForType(type));
             _componentManager.AddReference(type, id, component);
         }
 
@@ -306,7 +306,7 @@ namespace CodexECS
                 var callback = callbacks[reactWrapperId];
 #if DEBUG && !ECS_PERF_TEST
                 if (callback == null)
-                    throw new EcsException("no registered on add callback for type " + ComponentMapping.IdToType[reactWrapperId]);
+                    throw new EcsException("no registered on add callback for type " + ComponentMapping.GetTypeForId(reactWrapperId));
 #endif
                 callback(this);
                 //unrolled RemoveAll(reactWrapperId); without wrapper check

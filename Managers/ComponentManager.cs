@@ -60,7 +60,7 @@ namespace CodexECS
             if (id < 0)
                 throw new EcsException("negative id");
 #endif
-            var componentId = ComponentMapping.TypeToId[type];
+            var componentId = ComponentMapping.GetIdForType(type);
 
             var pool = GetPool(componentId);
 #if DEBUG && !ECS_PERF_TEST
