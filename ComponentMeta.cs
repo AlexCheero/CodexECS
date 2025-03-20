@@ -123,11 +123,11 @@ namespace CodexECS
         static ComponentMeta()
         {
             var type = typeof(T);
-            
-#if DEBUG
             if (ComponentMapping.HaveType(type))
-                throw new EcsException("Type should be already registered");
-#endif
+            {
+                //CODEX_TODO: for some reason at adding unity components from EntityView this could happen twice
+                return;
+            }
             
             Id = Interlocked.Increment(ref ComponentIdCounter.Counter);
             ComponentMapping.Add(type, Id);
