@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Text;
 using System.Threading;
 
 namespace CodexECS
@@ -63,6 +64,20 @@ namespace CodexECS
                 throw new EcsException($"Components mapping desynch");
 #endif
         }
+
+#if DEBUG
+        private static StringBuilder _debugBuilder;
+        public static string DebugByMask(BitMask mask)
+        {
+            _debugBuilder ??= new();
+            _debugBuilder.Clear();
+
+            foreach (var bit in mask)
+                _debugBuilder.Append(GetTypeForId(bit).FullName + ", ");
+            
+            return _debugBuilder.ToString();
+        }
+#endif
     }
 
     public static class ComponentMeta<T>

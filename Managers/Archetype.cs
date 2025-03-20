@@ -84,5 +84,9 @@ namespace CodexECS
             EntitiesEnd = 0;
             _entitiesMapping.Clear();
         }
+        
+#if DEBUG
+        public override string ToString() => ComponentMapping.DebugByMask(Mask);
+#endif
     }
 }
