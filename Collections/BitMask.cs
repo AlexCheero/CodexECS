@@ -22,14 +22,26 @@ namespace CodexECS
         public static readonly EqualityComparer MaskComparer;
         static BitMask() => MaskComparer = new();
 
+        //0 hash is dirty by default, I hope it will never calculate actual hash to 0 :)
+        private int _hash;
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public int GetMaskHash()//CODEX_TODO: cache hash
         {
+            if (_hash != 0 || Length == 0)
+                return _hash;
+            
             var hash = (int)(17 * 23 * _m1);
             var length = GetDynamicChunksLength(Length);
             for (int i = 0; i < length; ++i)
                 hash = hash * 23 + (int)_mn[i];
-            return hash;
+            _hash = hash;
+
+#if DEBUG
+            if (Length > 0 && _hash == 0)
+                throw new EcsException("actual value of BitMask hash is 0");
+#endif
+            
+            return _hash;
         }
 
         public const int SizeOfPartInBits = sizeof(MaskInternal) * 8;
@@ -49,6 +61,7 @@ namespace CodexECS
             _m1 = 0;
             _mn = null;
             Length = 0;
+            _hash = 0;
 
             Set(positions);
         }
@@ -77,6 +90,8 @@ namespace CodexECS
                 for (int i = 0; i < _mn.Length; i++)
                     _mn[i] = 0;
             }
+
+            _hash = 0;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -119,6 +134,8 @@ namespace CodexECS
             i++;
             if (Length < i)
                 Length = i;
+            
+            _hash = 0;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -223,6 +240,8 @@ namespace CodexECS
                 j++;
                 Length = j * SizeOfPartInBits + msb;
             }
+            
+            _hash = 0;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -300,6 +319,8 @@ namespace CodexECS
                 for (int i = 0; i < _mn.Length; i++)
                     _mn[i] = 0;
             }
+            
+            _hash = 0;
         }
 
         //[MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -366,22 +387,21 @@ namespace CodexECS
                 }
             }
 #if DEBUG
+            //equal Lengths assume that both _mns are null or not null at the same time
+            //if this is not the case- something went horribly wrong
             else if (other._mn != null)
-            {
                 throw new EcsException("both _mns should be null or not null at the same time");
-            }
 #else
-            //previously here were no check, probably it is assumed and I removed it for performance?
-            else if (other._mn != null)
-            {
-                for (int i = 0; i < other._mn.Length; i++)
-                {
-                    if (other._mn[i] != 0)
-                    {
-                        return false;
-                    }
-                }
-            }
+            // else if (other._mn != null)
+            // {
+            //     for (int i = 0; i < other._mn.Length; i++)
+            //     {
+            //         if (other._mn[i] != 0)
+            //         {
+            //             return false;
+            //         }
+            //     }
+            // }
 #endif
             
             return true;
