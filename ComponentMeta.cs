@@ -69,11 +69,17 @@ namespace CodexECS
         private static StringBuilder _debugBuilder;
         public static string DebugByMask(BitMask mask)
         {
+            if (mask.Length == 0)
+                return "{ }";
+            
             _debugBuilder ??= new();
             _debugBuilder.Clear();
-
+                
+            _debugBuilder.Append("{ ");
             foreach (var bit in mask)
                 _debugBuilder.Append(GetTypeForId(bit).FullName + ", ");
+            _debugBuilder.Remove(_debugBuilder.Length - 2, 2);
+            _debugBuilder.Append(" }");
             
             return _debugBuilder.ToString();
         }

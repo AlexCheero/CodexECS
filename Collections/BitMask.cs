@@ -23,14 +23,12 @@ namespace CodexECS
         static BitMask() => MaskComparer = new();
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public int GetMaskHash()
+        public int GetMaskHash()//CODEX_TODO: cache hash
         {
-            int hash = (int)(17 * 23 * _m1);
-            if (_mn != null && _mn.Length > 0)
-            {
-                for (int i = 0; i < _mn.Length; ++i)
-                    hash = hash * 23 + (int)_mn[i];
-            }
+            var hash = (int)(17 * 23 * _m1);
+            var length = GetDynamicChunksLength(Length);
+            for (int i = 0; i < length; ++i)
+                hash = hash * 23 + (int)_mn[i];
             return hash;
         }
 
@@ -367,16 +365,41 @@ namespace CodexECS
                         return false;
                 }
             }
-
+#if DEBUG
+            else if (other._mn != null)
+            {
+                throw new EcsException("both _mns should be null or not null at the same time");
+            }
+#else
+            //previously here were no check, probably it is assumed and I removed it for performance?
+            else if (other._mn != null)
+            {
+                for (int i = 0; i < other._mn.Length; i++)
+                {
+                    if (other._mn[i] != 0)
+                    {
+                        return false;
+                    }
+                }
+            }
+#endif
+            
             return true;
         }
 
 #if DEBUG && !ECS_PERF_TEST
         public override string ToString()
         {
+            if (Length == 0)
+                return "{ }";
+            
             var sb = new StringBuilder();
+            sb.Append("{ ");
             foreach (var bit in this)
                 sb.Append(bit).Append(", ");
+            sb.Remove(sb.Length - 2, 2);
+            sb.Append(" }");
+            
             // if (_mn != null)
             //     for (int i = _mn.Length - 1; i > -1; i--)
             //         sb.Append(Convert.ToString(_mn[i], 2).PadLeft(SizeOfPartInBits, '0'));
