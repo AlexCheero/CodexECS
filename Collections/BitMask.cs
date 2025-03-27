@@ -386,23 +386,6 @@ namespace CodexECS
                         return false;
                 }
             }
-#if DEBUG
-            //equal Lengths assume that both _mns are null or not null at the same time
-            //if this is not the case- something went horribly wrong
-            else if (other._mn != null)
-                throw new EcsException("both _mns should be null or not null at the same time");
-#else
-            // else if (other._mn != null)
-            // {
-            //     for (int i = 0; i < other._mn.Length; i++)
-            //     {
-            //         if (other._mn[i] != 0)
-            //         {
-            //             return false;
-            //         }
-            //     }
-            // }
-#endif
             
             return true;
         }
