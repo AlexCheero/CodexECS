@@ -45,10 +45,7 @@ namespace CodexECS
                 throw new EcsException("pool is null");
 #endif
 
-            if (ComponentMeta<T>.IsTag)
-                ((TagsPool<T>)pool).Add(eid);
-            else
-                ((ComponentsPool<T>)pool).Add(eid, component);
+            ((IComponentsPool<T>)pool).Add(eid, component);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -71,17 +68,14 @@ namespace CodexECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ref T GetComponent<T>(EntityType eid)
+        public ref T Get<T>(EntityType eid)
         {
 #if DEBUG && !ECS_PERF_TEST
-            if (ComponentMeta<T>.IsTag)
-                throw new EcsException(typeof(T) + " is tag component");
             if (!Have<T>(eid))
                 throw new EcsException("entity have no " + typeof(T));
 #endif
-            //var pool = (ComponentsPool<T>)_componentsPools[ComponentMeta<T>.Id];
-            var pool = (ComponentsPool<T>)_pools[ComponentMeta<T>.Id];
-            return ref pool._values[pool._sparse[eid]];
+            var pool = (IComponentsPool<T>)_pools[ComponentMeta<T>.Id];
+            return ref pool.Get(eid);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

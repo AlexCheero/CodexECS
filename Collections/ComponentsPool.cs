@@ -22,12 +22,17 @@ namespace CodexECS
         public Type GetComponentType();
     }
 
-    class ComponentsPool<T> : IComponentsPool
+    public interface IComponentsPool<T> : IComponentsPool
     {
-        //made public only for unrolling indexer for speeding up
-        public int[] _sparse;
+        public ref T Add(int id, T value = default);
+        public ref T Get(int id);
+    }
+
+    class ComponentsPool<T> : IComponentsPool<T>
+    {
+        private int[] _sparse;
         private int[] _dense;
-        public T[] _values;
+        private T[] _values;
 #if DEBUG
         public int ValuesLength { get; private set; }
 #else
@@ -82,7 +87,6 @@ namespace CodexECS
 
         public Type GetComponentType() => typeof(T);
 
-        #region Interface implementation
         public int Length
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -197,7 +201,6 @@ namespace CodexECS
 #endif
             Add(to, _values[_sparse[from]]);
         }
-        #endregion
 
         public ComponentsPool(int initialCapacity = 2)
         {
@@ -260,17 +263,20 @@ namespace CodexECS
 
             return ref _values[_sparse[id]];
         }
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ref T Get(int id) => ref _values[_sparse[id]];
     }
 
-    class TagsPool<T> : IComponentsPool
+    class TagsPool<T> : IComponentsPool<T>
     {
+        private T _default;
         private BitMask _tags;
         
         public string DebugString(int id, bool printFields) => typeof(T).Name;
 
         public Type GetComponentType() => typeof(T);
 
-        #region Interface implementation
         public int Length
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -305,7 +311,6 @@ namespace CodexECS
 #endif
             Add(to);
         }
-        #endregion
 
         public TagsPool(int initialCapacity = 0)
         {
@@ -313,7 +318,14 @@ namespace CodexECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Add(int id) => _tags.Set(id);
+        public ref T Add(int id, T value = default)
+        {
+            _tags.Set(id);
+            return ref _default;
+        }
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ref T Get(int id) => ref _default;
 
         public void AddReference(int id, object value) =>
             throw new EcsException("trying to call AddReference for TagsPool");

@@ -174,7 +174,7 @@ namespace CodexECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ref T GetComponent<T>(EntityType eid) => ref _componentManager.GetComponent<T>(eid);
+        public ref T Get<T>(EntityType eid) => ref _componentManager.Get<T>(eid);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool TryAdd<T>(EntityType eid)
@@ -190,7 +190,7 @@ namespace CodexECS
         {
             if (!Have<T>(eid))
                 Add<T>(eid);
-            return ref GetComponent<T>(eid);
+            return ref Get<T>(eid);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -207,7 +207,7 @@ namespace CodexECS
                 _archetypes.AddComponent<RemoveReact<T>>(eid);
                 _componentManager.Add(eid, new RemoveReact<T>
                 {
-                    removingComponent = ComponentMeta<T>.IsTag ? default : GetComponent<T>(eid)
+                    removingComponent = Get<T>(eid)
                 });
                 
                 _dirtyRemoveMask.Set(reactWrapperId);

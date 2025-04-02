@@ -9,7 +9,6 @@ using System.Threading;
 namespace CodexECS
 {
     public interface IComponent { }
-    public interface ITag { }
 
     static class ComponentIdCounter
     {
@@ -131,22 +130,28 @@ namespace CodexECS
             
             Id = Interlocked.Increment(ref ComponentIdCounter.Counter);
             ComponentMapping.Add(type, Id);
-            IsTag = typeof(ITag).IsAssignableFrom(type);
-            var defaultValueGetter = type.GetProperty("Default",
-                BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
-            if (defaultValueGetter != null)
-                Default = (T)defaultValueGetter.GetValue(null);
-            else
-                Default = default;
+            var fields = type.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+            IsTag = fields.Length == 0 && type.IsValueType && !type.IsEnum;
 
-            var initMethod = type.GetMethod("Init", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
-            if (initMethod != null)
-                Init = (InitDelegate)Delegate.CreateDelegate(typeof(InitDelegate), initMethod);
+            if (!IsTag)
+            {
+                var defaultValueGetter = type.GetProperty("Default",
+                    BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+                if (defaultValueGetter != null)
+                    Default = (T)defaultValueGetter.GetValue(null);
+                else
+                    Default = default;
 
-            if (IsTag)
-                PoolFactory.FactoryMethods.Add(Id, (poolSize) => new TagsPool<T>(poolSize));
-            else
+                var initMethod = type.GetMethod("Init", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+                if (initMethod != null)
+                    Init = (InitDelegate)Delegate.CreateDelegate(typeof(InitDelegate), initMethod);
+                
                 PoolFactory.FactoryMethods.Add(Id, (poolSize) => new ComponentsPool<T>(poolSize));
+            }
+            else
+            {
+                PoolFactory.FactoryMethods.Add(Id, (poolSize) => new TagsPool<T>(poolSize));  
+            }
         }
     }
 
