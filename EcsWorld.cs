@@ -122,9 +122,10 @@ namespace CodexECS
         }
         
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Add<T>(EntityType eid) => Add(eid, ComponentMeta<T>.GetDefault());
+        public ref T Add<T>(EntityType eid) => ref Add(eid, _componentManager.GetNextFree<T>());
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Add<T>(EntityType eid, T component)
+        public ref T Add<T>(EntityType eid, T component)
         {
 #if DEBUG && !ECS_PERF_TEST
             if (IsReactWrapperType<T>())
@@ -149,6 +150,8 @@ namespace CodexECS
             if (!ExistenceSynched<T>(eid))
                 throw new EcsException("Components and archetypes not synched");
 #endif
+            
+            return ref _componentManager.Get<T>(eid);
         }
         
 #if DEBUG
@@ -189,7 +192,7 @@ namespace CodexECS
         public ref T GetOrAddComponent<T>(EntityType eid)
         {
             if (!Have<T>(eid))
-                Add<T>(eid);
+                return ref Add<T>(eid);
             return ref Get<T>(eid);
         }
 

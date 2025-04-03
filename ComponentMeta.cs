@@ -111,14 +111,26 @@ namespace CodexECS
             return defaultValue;
         }
 
+        private static void DefaultInit(ref T defaultValue) { }
         public delegate void InitDelegate(ref T instance);
-        public static InitDelegate Init{
+        public static InitDelegate Init //Init methods should always assume that component is already inited
+        {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get;
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             private set;
-        } = delegate {};
-
+        } = DefaultInit;
+        
+        private static void DefaultCleanup(ref T defaultValue) => defaultValue = Default;
+        public delegate void CleanupDelegate(ref T instance);
+        public static CleanupDelegate Cleanup
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get;
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            private set;
+        } = DefaultCleanup;
+        
         static ComponentMeta()
         {
             var type = typeof(T);
@@ -142,9 +154,13 @@ namespace CodexECS
                 else
                     Default = default;
 
-                var initMethod = type.GetMethod("Init", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+                var initMethod = type.GetMethod(nameof(Init), BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
                 if (initMethod != null)
                     Init = (InitDelegate)Delegate.CreateDelegate(typeof(InitDelegate), initMethod);
+                
+                var cleanupMethod = type.GetMethod(nameof(Cleanup), BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+                if (cleanupMethod != null)
+                    Cleanup = (CleanupDelegate)Delegate.CreateDelegate(typeof(CleanupDelegate), cleanupMethod);
                 
                 PoolFactory.FactoryMethods.Add(Id, (poolSize) => new ComponentsPool<T>(poolSize));
             }

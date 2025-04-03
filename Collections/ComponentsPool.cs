@@ -26,6 +26,7 @@ namespace CodexECS
     {
         public ref T Add(int id, T value = default);
         public ref T Get(int id);
+        public ref T GetNextFree();
     }
 
     class ComponentsPool<T> : IComponentsPool<T>
@@ -104,16 +105,19 @@ namespace CodexECS
 
 #region Unrolled SimpleList.RemoveAt
 
-            _values[innerIndex] = default;
+            // _values[innerIndex] = default;
+            ComponentMeta<T>.Cleanup(ref _values[innerIndex]);
             ValuesLength--;
-            if (innerIndex < ValuesLength)
-                _values[innerIndex] = _values[ValuesLength];
+            // if (innerIndex < ValuesLength)
+            //     _values[innerIndex] = _values[ValuesLength];
 
 #endregion
             
-            
             if (innerIndex < ValuesLength)
             {
+                //moved from unrolled SimpleList.RemoveAt
+                _values[innerIndex] = _values[ValuesLength];
+                
                 var lastId = _dense[ValuesLength];
                 _sparse[lastId] = innerIndex;
                 _dense[innerIndex] = _dense[ValuesLength];
@@ -131,20 +135,13 @@ namespace CodexECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Clear()
         {
-#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP2_0_OR_GREATER || NET5_0_OR_GREATER
-            Array.Fill(_sparse, -1);
-#else
-            for (int i = 0; i < _sparse.Length; i++)
-                _sparse[i] = -1;
-#endif
-
-#region Unrolled SimpleList.Clear
-
+            for (int i = 0; i < _dense.Length; i++)
+            {
+                _sparse[_dense[i]] = -1;
+                //_values should be synched with _dense so this loop should work
+                ComponentMeta<T>.Cleanup(ref _values[i]);
+            }
             ValuesLength = 0;
-
-#endregion
-            
-            
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -209,6 +206,8 @@ namespace CodexECS
             for (int i = 0; i < initialCapacity; i++)
                 _sparse[i] = -1;
             _values = new T[initialCapacity];
+            for (int i = 0; i < initialCapacity; i++)
+                _values[i] = ComponentMeta<T>.GetDefault();
         }
 
         //CODEX_TODO: excess call, rewrite
@@ -266,6 +265,24 @@ namespace CodexECS
         
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ref T Get(int id) => ref _values[_sparse[id]];
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ref T GetNextFree()
+        {
+            if (ValuesLength >= _values.Length)
+            {
+                const int maxResizeDelta = 256;
+                Utils.ResizeArray(ValuesLength, ref _values, maxResizeDelta);
+                _values[ValuesLength] = ComponentMeta<T>.GetDefault();
+            }
+            else
+            {
+                ComponentMeta<T>.Init(ref _values[ValuesLength]);
+                ComponentMeta<T>.Cleanup(ref _values[ValuesLength]);
+            }
+            
+            return ref _values[ValuesLength];
+        }
     }
 
     class TagsPool<T> : IComponentsPool<T>
@@ -326,6 +343,9 @@ namespace CodexECS
         
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ref T Get(int id) => ref _default;
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ref T GetNextFree() => ref _default;
 
         public void AddReference(int id, object value) =>
             throw new EcsException("trying to call AddReference for TagsPool");
