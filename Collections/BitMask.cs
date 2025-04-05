@@ -25,7 +25,7 @@ namespace CodexECS
         //0 hash is dirty by default, I hope it will never calculate actual hash to 0 :)
         private int _hash;
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public int GetMaskHash()//CODEX_TODO: cache hash
+        public int GetMaskHash()
         {
             if (_hash != 0 || Length == 0)
                 return _hash;
