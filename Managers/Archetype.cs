@@ -42,8 +42,9 @@ namespace CodexECS
             }
             EntitiesArr[EntitiesEnd] = eid;
             EntitiesEnd++;
-            
-            OnEntityAdded?.Invoke(eid);
+
+            if (OnEntityAdded != null)
+                OnEntityAdded(eid);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -68,8 +69,9 @@ namespace CodexECS
 #endif
             EntitiesEnd--;
             EntitiesArr[lastEntityIdx] = EntitiesArr[EntitiesEnd];
-            
-            OnEntityRemoved?.Invoke(eid);
+
+            if (OnEntityRemoved != null)
+                OnEntityRemoved(eid);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -78,7 +80,7 @@ namespace CodexECS
             if (OnEntityRemoved != null)
             {
                 for (int i = 0; i < EntitiesEnd; i++)
-                    OnEntityRemoved.Invoke(EntitiesArr[i]);
+                    OnEntityRemoved(EntitiesArr[i]);
             }
 
             EntitiesEnd = 0;
