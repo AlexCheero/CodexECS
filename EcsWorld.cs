@@ -277,6 +277,29 @@ namespace CodexECS
                 Excludes = excludes
             });
         }
+        
+        public struct FilterBuilder
+        {
+            public EcsWorld World;
+            private BitMask _includes;
+            private BitMask _excludes;
+
+            public FilterBuilder With<T>()
+            {
+                _includes.Set(ComponentMeta<T>.Id);
+                return this;
+            }
+
+            public FilterBuilder Without<T>()
+            {
+                _excludes.Set(ComponentMeta<T>.Id);
+                return this;
+            }
+
+            public EcsFilter Build() => World.RegisterFilter(_includes, _excludes);
+        }
+
+        public FilterBuilder Filter() => new FilterBuilder { World = this };
 
         private int _lockCounter;
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
