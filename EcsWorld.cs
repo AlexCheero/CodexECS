@@ -196,6 +196,7 @@ namespace CodexECS
             return ref Get<T>(eid);
         }
 
+        //CODEX_TODO: possibly if filter is double looped and in outer loop the component is removed, than it won't be there in the inner loop
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Remove<T>(EntityType eid)
         {
