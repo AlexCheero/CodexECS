@@ -88,6 +88,16 @@ namespace CodexECS
 #endif
             return _archetypes.Have<T>(eid);
         }
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private bool Have(int componentId, EntityType eid)
+        {
+#if DEBUG && !ECS_PERF_TEST
+            if (_archetypes.Have(componentId, eid) != _componentManager.Have(componentId, eid))
+                throw new EcsException("Components and archetypes desynch");
+#endif
+            return _archetypes.Have(componentId, eid);
+        }
 
         public void SubscribeOnAdd<T>(Action<EcsWorld> callback)
         {
@@ -119,6 +129,38 @@ namespace CodexECS
                 callbacks.Add(reactWrapperId, callback);
             else
                 callbacks[reactWrapperId] += callback;
+        }
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        //erases ref return type, used only to call via reflection
+        public void AddMultiple_dynamic<T>(EntityType eid, T component) => AddMultiple(eid, component);
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ref T AddMultiple<T>(EntityType eid) => ref AddMultiple(eid, _componentManager.GetNextFree<T>());
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ref T AddMultiple<T>(EntityType eid, T component)
+        {
+            if (!Have<T>(eid))
+                return ref Add(eid, component);
+            
+            SimpleList<T> components;
+            if (!Have<MultipleComponents<T>>(eid))
+            {
+                components = Add<MultipleComponents<T>>(eid).components;
+                components.Add(Get<T>(eid));
+            }
+            else
+            {
+                components = Get<MultipleComponents<T>>(eid).components;
+            }
+            components.Add(component);
+            return ref components[^1];
+        }
+
+        public void RemoveMultiple<T>(EntityType eid)
+        {
+            throw new NotImplementedException("merge with add/remove, add AllowMultiple attribute to components meta");
         }
         
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
