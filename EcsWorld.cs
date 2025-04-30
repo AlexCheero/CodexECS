@@ -90,7 +90,7 @@ namespace CodexECS
         }
         
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool Have(int componentId, EntityType eid)
+        public bool Have(int componentId, EntityType eid)
         {
 #if DEBUG && !ECS_PERF_TEST
             if (_archetypes.Have(componentId, eid) != _componentManager.Have(componentId, eid))
