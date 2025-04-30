@@ -29,14 +29,6 @@ namespace CodexECS
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             private set;
         }
-        
-        public static bool AllowMultiple
-        {
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get;
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            private set;
-        }
 
         private static readonly T Default;
         public static T GetDefault()
@@ -79,7 +71,6 @@ namespace CodexECS
             ComponentMapping.Add(type, Id);
             var fields = type.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
             IsTag = fields.Length == 0 && type.IsValueType && !type.IsEnum;
-            AllowMultiple = type.GetCustomAttribute<AllowMultipleAttribute>() != null;
 
             if (!IsTag)
             {
