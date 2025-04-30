@@ -160,7 +160,20 @@ namespace CodexECS
 
         public void RemoveMultiple<T>(EntityType eid)
         {
-            throw new NotImplementedException("merge with add/remove, add AllowMultiple attribute to components meta");
+            if (!Have<MultipleComponents<T>>(eid))
+            {
+                Remove<T>(eid);
+                return;
+            }
+            
+            ref var firstComponent = ref Get<T>(eid);
+            ComponentMeta<T>.Cleanup(ref firstComponent);
+            var components = Get<MultipleComponents<T>>(eid).components;
+            components.SwapRemoveAt(0);
+            if (components.Length == 0)
+                Remove<MultipleComponents<T>>(eid);
+            else
+                firstComponent = Get<MultipleComponents<T>>(eid).components[0];
         }
         
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
