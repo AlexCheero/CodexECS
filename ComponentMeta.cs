@@ -147,7 +147,7 @@ namespace CodexECS
 
             if (!IsTag)
             {
-                var defaultValueGetter = type.GetProperty("Default",
+                var defaultValueGetter = type.GetProperty(nameof(Default),
                     BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
                 if (defaultValueGetter != null)
                     Default = (T)defaultValueGetter.GetValue(null);
