@@ -158,6 +158,7 @@ namespace CodexECS
             return ref components[^1];
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void RemoveMultiple<T>(EntityType eid)
         {
             if (!Have<MultipleComponents<T>>(eid))
@@ -174,6 +175,14 @@ namespace CodexECS
                 Remove<MultipleComponents<T>>(eid);
             else
                 firstComponent = Get<MultipleComponents<T>>(eid).components[0];
+        }
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void RemoveMultipleAll<T>(EntityType eid)
+        {
+            Remove<T>(eid);
+            if (Have<MultipleComponents<T>>(eid))
+                Remove<MultipleComponents<T>>(eid);
         }
         
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -258,6 +267,8 @@ namespace CodexECS
 #if DEBUG && !ECS_PERF_TEST
             if (IsReactWrapperType<T>())
                 throw new EcsException("Cannot remove reactive wrappers manually");
+            if (Have<MultipleComponents<T>>(eid))
+                throw new EcsException($"entity have multiple components of type {typeof(T).Name}, use {nameof(RemoveMultiple)} instead");
 #endif
             
             var reactWrapperId = ComponentMeta<RemoveReact<T>>.Id;
