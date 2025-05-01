@@ -16,8 +16,6 @@ namespace CodexECS
 
         public void CopyItem(int from, int to);
 
-        public void AddReference(int id, object value);
-
         public string DebugString(int id, bool printFields);
         public Type GetComponentType();
     }
@@ -210,16 +208,6 @@ namespace CodexECS
                 _values[i] = ComponentMeta<T>.GetDefault();
         }
 
-        //CODEX_TODO: excess call, rewrite
-        public void AddReference(int id, object value)
-        {
-#if DEBUG && !ECS_PERF_TEST
-            if (value is ValueType)
-                throw new EcsException("trying to add object of value type as reference");
-#endif
-            Add(id, (T)value);
-        }
-
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ref T Add(int id, T value)
         {
@@ -346,8 +334,5 @@ namespace CodexECS
         
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ref T GetNextFree() => ref _default;
-
-        public void AddReference(int id, object value) =>
-            throw new EcsException("trying to call AddReference for TagsPool");
     }
 }

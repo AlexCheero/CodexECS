@@ -49,25 +49,6 @@ namespace CodexECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void AddReference(int componentId, int id, object component)
-        {
-#if DEBUG && !ECS_PERF_TEST
-            if (component is ValueType)
-                throw new EcsException("trying to add object of value type as reference");
-            if (id < 0)
-                throw new EcsException("negative id");
-#endif
-            
-            var pool = GetPool(componentId);
-            
-#if DEBUG && !ECS_PERF_TEST
-            if (pool == null)
-                throw new EcsException("invalid pool");
-#endif
-            pool.AddReference(id, component);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ref T Get<T>(EntityType eid)
         {
 #if DEBUG && !ECS_PERF_TEST
