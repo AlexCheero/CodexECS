@@ -307,7 +307,10 @@ namespace CodexECS
             
             _archetypes.RemoveComponent<T>(eid);
             _componentManager.Remove<T>(eid);
-            
+
+            if (_archetypes.GetMask(eid).Length == 0)
+                Delete(eid);
+
 #if HEAVY_ECS_DEBUG
             if (!ExistenceSynched<T>(eid))
                 throw new EcsException("Components and archetypes not synched");
