@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Text;
 using EntityType = System.Int32;//duplicated in EntityExtension
+using static CodexECS.EcsWorld;
 
 #if DEBUG
 using CodexECS.Utility;
@@ -23,6 +24,13 @@ namespace CodexECS
         private bool _addDirty;
         private BitMask _dirtyRemoveMask;
         private bool _removeDirty;
+
+        private readonly static Dictionary<Type, IGenericCallDispatcher> _genericCallDispatchers;
+
+        static EcsWorld()
+        {
+            _genericCallDispatchers = new();
+        }
 
         public EcsWorld()
         {
@@ -132,10 +140,6 @@ namespace CodexECS
         }
         
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        //erases ref return type, used only to call via reflection
-        public void AddMultiple_dynamic<T>(EntityType eid, T component) => AddMultiple(eid, component);
-        
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ref T AddMultiple<T>(EntityType eid) => ref AddMultiple(eid, _componentManager.GetNextFree<T>());
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -228,17 +232,34 @@ namespace CodexECS
         }
 #endif
 
-        //CODEX_TODO: probably should implement lock checks as in Add
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void AddReference(Type type, int id, object component)
+        private interface IGenericCallDispatcher
         {
-// #if DEBUG && !ECS_PERF_TEST
-//             if (_lockCounter > 0)
-//                 throw new EcsException("shouldn't add reference while world is locked");
-// #endif
-            _archetypes.AddComponent(id, ComponentMapping.GetIdForType(type));
-            _componentManager.AddReference(type, id, component);
+            public void Add(EcsWorld world, int id, object obj);
+            public void AddMultiple(EcsWorld world, int id, object obj);
         }
+
+        private class GenericCallDispatcher<T> : IGenericCallDispatcher
+        {
+            public void Add(EcsWorld world, int id, object obj) => world.Add(id, (T)obj);
+            public void AddMultiple(EcsWorld world, int id, object obj) => world.AddMultiple(id, (T)obj);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static IGenericCallDispatcher GetCallDispatcher(Type type)
+        {
+            if (!_genericCallDispatchers.ContainsKey(type))
+            {
+                var closedType = typeof(GenericCallDispatcher<>).MakeGenericType(type);
+                _genericCallDispatchers[type] = (IGenericCallDispatcher)Activator.CreateInstance(closedType);
+            }
+            return _genericCallDispatchers[type];
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void AddMultiple_Dynamic(Type type, int id, object component) => GetCallDispatcher(type).AddMultiple(this, id, component);
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Add_Dynamic(Type type, int id, object component) => GetCallDispatcher(type).Add(this, id, component);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ref T Get<T>(EntityType eid) => ref _componentManager.Get<T>(eid);

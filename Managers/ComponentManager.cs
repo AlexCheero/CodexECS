@@ -49,7 +49,7 @@ namespace CodexECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void AddReference(Type type, int id, object component)
+        public void AddReference(int componentId, int id, object component)
         {
 #if DEBUG && !ECS_PERF_TEST
             if (component is ValueType)
@@ -57,9 +57,9 @@ namespace CodexECS
             if (id < 0)
                 throw new EcsException("negative id");
 #endif
-            var componentId = ComponentMapping.GetIdForType(type);
-
+            
             var pool = GetPool(componentId);
+            
 #if DEBUG && !ECS_PERF_TEST
             if (pool == null)
                 throw new EcsException("invalid pool");
