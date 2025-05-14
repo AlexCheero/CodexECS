@@ -47,6 +47,7 @@ namespace CodexECS
         private HashSet<EntityType> _pendingDelete;
 
         private readonly SimpleList<View> _views;
+        private int _viewsStartIdx;
         private readonly EcsWorld _world;
 
         public int EntitiesCount
@@ -355,14 +356,14 @@ namespace CodexECS
 
                 goto AddNewView;
             }
-            
-            for (int i = _views.Length; i > -1; i--)
+
+            var lastIdx = (_viewsStartIdx + _views.Length - 1) % _views.Length;
+            if (!_views[lastIdx].IsInUse)
             {
-                if (_views[i].IsInUse)
-                    continue;
-                view = _views[i];
-                (_views[i], _views[0]) = (_views[0], _views[i]);
-                break;
+                view = _views[lastIdx];
+                _viewsStartIdx--;
+                if (_viewsStartIdx < 0)
+                    _viewsStartIdx += _views.Length;
             }
             
             AddNewView:
@@ -370,9 +371,16 @@ namespace CodexECS
             {
                 view = new View(this, _views.Length);
                 _views.Add(view);
+                ReturnView(view.Idx);
             }
             
             UseView:
+            
+#if DEBUG && !ECS_PERF_TEST
+            if (view.IsInUse)
+                throw new EcsException("view is already in use");
+#endif
+            
             view.Use();
             return view;
         }
@@ -384,8 +392,13 @@ namespace CodexECS
             if (idx < 0 || idx >= _views.Length)
                 throw new EcsException("View index is out of range");
 #endif
-            if (_views.Length > 1)
-                (_views[idx], _views[^1]) = (_views[^1], _views[idx]);
+            if (_views.Length < 2)
+                return;
+            (_views[idx], _views[_viewsStartIdx]) = (_views[_viewsStartIdx], _views[idx]);
+            _views[idx].Idx = idx;
+            _views[_viewsStartIdx].Idx = _viewsStartIdx;
+            
+            _viewsStartIdx = (_viewsStartIdx + 1) % _views.Length;
         }
 
         private static readonly View EmptyView = new(null, -1);
@@ -393,7 +406,7 @@ namespace CodexECS
         public class View : IDisposable
         {
             private readonly EcsFilter _filter;
-            private readonly int _idx;
+            internal int Idx;
             
             //moved out form filter to reduce indirection
             private EntityType[] _dense;
@@ -422,7 +435,7 @@ namespace CodexECS
             {
                 _filter = filter;
                 _entityIndex = -1;
-                _idx = idx;
+                Idx = idx;
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -446,7 +459,7 @@ namespace CodexECS
                 if (_filter != null)
                 {
                     _filter.Unlock();
-                    _filter.ReturnView(_idx);
+                    _filter.ReturnView(Idx);
                 }
             }
         }
