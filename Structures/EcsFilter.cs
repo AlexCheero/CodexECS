@@ -46,7 +46,7 @@ namespace CodexECS
         private HashSet<EntityType> _pendingAdd;
         private HashSet<EntityType> _pendingDelete;
 
-        private readonly List<View> _views;
+        private readonly SimpleList<View> _views;
         private readonly EcsWorld _world;
 
         public int EntitiesCount
@@ -81,7 +81,8 @@ namespace CodexECS
             _pendingAdd = new();
             _pendingDelete = new();
             
-            _views = new() { new View(this) };
+            _views = new();
+            _views.Add(new View(this, 0));
             _world = world;
         }
 
@@ -338,23 +339,66 @@ namespace CodexECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public View GetEnumerator()
         {
+            if (EntitiesCount == 0)
+                return EmptyView;
+            
             Lock();
-            //CODEX_TODO: swap views in order to have first or last view always free
-            foreach (View view in _views)
+
+            View view = null; 
+            if (_views.Length == 1)
             {
-                if (view.IsInUse)
-                    continue;
-                view.Use();
-                return view;
+                if (!_views[0].IsInUse)
+                {
+                    view = _views[0];
+                    goto UseView;
+                }
+
+                goto AddNewView;
             }
-            _views.Add(new View(this));
-            _views[^1].Use();
-            return _views[^1];
+            
+            for (int i = _views.Length; i > -1; i--)
+            {
+                if (_views[i].IsInUse)
+                    continue;
+                view = _views[i];
+                (_views[i], _views[0]) = (_views[0], _views[i]);
+                break;
+            }
+            
+            AddNewView:
+            if (view == null)
+            {
+                view = new View(this, _views.Length);
+                _views.Add(view);
+            }
+            
+            UseView:
+            view.Use();
+            return view;
         }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void ReturnView(int idx)
+        {
+#if DEBUG && !ECS_PERF_TEST
+            if (idx < 0 || idx >= _views.Length)
+                throw new EcsException("View index is out of range");
+#endif
+            if (_views.Length > 1)
+                (_views[idx], _views[^1]) = (_views[^1], _views[idx]);
+        }
+
+        private static readonly View EmptyView = new(null, -1);
 
         public class View : IDisposable
         {
-            private EcsFilter _filter;
+            private readonly EcsFilter _filter;
+            private readonly int _idx;
+            
+            //moved out form filter to reduce indirection
+            private EntityType[] _dense;
+            private int _valuesEnd;
+            //===========================================
 
             private int _entityIndex;
 
@@ -367,40 +411,43 @@ namespace CodexECS
                 private set;
             }
 
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void Use() => IsInUse = true;
+            public void Use()
+            {
+                IsInUse = true;
+                _dense = _filter._dense;
+                _valuesEnd = _filter._valuesEnd;
+            }
 
-            public View(EcsFilter filter)
+            public View(EcsFilter filter, int idx)
             {
                 _filter = filter;
                 _entityIndex = -1;
+                _idx = idx;
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public bool MoveNext()
             {
                 _entityIndex++;
-                return _entityIndex < _filter._valuesEnd;
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void Reset()
-            {
-                _entityIndex = -1;
-                IsInUse = false;
+                return _entityIndex < _valuesEnd;
             }
 
             public EntityType Current
             {
                 [MethodImpl(MethodImplOptions.AggressiveInlining)]
-                get => _filter._dense[_entityIndex];
+                get => _dense[_entityIndex];
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void Dispose()
             {
-                _filter.Unlock();
-                Reset();
+                _entityIndex = -1;
+                IsInUse = false;
+                if (_filter != null)
+                {
+                    _filter.Unlock();
+                    _filter.ReturnView(_idx);
+                }
             }
         }
     }
