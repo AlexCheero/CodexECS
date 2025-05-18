@@ -38,6 +38,8 @@ namespace CodexECS
         private HashSet<Archetype> _archetypes;
 #endif
 
+        public readonly EcsWorld World;
+        
         // private SparseSet<EntityType> _entitiesSet;
         private int[] _sparse;
         private EntityType[] _dense;
@@ -48,8 +50,7 @@ namespace CodexECS
 
         private readonly SimpleList<View> _views;
         private int _viewsStartIdx;
-        private readonly EcsWorld _world;
-
+        
         public int EntitiesCount
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -84,7 +85,7 @@ namespace CodexECS
             
             _views = new();
             _views.Add(new View(this, 0));
-            _world = world;
+            World = world;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -258,13 +259,13 @@ namespace CodexECS
         private int _lockCounter;
         public void Lock()
         {
-            _world.Lock();
+            World.Lock();
             _lockCounter++;
         }
 
         public void Unlock()
         {
-            _world.Unlock();
+            World.Unlock();
             _lockCounter--;
 #if DEBUG && !ECS_PERF_TEST
             if (_lockCounter < 0)
