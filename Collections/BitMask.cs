@@ -317,7 +317,14 @@ namespace CodexECS
         public int GetNextSetBit(int fromPosition)
         {
             int firstChunkIdx = fromPosition / SizeOfPartInBits;
-            var m = firstChunkIdx == 0 ? _m1 : _mn[firstChunkIdx - 1];
+            MaskInternal m;
+            if (firstChunkIdx == 0)
+                m = _m1;
+            else if (_mn != null && firstChunkIdx - 1 < _mn.Length)
+                m = _mn[firstChunkIdx - 1];
+            else
+                return -1;
+
             for (int j = fromPosition % SizeOfPartInBits; j < SizeOfPartInBits; j++)
             {
                 if ((m & (1 << j)) != 0)
