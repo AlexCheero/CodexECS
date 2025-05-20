@@ -86,39 +86,39 @@ namespace CodexECS
         {
             var innerIndex = _sparse[outerIdx];
             _sparse[outerIdx] = -1;
-            
+
 #if DEBUG && !ECS_PERF_TEST
             if (innerIndex >= _valuesEnd)
                 throw new EcsException("innerIndex should be smaller than _valuesEnd");
             if (_values.Length != _dense.Length)
                 throw new EcsException("_values _dense desynch");
 #endif
-            
+
             //backswap using _dense
-            var lastIdx = _valuesEnd - 1;
-            if (innerIndex < lastIdx)
-                _sparse[_dense[lastIdx]] = innerIndex;
-            // _values.SwapRemoveAt(innerIndex);
-            // _dense.SwapRemoveAt(innerIndex);
-            _values[innerIndex] = default;
-            _dense[innerIndex] = -1;
             _valuesEnd--;
-            _values[innerIndex] = _values[_valuesEnd];
-            _dense[innerIndex] = _dense[_valuesEnd];
+            if (innerIndex < _valuesEnd)
+            {
+                _sparse[_dense[_valuesEnd]] = innerIndex;
+                _values[innerIndex] = _values[_valuesEnd];
+                _dense[innerIndex] = _dense[_valuesEnd];
+            }
+
+            _values[_valuesEnd] = default;
+            //_dense[_valuesEnd] = -1;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Clear()
         {
-#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP2_0_OR_GREATER || NET5_0_OR_GREATER
-            Array.Fill(_sparse, -1);
-#else
-            for (int i = 0; i < _sparse.Length; i++)
-                _sparse[i] = -1;
-#endif
+            for (int i = 0; i < _valuesEnd; i++)
+            {
+                ref int outerIdx = ref _dense[i];
+                if (outerIdx >= 0 && outerIdx < _sparse.Length)
+                    _sparse[outerIdx] = -1;
+                _values[i] = default;
+                outerIdx = -1;
+            }
 
-            // _values.Clear();
-            // _dense.Clear();
             _valuesEnd = 0;
         }
 
