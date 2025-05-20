@@ -29,6 +29,8 @@ namespace CodexECS
 
         private readonly static Dictionary<Type, IGenericCallDispatcher> _genericCallDispatchers;
 
+        private FilterBuilder _filterBuilder;
+
         static EcsWorld()
         {
             _genericCallDispatchers = new();
@@ -49,6 +51,7 @@ namespace CodexECS
             _onRemoveCallbacks = new();
             _dirtyAddMask = new();
             _dirtyRemoveMask = new();
+            _filterBuilder = new(this);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -402,11 +405,19 @@ namespace CodexECS
             });
         }
         
-        public struct FilterBuilder
+        public class FilterBuilder
         {
-            public EcsWorld World;
+            private EcsWorld _world;
             private BitMask _includes;
             private BitMask _excludes;
+
+            public FilterBuilder(EcsWorld world) => _world = world;
+
+            public void Reset()
+            {
+                _includes.Clear();
+                _excludes.Clear();
+            }
 
             public FilterBuilder With<T>()
             {
@@ -420,10 +431,14 @@ namespace CodexECS
                 return this;
             }
 
-            public EcsFilter Build() => World.RegisterFilter(_includes, _excludes);
+            public EcsFilter Build() => _world.RegisterFilter(_includes, _excludes);
         }
 
-        public FilterBuilder Filter() => new FilterBuilder { World = this };
+        public FilterBuilder Filter()
+        {
+            _filterBuilder.Reset();
+            return _filterBuilder;
+        }
 
         private int _lockCounter;
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
