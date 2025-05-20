@@ -15,6 +15,8 @@ namespace CodexECS
     {
         private readonly EntityManager _entityManager;
         private readonly ComponentManager _componentManager;
+        //this is the direct reference from component manager to speed thing up a bit
+        private IComponentsPool[] _pools;
         private readonly ArchetypesManager _archetypes;
         
         private readonly SparseSet<Action<EcsWorld>> _onAddCallbacks;
@@ -32,10 +34,14 @@ namespace CodexECS
             _genericCallDispatchers = new();
         }
 
+        private void SetPools(IComponentsPool[] pools) => _pools = pools;
+
         public EcsWorld()
         {
             _entityManager = new EntityManager();
             _componentManager = new ComponentManager();
+            _pools = _componentManager._pools;
+            _componentManager.OnPoolsResized = SetPools;
             _archetypes = new ArchetypesManager();
             _delayedDeleteList = new HashSet<EntityType>();
             
@@ -138,20 +144,36 @@ namespace CodexECS
             else
                 callbacks[reactWrapperId] += callback;
         }
-        
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ref T AddMultiple<T>(EntityType eid) => ref AddMultiple(eid, _componentManager.GetNextFree<T>());
+        public ref T AddMultiple<T>(EntityType eid)
+        {
+#if DEBUG && !ECS_PERF_TEST
+            if (ComponentMeta<T>.IsTag)
+                throw new EcsException("Tags are not assumed to be added multiple times, use component with counter instead");
+#endif
+            return ref AddMultiple(eid, _componentManager.GetNextFree<T>());
+        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ref T AddMultiple<T>(EntityType eid, T component)
         {
+#if DEBUG && !ECS_PERF_TEST
+            if (ComponentMeta<T>.IsTag)
+                throw new EcsException("Tags are not assumed to be added multiple times, use component with counter instead");
+#endif
+
             if (!Have<T>(eid))
-                return ref Add(eid, component);
-            
+            {
+                Add(eid, component);
+                return ref Get<T>(eid);
+            }
+
             SimpleList<T> components;
             if (!Have<MultipleComponents<T>>(eid))
             {
-                components = Add<MultipleComponents<T>>(eid).components;
+                Add<MultipleComponents<T>>(eid);
+                components = Get<MultipleComponents<T>>(eid).components;
                 components.Add(Get<T>(eid));
             }
             else
@@ -188,12 +210,16 @@ namespace CodexECS
             if (Have<MultipleComponents<T>>(eid))
                 Remove<MultipleComponents<T>>(eid);
         }
-        
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ref T Add<T>(EntityType eid) => ref Add(eid, _componentManager.GetNextFree<T>());
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ref T Add<T>(EntityType eid, T component)
+        public void Add<T>(EntityType eid)
+        {
+            var defaultValue = ComponentMeta<T>.IsTag ? default : _componentManager.GetNextFree<T>();
+            Add(eid, defaultValue);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Add<T>(EntityType eid, T component)
         {
 #if DEBUG && !ECS_PERF_TEST
             if (IsReactWrapperType<T>())
@@ -218,8 +244,6 @@ namespace CodexECS
             if (!ExistenceSynched<T>(eid))
                 throw new EcsException("Components and archetypes not synched");
 #endif
-            
-            return ref _componentManager.Get<T>(eid);
         }
         
 #if DEBUG
@@ -262,7 +286,17 @@ namespace CodexECS
         public void Add_Dynamic(Type type, int id, object component) => GetCallDispatcher(type).Add(this, id, component);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ref T Get<T>(EntityType eid) => ref _componentManager.Get<T>(eid);
+        public ref T Get<T>(EntityType eid)
+        {
+#if DEBUG && !ECS_PERF_TEST
+            if (ComponentMeta<T>.IsTag)
+                throw new EcsException("can't get specific component from tags pool");
+#endif
+            var pool = (ComponentsPool<T>)_pools[ComponentMeta<T>.Id];
+
+            //return ref pool.Get(eid);
+            return ref pool._values[pool._sparse[eid]];
+        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool TryAdd<T>(EntityType eid)
@@ -277,7 +311,7 @@ namespace CodexECS
         public ref T GetOrAddComponent<T>(EntityType eid)
         {
             if (!Have<T>(eid))
-                return ref Add<T>(eid);
+                Add<T>(eid);
             return ref Get<T>(eid);
         }
 

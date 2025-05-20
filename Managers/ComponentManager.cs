@@ -8,7 +8,7 @@ namespace CodexECS
 {
     public class ComponentManager
     {
-        private IComponentsPool[] _pools;
+        public IComponentsPool[] _pools;
         private int _poolsEnd;
         private struct DummyStruct { }
         private static readonly IComponentsPool DummyPool = new ComponentsPool<DummyStruct>();
@@ -36,31 +36,49 @@ namespace CodexECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Add<T>(EntityType eid, T component = default)
         {
-            var pool = GetPool<T>();
-
-#if DEBUG && !ECS_PERF_TEST
-            if (eid < 0)
-                throw new EcsException("negative id");
-            if (pool == null)
-                throw new EcsException("pool is null");
-#endif
-
-            pool.Add(eid, component);
+            var componentId = ComponentMeta<T>.Id;
+            var shouldAddNewPool = componentId >= _poolsEnd || _pools[componentId] == DummyPool;
+            if (ComponentMeta<T>.IsTag)
+            {
+                if (shouldAddNewPool)
+                    AddPool(componentId, new TagsPool<T>());
+                ((TagsPool<T>)_pools[componentId]).Add(eid);
+            }
+            else
+            {
+                if (shouldAddNewPool)
+                    AddPool(componentId, new ComponentsPool<T>());
+                ((ComponentsPool<T>)_pools[componentId]).Add(eid, component);
+            }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ref T Get<T>(EntityType eid)
         {
 #if DEBUG && !ECS_PERF_TEST
-            if (!Have<T>(eid))
-                throw new EcsException("entity have no " + typeof(T));
+            if (ComponentMeta<T>.IsTag)
+                throw new EcsException("can't get specific component from tags pool");
 #endif
-            var pool = (IComponentsPool<T>)_pools[ComponentMeta<T>.Id];
-            return ref pool.Get(eid);
+            var pool = (ComponentsPool<T>)_pools[ComponentMeta<T>.Id];
+
+            //return ref pool.Get(eid);
+            return ref pool._values[pool._sparse[eid]];
         }
-        
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ref T GetNextFree<T>() => ref GetPool<T>().GetNextFree();
+        public ref T GetNextFree<T>()
+        {
+#if DEBUG && !ECS_PERF_TEST
+            if (ComponentMeta<T>.IsTag)
+                throw new EcsException("can only be called for non empty components");
+#endif
+
+            var componentId = ComponentMeta<T>.Id;
+            var shouldAddPool = componentId >= _poolsEnd || _pools[componentId] == DummyPool;
+            if (shouldAddPool)
+                AddPool(componentId, new ComponentsPool<T>());
+            return ref ((ComponentsPool<T>)_pools[componentId]).GetNextFree();
+        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Remove<T>(EntityType eid) => _pools[ComponentMeta<T>.Id].Remove(eid);
@@ -75,27 +93,15 @@ namespace CodexECS
         public void RemoveAll(int componentId) => _pools[componentId].Clear();
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private IComponentsPool<T> GetPool<T>()
-        {
-            var componentId = ComponentMeta<T>.Id;
-            //if (_componentsPools.ContainsIdx(componentId))
-            if (componentId < _poolsEnd && _pools[componentId] != DummyPool)
-                return (IComponentsPool<T>)_pools[componentId];
-            if (ComponentMeta<T>.IsTag)
-                AddPool(componentId, new TagsPool<T>());
-            else
-                AddPool(componentId, new ComponentsPool<T>());
-            return (IComponentsPool<T>)_pools[componentId];
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public IComponentsPool GetPool(int componentId)
         {
             if (!(componentId < _poolsEnd && _pools[componentId] != DummyPool))
                 AddPool(componentId, PoolFactory.FactoryMethods[componentId](/*EcsCacheSettings.PoolSize*/32));
             return _pools[componentId];
         }
-        
+
+        public Action<IComponentsPool[]> OnPoolsResized;
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void AddPool(int idx, IComponentsPool pool)
         {
@@ -105,6 +111,7 @@ namespace CodexECS
 
                 const int maxResizeDelta = 256;
                 Utils.ResizeArray(idx, ref _pools, maxResizeDelta);
+                OnPoolsResized(_pools);
                 for (int i = oldLength; i < _pools.Length; i++)
                     _pools[i] = DummyPool;
             }

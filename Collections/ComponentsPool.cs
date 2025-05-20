@@ -20,18 +20,11 @@ namespace CodexECS
         public Type GetComponentType();
     }
 
-    public interface IComponentsPool<T> : IComponentsPool
+    class ComponentsPool<T> : IComponentsPool
     {
-        public ref T Add(int id, T value = default);
-        public ref T Get(int id);
-        public ref T GetNextFree();
-    }
-
-    class ComponentsPool<T> : IComponentsPool<T>
-    {
-        private int[] _sparse;
+        public int[] _sparse;
         private int[] _dense;
-        private T[] _values;
+        public T[] _values;
 #if DEBUG
         public int ValuesLength { get; private set; }
 #else
@@ -115,14 +108,11 @@ namespace CodexECS
             {
                 //moved from unrolled SimpleList.RemoveAt
                 _values[innerIndex] = _values[ValuesLength];
-                
+                _values[ValuesLength] = default;
+
                 var lastId = _dense[ValuesLength];
                 _sparse[lastId] = innerIndex;
-                _dense[innerIndex] = _dense[ValuesLength];
-                
-                //TODO: ???
-                //_sparse[id] = _dense[innerIndex];
-                //_values[innerIndex] = _values[_values.Length];
+                _dense[innerIndex] = lastId;
             }
 
 #if HEAVY_ECS_DEBUG
@@ -133,11 +123,14 @@ namespace CodexECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Clear()
         {
-            for (int i = 0; i < _dense.Length; i++)
+            for (int i = 0; i < ValuesLength; i++)
             {
-                _sparse[_dense[i]] = -1;
-                //_values should be synched with _dense so this loop should work
-                ComponentMeta<T>.Cleanup(ref _values[i]);
+                int id = _dense[i];
+                if (id >= 0 && id < _sparse.Length)
+                {
+                    _sparse[id] = -1;
+                    ComponentMeta<T>.Cleanup(ref _values[i]);
+                }
             }
             ValuesLength = 0;
         }
@@ -209,8 +202,9 @@ namespace CodexECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ref T Add(int id, T value)
+        public void Add(int id, T value)
         {
+            // Resize sparse array if needed
             if (id >= _sparse.Length)
             {
                 var oldLength = _sparse.Length;
@@ -225,32 +219,29 @@ namespace CodexECS
                 throw new EcsException(typeof(T) + " sparse set already have element at this index");
 #endif
 
-            _sparse[id] = ValuesLength;
-            
-#region Unrolled SimpleList.Add
-
+            // Make sure values array has space
             if (ValuesLength >= _values.Length)
             {
                 const int maxResizeDelta = 256;
                 Utils.ResizeArray(ValuesLength, ref _values, maxResizeDelta);
             }
-            _values[ValuesLength] = value;
-            ValuesLength++;
 
-#endregion
-            
-            
+            // Make sure dense array has space
             if (_dense.Length < _values.Length)
                 Array.Resize(ref _dense, _values.Length);
-            _dense[_sparse[id]] = id;
+
+            // Set up the connections
+            _sparse[id] = ValuesLength;
+            _values[ValuesLength] = value;
+            _dense[ValuesLength] = id;
+
+            ValuesLength++;
 
 #if HEAVY_ECS_DEBUG
             CheckArrays();
 #endif
-
-            return ref _values[_sparse[id]];
         }
-        
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ref T Get(int id) => ref _values[_sparse[id]];
         
@@ -273,9 +264,8 @@ namespace CodexECS
         }
     }
 
-    class TagsPool<T> : IComponentsPool<T>
+    class TagsPool<T> : IComponentsPool
     {
-        private T _default;
         private BitMask _tags;
         
         public string DebugString(int id, bool printFields) => typeof(T).Name;
@@ -303,7 +293,7 @@ namespace CodexECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public IComponentsPool Duplicate()
         {
-            var newPool = new TagsPool<T>(Length);
+            var newPool = new TagsPool<T>();
             newPool.Copy(this);
             return newPool;
         }
@@ -317,22 +307,9 @@ namespace CodexECS
             Add(to);
         }
 
-        public TagsPool(int initialCapacity = 0)
-        {
-            _tags = new BitMask();
-        }
+        public TagsPool() => _tags = new BitMask();
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ref T Add(int id, T value = default)
-        {
-            _tags.Set(id);
-            return ref _default;
-        }
-        
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ref T Get(int id) => ref _default;
-        
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ref T GetNextFree() => ref _default;
+        public void Add(int id) => _tags.Set(id);
     }
 }

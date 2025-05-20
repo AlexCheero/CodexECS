@@ -93,7 +93,7 @@ namespace CodexECS
             }
             else
             {
-                PoolFactory.FactoryMethods.Add(Id, (poolSize) => new TagsPool<T>(poolSize));  
+                PoolFactory.FactoryMethods.Add(Id, (_) => new TagsPool<T>());  
             }
         }
     }
