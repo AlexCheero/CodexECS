@@ -51,7 +51,6 @@ namespace CodexECS
             _onRemoveCallbacks = new();
             _dirtyAddMask = new();
             _dirtyRemoveMask = new();
-            _filterBuilder = new(this);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -405,19 +404,11 @@ namespace CodexECS
             });
         }
         
-        public class FilterBuilder
+        public struct FilterBuilder
         {
-            private EcsWorld _world;
+            public EcsWorld _world;
             private BitMask _includes;
             private BitMask _excludes;
-
-            public FilterBuilder(EcsWorld world) => _world = world;
-
-            public void Reset()
-            {
-                _includes.Clear();
-                _excludes.Clear();
-            }
 
             public FilterBuilder With<T>()
             {
@@ -434,11 +425,7 @@ namespace CodexECS
             public EcsFilter Build() => _world.RegisterFilter(_includes, _excludes);
         }
 
-        public FilterBuilder Filter()
-        {
-            _filterBuilder.Reset();
-            return _filterBuilder;
-        }
+        public FilterBuilder Filter() => new FilterBuilder { _world = this };
 
         private int _lockCounter;
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
