@@ -381,7 +381,8 @@ namespace CodexECS
                 for (int i = 0; i < _mn.Length; i++)
                     _mn[i] = 0;
             }
-            
+
+            _length = 0;
             _hash = 0;
         }
 
