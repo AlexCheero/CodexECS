@@ -4,6 +4,7 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using EntityType = System.Int32;//duplicated in EntityExtension
 using static CodexECS.EcsWorld;
+using UnityEngine.UI;
 
 #if DEBUG
 using CodexECS.Utility;
@@ -104,7 +105,17 @@ namespace CodexECS
 #endif
             return _archetypes.Have<T>(eid);
         }
-        
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool Have(in BitMask mask, EntityType eid)
+        {
+#if DEBUG && !ECS_PERF_TEST
+            if (_archetypes.Have(mask, eid) != _componentManager.Have(mask, eid))
+                throw new EcsException("Components and archetypes desynch");
+#endif
+            return _archetypes.Have(mask, eid);
+        }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Have(int componentId, EntityType eid)
         {

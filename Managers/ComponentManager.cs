@@ -32,6 +32,16 @@ namespace CodexECS
         [Obsolete("slow, use Archetypes.Have instead")]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Have(int componentId, EntityType eid) => componentId < _poolsEnd && _pools[componentId] != DummyPool && _pools[componentId].Contains(eid);
+        
+        [Obsolete("slow, use Archetypes.Have instead")]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool Have(in BitMask mask, EntityType eid)
+        {
+            var have = true;
+            foreach (var componentId in mask)
+                have &= componentId < _poolsEnd && _pools[componentId] != DummyPool && _pools[componentId].Contains(eid);
+            return have;
+        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Add<T>(EntityType eid, T component = default)

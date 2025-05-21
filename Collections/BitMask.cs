@@ -8,6 +8,16 @@ namespace CodexECS
 {
     using MaskInternal = UInt32;
 
+    public static class BitMaskExtensions
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static ref BitMask SetTypeId<T>(this ref BitMask mask)
+        {
+            mask.Set(ComponentMeta<T>.Id);
+            return ref mask;
+        }
+    }
+
     public struct BitMask
     {
         public class EqualityComparer : IEqualityComparer<BitMask>
