@@ -200,55 +200,6 @@ namespace CodexECS
         private bool CheckChunkIdx(int idx) => idx < 1 || (_mn != null && _mn.Length > idx - 1);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Unset_(int i)
-        {
-            int chunkIdx = i / SizeOfPartInBits;
-            if (!CheckChunkIdx(chunkIdx))
-                return;
-
-            ref var m = ref _m1;
-            if (chunkIdx > 0)
-                m = ref _mn[chunkIdx - 1];
-
-            int position = i % SizeOfPartInBits;
-            MaskInternal shifted = 1;
-            m &= (MaskInternal)~(shifted << position);
-
-            //update length
-            if (chunkIdx == (Length - 1) / SizeOfPartInBits)
-            {
-                int j = chunkIdx - 1;
-                var msb = 0;
-                for (; j >= 0; j--)
-                {
-                    if (_mn[j] == 0)
-                        continue;
-                    var chunk = _mn[j];
-                    while (chunk != 0)
-                    {
-                        chunk >>= 1;
-                        msb++;
-                    }
-                    break;
-                }
-                if (j < 0)
-                {
-                    var chunk = _m1;
-                    while (chunk != 0)
-                    {
-                        chunk >>= 1;
-                        msb++;
-                    }
-                }
-
-                j++;
-                _length = j * SizeOfPartInBits + msb;
-            }
-            
-            _hash = 0;
-        }
-        
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Unset(int i)
         {
             int chunkIdx = i / SizeOfPartInBits;
