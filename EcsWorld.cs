@@ -46,7 +46,7 @@ namespace CodexECS
             _pools = _componentManager._pools;
             _componentManager.OnPoolsResized = SetPools;
             _archetypes = new ArchetypesManager();
-            _delayedDeleteList = new HashSet<EntityType>();
+            _delayedDeleteList = new();
             
             _onAddCallbacks = new();
             _onRemoveCallbacks = new();
@@ -485,18 +485,18 @@ namespace CodexECS
             Unlock();
         }
 
-        private HashSet<EntityType> _delayedDeleteList;
+        private BitMask _delayedDeleteList;
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Delete(EntityType eid)
         {
             if (_lockCounter > 0)
             {
-                _delayedDeleteList.Add(eid);
+                _delayedDeleteList.Set(eid);
             }
             else
             {
 #if DEBUG && !ECS_PERF_TEST
-                if (_delayedDeleteList.Count > 0)
+                if (_delayedDeleteList.Length > 0)
                     throw new EcsException("_delayedDeleteList is not empty here");
 #endif
                 Delete_Impl(eid);
