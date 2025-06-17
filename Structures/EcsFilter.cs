@@ -45,8 +45,8 @@ namespace CodexECS
         private EntityType[] _dense;
         private int _valuesEnd;
         
-        private HashSet<EntityType> _pendingAdd;
-        private HashSet<EntityType> _pendingDelete;
+        private BitMask _pendingAdd;
+        private BitMask _pendingDelete;
 
         private readonly SimpleList<View> _views;
         private int _viewsStartIdx;
@@ -109,19 +109,19 @@ namespace CodexECS
 #if DEBUG && !ECS_PERF_TEST
             // if (!_pendingDelete.Contains(eid) && _entitiesSet.ContainsIdx(eid))
             var containsEntity = eid < _sparse.Length && _sparse[eid] > -1;
-            if (!_pendingDelete.Contains(eid) && containsEntity)
+            if (!_pendingDelete.Check(eid) && containsEntity)
                 throw new EcsException("filter already have this entity");
 #endif
             
             if (_lockCounter > 0)
             {
-                if (_pendingDelete.Contains(eid))
+                if (_pendingDelete.Check(eid))
                 {
-                    _pendingDelete.Remove(eid);
+                    _pendingDelete.Unset(eid);
                 }
                 else
                 {
-                    _pendingAdd.Add(eid);
+                    _pendingAdd.Set(eid);
                     _dirty = true;
                 }
                 
@@ -177,19 +177,19 @@ namespace CodexECS
 #if DEBUG && !ECS_PERF_TEST
             // if (!_pendingAdd.Contains(eid) && !_entitiesSet.ContainsIdx(eid))
             var containsEntity = eid < _sparse.Length && _sparse[eid] > -1;
-            if (!_pendingAdd.Contains(eid) && !containsEntity)
+            if (!_pendingAdd.Check(eid) && !containsEntity)
                 throw new EcsException("filter have no this entity");
 #endif
             
             if (_lockCounter > 0)
             {
-                if (_pendingAdd.Contains(eid))
+                if (_pendingAdd.Check(eid))
                 {
-                    _pendingAdd.Remove(eid);
+                    _pendingAdd.Unset(eid);
                 }
                 else
                 {
-                    _pendingDelete.Add(eid);
+                    _pendingDelete.Set(eid);
                     _dirty = true;
                 }
                 
