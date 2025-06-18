@@ -91,8 +91,13 @@ namespace CodexECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void AddArchetype(Archetype archetype)
         {
-            archetype.OnEntityAdded += AddEntity;
-            archetype.OnEntityRemoved += RemoveEntity;
+            for (int i = 0; i < archetype.RelatedFilters.Length; i++)
+            {
+                if (archetype.RelatedFilters[i] == this)
+                    throw new EcsException("HUI!");
+            }
+
+            archetype.RelatedFilters.Add(this);
 
             for (int i = 0; i < archetype.EntitiesEnd; i++)
                 AddEntity(archetype.EntitiesArr[i]);
@@ -104,7 +109,7 @@ namespace CodexECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void AddEntity(EntityType eid)
+        public void AddEntity(EntityType eid)
         {
 #if DEBUG && !ECS_PERF_TEST
             // if (!_pendingDelete.Contains(eid) && _entitiesSet.ContainsIdx(eid))
@@ -172,7 +177,7 @@ namespace CodexECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void RemoveEntity(EntityType eid)
+        public void RemoveEntity(EntityType eid)
         {
 #if DEBUG && !ECS_PERF_TEST
             // if (!_pendingAdd.Contains(eid) && !_entitiesSet.ContainsIdx(eid))

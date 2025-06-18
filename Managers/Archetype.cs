@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Runtime.CompilerServices;
+using System.Security.Cryptography;
 using CodexECS.Utility;
 using EntityType = System.Int32;//duplicated in EntityExtension
 
@@ -7,8 +8,7 @@ namespace CodexECS
 {
     public class Archetype
     {
-        public event Action<EntityType> OnEntityAdded;
-        public event Action<EntityType> OnEntityRemoved;
+        public readonly SimpleList<EcsFilter> RelatedFilters;
 
         public BitMask Mask;
 
@@ -23,6 +23,7 @@ namespace CodexECS
             Mask = mask;
             _entitiesMapping = new(2);
             EntitiesArr = new EntityType[2];
+            RelatedFilters = new();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -43,8 +44,8 @@ namespace CodexECS
             EntitiesArr[EntitiesEnd] = eid;
             EntitiesEnd++;
 
-            if (OnEntityAdded != null)
-                OnEntityAdded(eid);
+            for (int i = 0; i < RelatedFilters._end; i++)
+                RelatedFilters._elements[i].AddEntity(eid);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -70,17 +71,20 @@ namespace CodexECS
             EntitiesEnd--;
             EntitiesArr[lastEntityIdx] = EntitiesArr[EntitiesEnd];
 
-            if (OnEntityRemoved != null)
-                OnEntityRemoved(eid);
+            for (int i = 0; i < RelatedFilters._end; i++)
+                RelatedFilters._elements[i].RemoveEntity(eid);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Clear()
         {
-            if (OnEntityRemoved != null)
+            if (RelatedFilters._end > 0)
             {
                 for (int i = 0; i < EntitiesEnd; i++)
-                    OnEntityRemoved(EntitiesArr[i]);
+                {
+                    for (int j = 0; j < RelatedFilters._end; j++)
+                        RelatedFilters._elements[j].RemoveEntity(EntitiesArr[i]);
+                }
             }
 
             EntitiesEnd = 0;
