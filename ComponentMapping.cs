@@ -8,49 +8,71 @@ namespace CodexECS
 {
     public static class ComponentMapping
     {
-        private static Dictionary<Type, int> TypeToId = new();
-        private static Dictionary<int, Type> IdToType = new();
+        public interface IWorldCallDispatcher
+        {
+            public void Add(EcsWorld world, int id, object obj);
+            public void AddMultiple(EcsWorld world, int id, object obj);
+        }
+
+        public class WorldCallDispatcher<T> : IWorldCallDispatcher
+        {
+            public void Add(EcsWorld world, int id, object obj) => world.Add(id, (T)obj);
+            public void AddMultiple(EcsWorld world, int id, object obj) => world.AddMultiple(id, (T)obj);
+        }
+
+        public readonly static Dictionary<Type, IWorldCallDispatcher> CallDispatchers;
+
+        private static Dictionary<Type, int> _typeToId;
+        private static Dictionary<int, Type> _idToType;
+
+        static ComponentMapping()
+        {
+            _typeToId = new();
+            _idToType = new();
+            CallDispatchers = new();
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static int GetIdForType(Type type) => _typeToId[type];
         
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static int GetIdForType(Type type) => TypeToId[type];
+        public static Type GetTypeForId(int id) => _idToType[id];
         
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static Type GetTypeForId(int id) => IdToType[id];
+        public static bool HaveType(Type type) => _typeToId.ContainsKey(type);
         
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static bool HaveType(Type type) => TypeToId.ContainsKey(type);
+        public static bool HaveId(int id) => _idToType.ContainsKey(id);
         
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static bool HaveId(int id) => IdToType.ContainsKey(id);
-        
-        public static void Add(Type type, int id)
+        public static void Add<T>(Type type, int id)
         {
 #if DEBUG && !ECS_PERF_TEST
-            if (TypeToId.ContainsKey(type))
+            if (_typeToId.ContainsKey(type))
                 throw new EcsException($"Components mapping desynch. TypeToId already contains {type.FullName}");
-            if (IdToType.ContainsKey(id))
+            if (_idToType.ContainsKey(id))
                 throw new EcsException($"Components mapping desynch. IdToType already contains {id}");
 #endif
             
-            TypeToId[type] = id;
-            IdToType[id] = type;
+            _typeToId[type] = id;
+            _idToType[id] = type;
+            CallDispatchers[type] = new WorldCallDispatcher<T>();
 
 #if DEBUG && !ECS_PERF_TEST
-            foreach (var pair in TypeToId)
+            foreach (var pair in _typeToId)
             {
-                if (!IdToType.ContainsKey(pair.Value))
+                if (!_idToType.ContainsKey(pair.Value))
                     throw new EcsException($"Components mapping desynch");
             }
             
-            foreach (var pair in IdToType)
+            foreach (var pair in _idToType)
             {
-                if (!TypeToId.ContainsKey(pair.Value))
+                if (!_typeToId.ContainsKey(pair.Value))
                     throw new EcsException($"Components mapping desynch");
             }
             
-            if (TypeToId.GroupBy(kv => kv.Value).Any(g => g.Count() > 1))
+            if (_typeToId.GroupBy(kv => kv.Value).Any(g => g.Count() > 1))
                 throw new EcsException($"Components mapping desynch");
-            if (IdToType.GroupBy(kv => kv.Value).Any(g => g.Count() > 1))
+            if (_idToType.GroupBy(kv => kv.Value).Any(g => g.Count() > 1))
                 throw new EcsException($"Components mapping desynch");
 #endif
         }

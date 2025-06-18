@@ -28,14 +28,7 @@ namespace CodexECS
         private BitMask _dirtyRemoveMask;
         private bool _removeDirty;
 
-        private readonly static Dictionary<Type, IGenericCallDispatcher> _genericCallDispatchers;
-
         private FilterBuilder _filterBuilder;
-
-        static EcsWorld()
-        {
-            _genericCallDispatchers = new();
-        }
 
         private void SetPools(IComponentsPool[] pools) => _pools = pools;
 
@@ -269,34 +262,13 @@ namespace CodexECS
         }
 #endif
 
-        private interface IGenericCallDispatcher
-        {
-            public void Add(EcsWorld world, int id, object obj);
-            public void AddMultiple(EcsWorld world, int id, object obj);
-        }
-
-        private class GenericCallDispatcher<T> : IGenericCallDispatcher
-        {
-            public void Add(EcsWorld world, int id, object obj) => world.Add(id, (T)obj);
-            public void AddMultiple(EcsWorld world, int id, object obj) => world.AddMultiple(id, (T)obj);
-        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void AddMultiple_Dynamic(Type type, int id, object component) =>
+            ComponentMapping.CallDispatchers[type].AddMultiple(this, id, component);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static IGenericCallDispatcher GetCallDispatcher(Type type)
-        {
-            if (!_genericCallDispatchers.ContainsKey(type))
-            {
-                var closedType = typeof(GenericCallDispatcher<>).MakeGenericType(type);
-                _genericCallDispatchers[type] = (IGenericCallDispatcher)Activator.CreateInstance(closedType);
-            }
-            return _genericCallDispatchers[type];
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void AddMultiple_Dynamic(Type type, int id, object component) => GetCallDispatcher(type).AddMultiple(this, id, component);
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Add_Dynamic(Type type, int id, object component) => GetCallDispatcher(type).Add(this, id, component);
+        public void Add_Dynamic(Type type, int id, object component) =>
+            ComponentMapping.CallDispatchers[type].Add(this, id, component);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ref T Get<T>(EntityType eid)

@@ -68,7 +68,7 @@ namespace CodexECS
 #endif
             
             Id = Interlocked.Increment(ref ComponentIdCounter.Counter);
-            ComponentMapping.Add(type, Id);
+            ComponentMapping.Add<T>(type, Id);
             var fields = type.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
             IsTag = fields.Length == 0 && type.IsValueType && !type.IsEnum;
 
