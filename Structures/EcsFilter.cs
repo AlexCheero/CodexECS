@@ -91,12 +91,6 @@ namespace CodexECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void AddArchetype(Archetype archetype)
         {
-            for (int i = 0; i < archetype.RelatedFilters.Length; i++)
-            {
-                if (archetype.RelatedFilters[i] == this)
-                    throw new EcsException("HUI!");
-            }
-
             archetype.RelatedFilters.Add(this);
 
             for (int i = 0; i < archetype.EntitiesEnd; i++)
