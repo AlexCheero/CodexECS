@@ -3,8 +3,6 @@ using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Text;
 using EntityType = System.Int32;//duplicated in EntityExtension
-using static CodexECS.EcsWorld;
-using UnityEngine.UI;
 
 #if DEBUG
 using CodexECS.Utility;
@@ -27,6 +25,9 @@ namespace CodexECS
         private bool _addDirty;
         private BitMask _dirtyRemoveMask;
         private bool _removeDirty;
+
+        private BitMask _addReactGuard;
+        private BitMask _removeReactGuard;
 
         private FilterBuilder _filterBuilder;
 
@@ -125,6 +126,7 @@ namespace CodexECS
             if (IsReactWrapperType<T>())
                 throw new EcsException("Cannot subscribe on reactive wrappers manually");
 #endif
+            _addReactGuard.Set(ComponentMeta<T>.Id);
             SubscribeOnExistenceChange<AddReact<T>>(_onAddCallbacks, callback);
         }
         
@@ -134,6 +136,7 @@ namespace CodexECS
             if (IsReactWrapperType<T>())
                 throw new EcsException("Cannot subscribe on reactive wrappers manually");
 #endif
+            _removeReactGuard.Set(ComponentMeta<T>.Id);
             SubscribeOnExistenceChange<RemoveReact<T>>(_onRemoveCallbacks, callback);
         }
         
@@ -235,15 +238,19 @@ namespace CodexECS
             _archetypes.AddComponent<T>(eid);
             _componentManager.Add<T>(eid, component);
 
-            var reactWrapperId = ComponentMeta<AddReact<T>>.Id;
-            if (_onAddCallbacks.ContainsIdx(reactWrapperId))
+            if (_addReactGuard.Check(ComponentMeta<T>.Id))
             {
-                //unrolled Add<AddReact<T>>(eid); without wrapper check
-                _archetypes.AddComponent<AddReact<T>>(eid);
-                _componentManager.Add<AddReact<T>>(eid);
-                
-                _dirtyAddMask.Set(reactWrapperId);
-                _addDirty = true;
+                var reactWrapperId = ComponentMeta<AddReact<T>>.Id;
+                //excess check- it already checked in react type guard
+                //if (_onAddCallbacks.ContainsIdx(reactWrapperId))
+                {
+                    //unrolled Add<AddReact<T>>(eid); without wrapper check
+                    _archetypes.AddComponent<AddReact<T>>(eid);
+                    _componentManager.Add<AddReact<T>>(eid);
+
+                    _dirtyAddMask.Set(reactWrapperId);
+                    _addDirty = true;
+                }
             }
             
 #if HEAVY_ECS_DEBUG
@@ -310,18 +317,22 @@ namespace CodexECS
             if (Have<MultipleComponents<T>>(eid))
                 throw new EcsException($"entity have multiple components of type {typeof(T).Name}, use {nameof(RemoveMultiple)} instead");
 #endif
-            
-            var reactWrapperId = ComponentMeta<RemoveReact<T>>.Id;
-            if (_onRemoveCallbacks.ContainsIdx(reactWrapperId))
+
+            if (_removeReactGuard.Check(ComponentMeta<T>.Id))
             {
-                _archetypes.AddComponent<RemoveReact<T>>(eid);
-                _componentManager.Add(eid, new RemoveReact<T>
+                var reactWrapperId = ComponentMeta<RemoveReact<T>>.Id;
+                //excess check- it already checked in react type guard
+                //if (_onRemoveCallbacks.ContainsIdx(reactWrapperId))
                 {
-                    removingComponent = Get<T>(eid)
-                });
-                
-                _dirtyRemoveMask.Set(reactWrapperId);
-                _removeDirty = true;
+                    _archetypes.AddComponent<RemoveReact<T>>(eid);
+                    _componentManager.Add(eid, new RemoveReact<T>
+                    {
+                        removingComponent = Get<T>(eid)
+                    });
+
+                    _dirtyRemoveMask.Set(reactWrapperId);
+                    _removeDirty = true;
+                }
             }
             
             _archetypes.RemoveComponent<T>(eid);
