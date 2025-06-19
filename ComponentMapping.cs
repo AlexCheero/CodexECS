@@ -22,6 +22,10 @@ namespace CodexECS
 
         public readonly static Dictionary<Type, IWorldCallDispatcher> CallDispatchers;
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static WorldCallDispatcher<T> GetCallDispatcher<T>() =>
+            (WorldCallDispatcher<T>)CallDispatchers[typeof(T)];
+
         private static Dictionary<Type, int> _typeToId;
         private static Dictionary<int, Type> _idToType;
 
