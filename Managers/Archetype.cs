@@ -68,8 +68,7 @@ namespace CodexECS
             if (lastEntityIdx >= EntitiesEnd)
                 throw new EcsException("lastEntityIdx should be smaller than EntitiesEnd");
 #endif
-            EntitiesEnd--;
-            EntitiesArr[lastEntityIdx] = EntitiesArr[EntitiesEnd];
+            EntitiesEnd = lastEntityIdx;
 
             for (int i = 0; i < RelatedFilters._end; i++)
                 RelatedFilters._elements[i].RemoveEntity(eid);
