@@ -34,55 +34,49 @@ namespace CodexECS
 
     public class EcsFilter
     {
-#if DEBUG
-        private HashSet<Archetype> _archetypes;
-#endif
+        public string Name;
+
+        private Archetype[] _archetypes;
+        private int _archetypesEnd;
 
         public readonly EcsWorld World;
         
-        // private SparseSet<EntityType> _entitiesSet;
-        private int[] _sparse;
-        private EntityType[] _dense;
-        private int _valuesEnd;
-        
-        private BitMask _pendingAdd;
-        private BitMask _pendingDelete;
-
         private readonly SimpleList<View> _views;
         private int _viewsStartIdx;
         
         public int EntitiesCount
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get => _valuesEnd;
+            get
+            {
+                var count = 0;
+                for (int i = 0; i < _archetypesEnd; i++)
+                    count += _archetypes[i].EntitiesEnd;
+                return count;
+            }
         }
 
         public EntityType this[int idx]
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            // get => _entitiesSet._values[idx];
-            get => _dense[idx];
+            get
+            {
+                var archetypeIdx = 0;
+                while (idx >= _archetypes[archetypeIdx].EntitiesEnd)
+                {
+                    idx -= _archetypes[archetypeIdx].EntitiesEnd;
+                    archetypeIdx++;
+                }
+                return _archetypes[archetypeIdx].EntitiesArr[idx];
+            }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        // public EntityType GetNthEntitySafe(int idx) => _entitiesSet.Length > idx ? _entitiesSet._values[idx] : -1;
-        public EntityType GetNthEntitySafe(int idx) => _valuesEnd > idx ? _dense[idx] : -1;
+        public EntityType GetNthEntitySafe(int idx) => EntitiesCount > idx ? this[idx] : -1;
 
         public EcsFilter(EcsWorld world)
         {
-#if DEBUG && !ECS_PERF_TEST
-            _archetypes = new();
-#endif
-            // _entitiesSet = new();
-            const int initialCapacity = 2;
-            _sparse = new int[initialCapacity];
-            for (int i = 0; i < initialCapacity; i++)
-                _sparse[i] = -1;
-            _dense = new int[initialCapacity];
-            
-            _pendingAdd = new();
-            _pendingDelete = new();
-            
+            _archetypes = Array.Empty<Archetype>();
             _views = new();
             _views.Add(new View(this, 0));
             World = world;
@@ -91,250 +85,20 @@ namespace CodexECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void AddArchetype(Archetype archetype)
         {
-            archetype.RelatedFilters.Add(this);
-
-            for (int i = 0; i < archetype.EntitiesEnd; i++)
-                AddEntity(archetype.EntitiesArr[i]);
-
 #if DEBUG && !ECS_PERF_TEST
-            if (!_archetypes.Add(archetype))
-                throw new EcsException("filter already have this archetype");
-#endif
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void AddEntity(EntityType eid)
-        {
-#if DEBUG && !ECS_PERF_TEST
-            // if (!_pendingDelete.Contains(eid) && _entitiesSet.ContainsIdx(eid))
-            var containsEntity = eid < _sparse.Length && _sparse[eid] > -1;
-            if (!_pendingDelete.Check(eid) && containsEntity)
-                throw new EcsException("filter already have this entity");
-#endif
-            
-            if (_lockCounter > 0)
+            for (int i = 0; i < _archetypesEnd; i++)
             {
-                if (_pendingDelete.Check(eid))
-                {
-                    _pendingDelete.Unset(eid);
-                }
-                else
-                {
-                    _pendingAdd.Set(eid);
-                    _dirty = true;
-                }
-                
-                return;
+                if (_archetypes[i] == archetype)
+                    throw new EcsException("filter already have this archetype");
             }
-            
-            // _entitiesSet.Add(eid, eid);
-#region SparseSet.Add unrolled
+#endif
 
-            if (eid >= _sparse.Length)
+            if (_archetypesEnd >= _archetypes.Length)
             {
-                var oldLength = _sparse.Length;
-
-                const int maxResizeDelta = 256;
-                Utils.ResizeArray(eid, ref _sparse, maxResizeDelta);
-                for (int i = oldLength; i < _sparse.Length; i++)
-                    _sparse[i] = -1;
+                Utils.ResizeArray(_archetypesEnd, ref _archetypes, 32);
             }
-
-#if DEBUG && !ECS_PERF_TEST
-            if (_sparse[eid] > -1)
-                throw new EcsException("sparse set already have element at this index");
-#endif
-
-            _sparse[eid] = _valuesEnd;
-            if (_valuesEnd >= _dense.Length)
-            {
-                const int maxResizeDelta = 256;
-                Utils.ResizeArray(_valuesEnd, ref _dense, maxResizeDelta);
-            }
-            _dense[_valuesEnd] = eid;
-            _valuesEnd++;
-
-#if DEBUG && !ECS_PERF_TEST
-            if (_dense[_sparse[eid]] != eid)
-                throw new EcsException("wrong sparse set entities");
-#endif
-
-#endregion
-            
-
-#if HEAVY_ECS_DEBUG
-            if (!CheckEntitiesSynch())
-                throw new EcsException("Entities desynched!");
-            if (!CheckUniqueness())
-                throw new EcsException("Entities not unique!");
-#endif
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void RemoveEntity(EntityType eid)
-        {
-#if DEBUG && !ECS_PERF_TEST
-            // if (!_pendingAdd.Contains(eid) && !_entitiesSet.ContainsIdx(eid))
-            var containsEntity = eid < _sparse.Length && _sparse[eid] > -1;
-            if (!_pendingAdd.Check(eid) && !containsEntity)
-                throw new EcsException("filter have no this entity");
-#endif
-            
-            if (_lockCounter > 0)
-            {
-                if (_pendingAdd.Check(eid))
-                {
-                    _pendingAdd.Unset(eid);
-                }
-                else
-                {
-                    _pendingDelete.Set(eid);
-                    _dirty = true;
-                }
-                
-                return;
-            }
-
-            // _entitiesSet.RemoveAt(eid);
-#region SparseSet.RemoveAt unrolled
-
-            var innerIndex = _sparse[eid];
-            _sparse[eid] = -1;
-            
-#if DEBUG && !ECS_PERF_TEST
-            if (innerIndex >= _valuesEnd)
-                throw new EcsException("innerIndex should be smaller than _valuesEnd");
-#endif
-            
-            //backswap using _dense
-            var lastIdx = _valuesEnd - 1;
-            if (innerIndex < lastIdx)
-                _sparse[_dense[lastIdx]] = innerIndex;
-            _dense[innerIndex] = -1;
-            _valuesEnd--;
-            _dense[innerIndex] = _dense[_valuesEnd];
-
-#endregion
-            
-#if HEAVY_ECS_DEBUG
-            if (!CheckEntitiesSynch())
-                throw new EcsException("Entities desynched!");
-            if (!CheckUniqueness())
-                throw new EcsException("Entities not unique!");
-#endif
-        }
-
-#if HEAVY_ECS_DEBUG
-        private bool CheckEntitiesSynch()
-        {
-            for (int i = 0; i < _valuesEnd; i++)
-            {
-                var outerIdx = _dense[i];
-                if (outerIdx != _dense[_sparse[outerIdx]])
-                    return false;
-            }
-
-            return true;
-        }
-        
-        private bool CheckUniqueness()
-        {
-            for (int i = 0; i < _valuesEnd; i++)
-            {
-                for (int j = 0; j < _valuesEnd; j++)
-                {
-                    if (i == j)
-                        continue;
-                    if (_dense[i] == _dense[j])
-                        return false;
-                }
-            }
-
-            return true;
-        }
-#endif
-
-        private bool _dirty;
-        private int _lockCounter;
-        public void Lock()
-        {
-            World.Lock();
-            _lockCounter++;
-        }
-
-        public void Unlock()
-        {
-            World.Unlock();
-            _lockCounter--;
-#if DEBUG && !ECS_PERF_TEST
-            if (_lockCounter < 0)
-                throw new EcsException("negative lock counter");
-#endif
-            if (_lockCounter != 0 || !_dirty)
-                return;
-
-            foreach (var eid in _pendingAdd)
-            {
-                // _entitiesSet.Add(eid, eid);
-                if (eid >= _sparse.Length)
-                {
-                    var oldLength = _sparse.Length;
-
-                    const int maxResizeDelta = 256;
-                    Utils.ResizeArray(eid, ref _sparse, maxResizeDelta);
-                    for (int i = oldLength; i < _sparse.Length; i++)
-                        _sparse[i] = -1;
-                }
-
-#if DEBUG && !ECS_PERF_TEST
-                if (_sparse[eid] > -1)
-                    throw new EcsException("sparse set already have element at this index");
-#endif
-
-                _sparse[eid] = _valuesEnd;
-                if (_valuesEnd >= _dense.Length)
-                {
-                    const int maxResizeDelta = 256;
-                    Utils.ResizeArray(_valuesEnd, ref _dense, maxResizeDelta);
-                }
-                _dense[_valuesEnd] = eid;
-                _valuesEnd++;
-
-#if DEBUG && !ECS_PERF_TEST
-                if (_dense[_sparse[eid]] != eid)
-                    throw new EcsException("wrong sparse set idices");
-#endif
-            }
-            _pendingAdd.Clear();
-            foreach (var eid in _pendingDelete)
-            {
-                // _entitiesSet.RemoveAt(eid);
-                var innerIndex = _sparse[eid];
-                _sparse[eid] = -1;
-            
-#if DEBUG && !ECS_PERF_TEST
-                if (innerIndex >= _valuesEnd)
-                    throw new EcsException("innerIndex should be smaller than _valuesEnd");
-#endif
-            
-                //backswap using _dense
-                var lastIdx = _valuesEnd - 1;
-                if (innerIndex < lastIdx)
-                    _sparse[_dense[lastIdx]] = innerIndex;
-                _dense[innerIndex] = -1;
-                _valuesEnd--;
-                _dense[innerIndex] = _dense[_valuesEnd];
-            }
-            _pendingDelete.Clear();
-
-            _dirty = false;
-            
-#if HEAVY_ECS_DEBUG
-            if (!CheckEntitiesSynch())
-                throw new EcsException("Entities desynched!");
-            if (!CheckUniqueness())
-                throw new EcsException("Entities not unique!");
-#endif
+            _archetypes[_archetypesEnd] = archetype;
+            _archetypesEnd++;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -343,7 +107,7 @@ namespace CodexECS
             if (EntitiesCount == 0)
                 return EmptyView;
             
-            Lock();
+            World.Lock();
 
             View view = null; 
             if (_views.Length == 1)
@@ -380,7 +144,10 @@ namespace CodexECS
             if (view.IsInUse)
                 throw new EcsException("view is already in use");
 #endif
-            
+
+            for (int i = 0; i < _archetypesEnd; i++)
+                _archetypes[i].Lock();
+
             view.Use();
             return view;
         }
@@ -407,13 +174,16 @@ namespace CodexECS
         {
             private readonly EcsFilter _filter;
             internal int Idx;
-            
-            //moved out form filter to reduce indirection
-            private EntityType[] _dense;
-            private int _valuesEnd;
-            //===========================================
 
+            private int _archetypeIndex;
             private int _entityIndex;
+
+            //copied from filter to reduce indirection
+            //and to preserve old _entitiesEnd to emulate delayed add
+            private Archetype[] _archetypes;
+            private EntityType[] _entitiesArr;
+            private int _entitiesEnd;
+            private int _archetypesEnd;
 
             //CODEX_TODO: dunno how to properly reset it
             public bool IsInUse
@@ -427,38 +197,78 @@ namespace CodexECS
             public void Use()
             {
                 IsInUse = true;
-                _dense = _filter._dense;
-                _valuesEnd = _filter._valuesEnd;
+
+                _archetypes = _filter._archetypes;
+                _archetypesEnd = _filter._archetypesEnd;
+
+                if (_archetypesEnd > 0)
+                {
+                    _entitiesArr = _archetypes[0].EntitiesArr;
+                    _entitiesEnd = _archetypes[0].EntitiesEnd;
+                }
+                else
+                {
+                    _entitiesArr = null;
+                    _entitiesEnd = 0;
+                }
             }
 
             public View(EcsFilter filter, int idx)
             {
                 _filter = filter;
                 _entityIndex = -1;
+                _archetypeIndex = 0;
                 Idx = idx;
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public bool MoveNext()
             {
+                if (_archetypesEnd == 0)
+                    return false;
+                
                 _entityIndex++;
-                return _entityIndex < _valuesEnd;
+                if (_entityIndex < _entitiesEnd)
+                    return true;
+
+                _entityIndex = 0;
+                do
+                {
+                    _archetypes[_archetypeIndex].Unlock();
+                    _archetypeIndex++;
+                    
+                    if (_archetypeIndex >= _archetypesEnd)
+                        break;
+
+                    _entitiesArr = _archetypes[_archetypeIndex].EntitiesArr;
+                    _entitiesEnd = _archetypes[_archetypeIndex].EntitiesEnd;
+                    if (_archetypes[_archetypeIndex].EntitiesEnd < _entitiesEnd)
+                        _entitiesEnd = _archetypes[_archetypeIndex].EntitiesEnd;
+                }
+                while (_entitiesEnd < 1);
+
+                return _archetypeIndex < _archetypesEnd;
             }
 
             public EntityType Current
             {
                 [MethodImpl(MethodImplOptions.AggressiveInlining)]
-                get => _dense[_entityIndex];
+                get => _entitiesArr[_entityIndex];
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void Dispose()
             {
                 _entityIndex = -1;
+
+                for (int i = _archetypeIndex; i < _archetypesEnd; i++)
+                    _archetypes[i].Unlock();
+
+                _archetypeIndex = 0;
                 IsInUse = false;
                 if (_filter != null)
                 {
-                    _filter.Unlock();
+                    _filter.World.Unlock();
                     _filter.ReturnView(Idx);
                 }
             }

@@ -1,6 +1,4 @@
-﻿using System;
-using System.Runtime.CompilerServices;
-using System.Security.Cryptography;
+﻿using System.Runtime.CompilerServices;
 using CodexECS.Utility;
 using EntityType = System.Int32;//duplicated in EntityExtension
 
@@ -8,31 +6,41 @@ namespace CodexECS
 {
     public class Archetype
     {
-        public readonly SimpleList<EcsFilter> RelatedFilters;
-
         public BitMask Mask;
-
-        //public IndexableHashSet<EntityType> Entities;
         private readonly SparseSet<int> _entitiesMapping;
-        // public readonly SimpleList<EntityType> EntitiesArr;
         public EntityType[] EntitiesArr;
         public int EntitiesEnd;
+
+        private BitMask _pendingRemove;
+        private BitMask _pendingAdd;
+        private int _lockCounter;
 
         public Archetype(BitMask mask)
         {
             Mask = mask;
             _entitiesMapping = new(2);
             EntitiesArr = new EntityType[2];
-            RelatedFilters = new();
+            _pendingRemove = new();
+            _pendingAdd = new();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void AddEntity(EntityType eid)
         {
+            if (_lockCounter > 0)
+            {
+                if (_pendingRemove.Check(eid))
+                    _pendingRemove.Unset(eid);
+                else
+                    _pendingAdd.Set(eid);
+                return;
+            }
+
 #if DEBUG && !ECS_PERF_TEST
             if (_entitiesMapping.ContainsIdx(eid))
-                throw new EcsException("entity was already in archetype");
+                throw new EcsException($"entity id {eid} was already in archetype");
 #endif
+
             _entitiesMapping.Add(eid, EntitiesEnd);
 
             // EntitiesArr.Add(eid);
@@ -43,18 +51,51 @@ namespace CodexECS
             }
             EntitiesArr[EntitiesEnd] = eid;
             EntitiesEnd++;
+        }
 
-            for (int i = 0; i < RelatedFilters._end; i++)
-                RelatedFilters._elements[i].AddEntity(eid);
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Lock()
+        {
+            _lockCounter++;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Unlock()
+        {
+            _lockCounter--;
+#if DEBUG && !ECS_PERF_TEST
+            if (_lockCounter < 0)
+                throw new EcsException("negative lock counter");
+#endif
+            if (_lockCounter > 0)
+                return;
+
+            foreach (var eid in _pendingRemove)
+                RemoveEntity(eid);
+            _pendingRemove.Clear();
+
+            foreach (var eid in _pendingAdd)
+                AddEntity(eid);
+            _pendingAdd.Clear();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void RemoveEntity(EntityType eid)
-        {            
+        {
+            if (_lockCounter > 0)
+            {
+                if (_pendingAdd.Check(eid))
+                    _pendingAdd.Unset(eid);
+                else
+                    _pendingRemove.Set(eid);
+                return;
+            }
+
 #if DEBUG && !ECS_PERF_TEST
             if (!_entitiesMapping.ContainsIdx(eid))
                 throw new EcsException("entity was not in archetype");
 #endif
+
             var lastEntityIdx = EntitiesEnd - 1;
             var index = _entitiesMapping[eid];
             var lastEntity = EntitiesArr[lastEntityIdx];
@@ -69,23 +110,11 @@ namespace CodexECS
                 throw new EcsException("lastEntityIdx should be smaller than EntitiesEnd");
 #endif
             EntitiesEnd = lastEntityIdx;
-
-            for (int i = 0; i < RelatedFilters._end; i++)
-                RelatedFilters._elements[i].RemoveEntity(eid);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Clear()
         {
-            if (RelatedFilters._end > 0)
-            {
-                for (int i = 0; i < EntitiesEnd; i++)
-                {
-                    for (int j = 0; j < RelatedFilters._end; j++)
-                        RelatedFilters._elements[j].RemoveEntity(EntitiesArr[i]);
-                }
-            }
-
             EntitiesEnd = 0;
             _entitiesMapping.Clear();
         }
