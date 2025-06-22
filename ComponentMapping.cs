@@ -93,7 +93,7 @@ namespace CodexECS
                 
             _debugBuilder.Append("{ ");
             foreach (var bit in mask)
-                _debugBuilder.Append(GetTypeForId(bit).FullName + ", ");
+                _debugBuilder.Append(GetTypeForId(bit).FullName + ",\n");
             _debugBuilder.Remove(_debugBuilder.Length - 2, 2);
             _debugBuilder.Append(" }");
             
