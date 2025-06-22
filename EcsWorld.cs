@@ -270,9 +270,9 @@ namespace CodexECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Add<T>(EntityType eid,
+        public void Add<T>(EntityType eid
 #if USE_DEBUG_TRACE_COMPONENT && DEBUG
-            [CallerMemberName] string memberName = "",
+          , [CallerMemberName] string memberName = "",
             [CallerFilePath] string filePath = "",
             [CallerLineNumber] int lineNumber = 0
 #endif
@@ -288,9 +288,9 @@ namespace CodexECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Add<T>(EntityType eid, T component,
+        public void Add<T>(EntityType eid, T component
 #if USE_DEBUG_TRACE_COMPONENT && DEBUG
-            [CallerMemberName] string memberName = "",
+          , [CallerMemberName] string memberName = "",
             [CallerFilePath] string filePath = "",
             [CallerLineNumber] int lineNumber = 0
 #endif
@@ -362,9 +362,9 @@ namespace CodexECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool TryAdd<T>(EntityType eid,
+        public bool TryAdd<T>(EntityType eid
 #if USE_DEBUG_TRACE_COMPONENT && DEBUG
-            [CallerMemberName] string memberName = "",
+          , [CallerMemberName] string memberName = "",
             [CallerFilePath] string filePath = "",
             [CallerLineNumber] int lineNumber = 0
 #endif
@@ -384,9 +384,9 @@ namespace CodexECS
         }
         
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ref T GetOrAddComponent<T>(EntityType eid,
+        public ref T GetOrAddComponent<T>(EntityType eid
 #if USE_DEBUG_TRACE_COMPONENT && DEBUG
-            [CallerMemberName] string memberName = "",
+          , [CallerMemberName] string memberName = "",
             [CallerFilePath] string filePath = "",
             [CallerLineNumber] int lineNumber = 0
 #endif
@@ -406,9 +406,9 @@ namespace CodexECS
 
         //CODEX_TODO: possibly if filter is double looped and in outer loop the component is removed, than it won't be there in the inner loop
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Remove<T>(EntityType eid,
+        public void Remove<T>(EntityType eid
 #if USE_DEBUG_TRACE_COMPONENT && DEBUG
-            [CallerMemberName] string memberName = "",
+          , [CallerMemberName] string memberName = "",
             [CallerFilePath] string filePath = "",
             [CallerLineNumber] int lineNumber = 0
 #endif
@@ -481,9 +481,9 @@ namespace CodexECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool TryRemove<T>(int eid,
+        public bool TryRemove<T>(int eid
 #if USE_DEBUG_TRACE_COMPONENT && DEBUG
-            [CallerMemberName] string memberName = "",
+          , [CallerMemberName] string memberName = "",
             [CallerFilePath] string filePath = "",
             [CallerLineNumber] int lineNumber = 0
 #endif
