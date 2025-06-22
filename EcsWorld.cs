@@ -87,8 +87,57 @@ namespace CodexECS
         {
             var entity = _entityManager.Create();
             _archetypes.AddToEmptyArchetype(entity);
+
+#if USE_DEBUG_TRACE_COMPONENT && DEBUG
+            Add<DebugTraceData>(entity);
+#endif
+
             return entity;
         }
+
+#if USE_DEBUG_TRACE_COMPONENT && DEBUG
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void SaveTraceData(EntityType eid, Type type, DebugTraceData.EMethodType method, string memberName, string filePath, int lineNumber)
+        {
+            if (string.IsNullOrEmpty(memberName))
+                return;
+
+            ref var component = ref Get<DebugTraceData>(eid);
+            var traceData = new DebugTraceData.Data
+            {
+                memberName = memberName,
+                filePath = filePath,
+                lineNumber = lineNumber
+            };
+
+            switch (method)
+            {
+                case DebugTraceData.EMethodType.Add:
+                    component.added[type] = traceData;
+                    break;
+                case DebugTraceData.EMethodType.Remove:
+                    component.removed[type] = traceData;
+                    break;
+                default:
+                    throw new EcsException($"wrong value of {nameof(DebugTraceData.EMethodType)}");
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private bool IsCalledFromWorld(string sourceFilePath)
+        {
+            var classNameStartIdx = sourceFilePath.Length - ".cs".Length - nameof(EcsWorld).Length;
+            if (classNameStartIdx < 0)
+                return false;
+            for (int i = 0; i < 8; i++)
+            {
+                if (nameof(EcsWorld)[i] != sourceFilePath[classNameStartIdx + i])
+                    return false;
+            }
+
+            return true;
+        }
+#endif
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Have<T>(EntityType eid)
@@ -221,14 +270,31 @@ namespace CodexECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Add<T>(EntityType eid)
+        public void Add<T>(EntityType eid,
+#if USE_DEBUG_TRACE_COMPONENT && DEBUG
+            [CallerMemberName] string memberName = "",
+            [CallerFilePath] string filePath = "",
+            [CallerLineNumber] int lineNumber = 0
+#endif
+            )
         {
             var defaultValue = ComponentMeta<T>.IsTag ? default : _componentManager.GetNextFree<T>();
             Add(eid, defaultValue);
+
+#if USE_DEBUG_TRACE_COMPONENT && DEBUG
+            if (!IsCalledFromWorld(filePath))
+                SaveTraceData(eid, typeof(T), DebugTraceData.EMethodType.Add, memberName, filePath, lineNumber);
+#endif
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Add<T>(EntityType eid, T component)
+        public void Add<T>(EntityType eid, T component,
+#if USE_DEBUG_TRACE_COMPONENT && DEBUG
+            [CallerMemberName] string memberName = "",
+            [CallerFilePath] string filePath = "",
+            [CallerLineNumber] int lineNumber = 0
+#endif
+            )
         {
 #if DEBUG && !ECS_PERF_TEST
             if (IsReactWrapperType<T>())
@@ -252,13 +318,18 @@ namespace CodexECS
                     _addDirty = true;
                 }
             }
-            
+
 #if HEAVY_ECS_DEBUG
             if (!ExistenceSynched<T>(eid))
                 throw new EcsException("Components and archetypes not synched");
 #endif
+
+#if USE_DEBUG_TRACE_COMPONENT && DEBUG
+            if (!IsCalledFromWorld(filePath))
+                SaveTraceData(eid, typeof(T), DebugTraceData.EMethodType.Add, memberName, filePath, lineNumber);
+#endif
         }
-        
+
 #if DEBUG
         private bool IsReactWrapperType<T>() => IsReactWrapperType(ComponentMeta<T>.Id);
 
@@ -291,25 +362,57 @@ namespace CodexECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool TryAdd<T>(EntityType eid)
+        public bool TryAdd<T>(EntityType eid,
+#if USE_DEBUG_TRACE_COMPONENT && DEBUG
+            [CallerMemberName] string memberName = "",
+            [CallerFilePath] string filePath = "",
+            [CallerLineNumber] int lineNumber = 0
+#endif
+            )
         {
             if (Have<T>(eid))
                 return false;
+
             Add<T>(eid);
+
+#if USE_DEBUG_TRACE_COMPONENT && DEBUG
+            if (!IsCalledFromWorld(filePath))
+                SaveTraceData(eid, typeof(T), DebugTraceData.EMethodType.Add, memberName, filePath, lineNumber);
+#endif
+
             return true;
         }
         
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ref T GetOrAddComponent<T>(EntityType eid)
+        public ref T GetOrAddComponent<T>(EntityType eid,
+#if USE_DEBUG_TRACE_COMPONENT && DEBUG
+            [CallerMemberName] string memberName = "",
+            [CallerFilePath] string filePath = "",
+            [CallerLineNumber] int lineNumber = 0
+#endif
+            )
         {
             if (!Have<T>(eid))
+            {
                 Add<T>(eid);
+
+#if USE_DEBUG_TRACE_COMPONENT && DEBUG
+                if (!IsCalledFromWorld(filePath))
+                    SaveTraceData(eid, typeof(T), DebugTraceData.EMethodType.Add, memberName, filePath, lineNumber);
+#endif
+            }
             return ref Get<T>(eid);
         }
 
         //CODEX_TODO: possibly if filter is double looped and in outer loop the component is removed, than it won't be there in the inner loop
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Remove<T>(EntityType eid)
+        public void Remove<T>(EntityType eid,
+#if USE_DEBUG_TRACE_COMPONENT && DEBUG
+            [CallerMemberName] string memberName = "",
+            [CallerFilePath] string filePath = "",
+            [CallerLineNumber] int lineNumber = 0
+#endif
+            )
         {
 #if DEBUG && !ECS_PERF_TEST
             if (IsReactWrapperType<T>())
@@ -345,6 +448,11 @@ namespace CodexECS
             if (!ExistenceSynched<T>(eid))
                 throw new EcsException("Components and archetypes not synched");
 #endif
+
+#if USE_DEBUG_TRACE_COMPONENT && DEBUG
+            if (!IsCalledFromWorld(filePath))
+                SaveTraceData(eid, typeof(T), DebugTraceData.EMethodType.Remove, memberName, filePath, lineNumber);
+#endif
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -373,11 +481,24 @@ namespace CodexECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool TryRemove<T>(int eid)
+        public bool TryRemove<T>(int eid,
+#if USE_DEBUG_TRACE_COMPONENT && DEBUG
+            [CallerMemberName] string memberName = "",
+            [CallerFilePath] string filePath = "",
+            [CallerLineNumber] int lineNumber = 0
+#endif
+            )
         {
             if (!Have<T>(eid))
                 return false;
+
             Remove<T>(eid);
+
+#if USE_DEBUG_TRACE_COMPONENT && DEBUG
+            if (!IsCalledFromWorld(filePath))
+                SaveTraceData(eid, typeof(T), DebugTraceData.EMethodType.Remove, memberName, filePath, lineNumber);
+#endif
+
             return true;
         }
 
