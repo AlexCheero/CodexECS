@@ -54,10 +54,7 @@ namespace CodexECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Lock()
-        {
-            _lockCounter++;
-        }
+        public void Lock() => _lockCounter++;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Unlock()

@@ -104,7 +104,21 @@ namespace CodexECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public View GetEnumerator()
         {
-            if (EntitiesCount == 0)
+            var isNotEmpty = false;
+            int firstArchetypeIndex = 0;
+            for (int i = 0; i < _archetypesEnd; i++)
+            {
+                if (_archetypes[i].EntitiesEnd == 0 && !isNotEmpty)
+                    continue;
+                if (!isNotEmpty)
+                {
+                    firstArchetypeIndex = i;
+                    isNotEmpty = true;
+                }
+                _archetypes[i].Lock();
+            }
+
+            if (!isNotEmpty)
                 return EmptyView;
             
             World.Lock();
@@ -145,10 +159,7 @@ namespace CodexECS
                 throw new EcsException("view is already in use");
 #endif
 
-            for (int i = 0; i < _archetypesEnd; i++)
-                _archetypes[i].Lock();
-
-            view.Use();
+            view.Use(firstArchetypeIndex);
             return view;
         }
 
@@ -194,17 +205,18 @@ namespace CodexECS
                 private set;
             }
 
-            public void Use()
+            public void Use(int archetypeIndex)
             {
                 IsInUse = true;
 
+                _archetypeIndex = archetypeIndex;
                 _archetypes = _filter._archetypes;
                 _archetypesEnd = _filter._archetypesEnd;
 
                 if (_archetypesEnd > 0)
                 {
-                    _entitiesArr = _archetypes[0].EntitiesArr;
-                    _entitiesEnd = _archetypes[0].EntitiesEnd;
+                    _entitiesArr = _archetypes[_archetypeIndex].EntitiesArr;
+                    _entitiesEnd = _archetypes[_archetypeIndex].EntitiesEnd;
                 }
                 else
                 {
