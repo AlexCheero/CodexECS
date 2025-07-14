@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Text;
 using EntityType = System.Int32;//duplicated in EntityExtension
+using System.Linq;
 
 #if DEBUG
 using CodexECS.Utility;
@@ -21,10 +22,7 @@ namespace CodexECS
         private readonly SparseSet<Action<EcsWorld>> _onAddCallbacks;
         private readonly SparseSet<Action<EcsWorld>> _onRemoveCallbacks;
         private BitMask _dirtyAddMask;
-        //TODO: rename BitMask.Length into capacity, implement BitMask.Count and use it instead of this flag
-        private bool _addDirty;
         private BitMask _dirtyRemoveMask;
-        private bool _removeDirty;
 
         private BitMask _addReactGuard;
         private BitMask _removeReactGuard;
@@ -46,6 +44,11 @@ namespace CodexECS
             _onRemoveCallbacks = new();
             _dirtyAddMask = new();
             _dirtyRemoveMask = new();
+
+            _dirtyMatchMasksSet = new(BitMask.MaskComparer);
+            _dirtyMatchMasksList = new();
+            _onMatchCallbacks = new(BitMask.MaskComparer);
+            _componentToMatchMaskMapping = new();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -203,6 +206,25 @@ namespace CodexECS
                 callbacks[reactWrapperId] += callback;
         }
 
+        private HashSet<BitMask> _dirtyMatchMasksSet;
+        private List<BitMask> _dirtyMatchMasksList;
+        private Dictionary<BitMask, Action<EcsWorld>> _onMatchCallbacks;
+        private SparseSet<HashSet<BitMask>> _componentToMatchMaskMapping;
+        public void SubscribeOnComponentsSetMatch(BitMask mask, Action<EcsWorld> callback)
+        {
+            if (!_onMatchCallbacks.ContainsKey(mask))
+                _onMatchCallbacks.Add(mask, callback);
+            else
+                _onMatchCallbacks[mask] += callback;
+
+            foreach (var componentId in mask)
+            {
+                if (!_componentToMatchMaskMapping.ContainsIdx(componentId))
+                    _componentToMatchMaskMapping.Add(componentId, new(BitMask.MaskComparer));
+                _componentToMatchMaskMapping[componentId].Add(mask);
+            }
+        }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ref T AddMultiple<T>(EntityType eid)
         {
@@ -304,7 +326,8 @@ namespace CodexECS
             _archetypes.AddComponent<T>(eid);
             _componentManager.Add<T>(eid, component);
 
-            if (_addReactGuard.Check(ComponentMeta<T>.Id))
+            var componentId = ComponentMeta<T>.Id;
+            if (_addReactGuard.Check(componentId))
             {
                 var reactWrapperId = ComponentMeta<AddReact<T>>.Id;
                 //excess check- it already checked in react type guard
@@ -315,7 +338,16 @@ namespace CodexECS
                     _componentManager.Add<AddReact<T>>(eid);
 
                     _dirtyAddMask.Set(reactWrapperId);
-                    _addDirty = true;
+                }
+            }
+
+            if (_componentToMatchMaskMapping.ContainsIdx(componentId))
+            {
+                ref readonly var mask = ref _archetypes.GetMask(eid);
+                foreach (var key in _componentToMatchMaskMapping[componentId])
+                {
+                    if (mask.InclusivePass(key))
+                        _dirtyMatchMasksSet.Add(key);
                 }
             }
 
@@ -434,7 +466,6 @@ namespace CodexECS
                     });
 
                     _dirtyRemoveMask.Set(reactWrapperId);
-                    _removeDirty = true;
                 }
             }
             
@@ -559,13 +590,29 @@ namespace CodexECS
                 Delete_Impl(eid);
             _delayedDeleteList.Clear();
 
-            if (_addDirty)
-                ReactOnAddRemove(ref _dirtyAddMask, ref _addDirty, _onAddCallbacks);
-            if (_removeDirty)
-                ReactOnAddRemove(ref _dirtyRemoveMask, ref _removeDirty, _onRemoveCallbacks);
+            if (_dirtyAddMask.Length > 0)
+                ReactOnAddRemove(ref _dirtyAddMask, _onAddCallbacks);
+            if (_dirtyRemoveMask.Length > 0)
+                ReactOnAddRemove(ref _dirtyRemoveMask, _onRemoveCallbacks);
+
+            if (_dirtyMatchMasksSet.Count > 0)
+            {
+                _dirtyMatchMasksList.Clear();
+                foreach (var mask in _dirtyMatchMasksSet)
+                    _dirtyMatchMasksList.Add(mask);
+                _dirtyMatchMasksList.Sort((m1, m2) =>
+                {
+                    //branchless sign function
+                    int diff = m1.SetBitsCount - m2.SetBitsCount;
+                    return (diff >> 31) | ((-diff) >> 31 & 1);
+                });
+                _dirtyMatchMasksSet.Clear();
+                for (int i = 0; i < _dirtyMatchMasksList.Count; i++)
+                    _onMatchCallbacks[_dirtyMatchMasksList[i]](this);
+            }
         }
 
-        private void ReactOnAddRemove(ref BitMask dirtyMask, ref bool dirtyFlag, SparseSet<Action<EcsWorld>> callbacks)
+        private void ReactOnAddRemove(ref BitMask dirtyMask, SparseSet<Action<EcsWorld>> callbacks)
         {
             Lock();
                 
@@ -584,7 +631,6 @@ namespace CodexECS
                 _componentManager.RemoveAll(reactWrapperId);
             }
             dirtyMask.Clear();
-            dirtyFlag = false;
                 
             Unlock();
         }

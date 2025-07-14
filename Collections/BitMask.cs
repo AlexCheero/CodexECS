@@ -62,12 +62,20 @@ namespace CodexECS
             get => _length;
         }
 
+        private int _setBitsCount;
+        public int SetBitsCount
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get => _setBitsCount;
+        }
+
         public BitMask(params int[] positions)
         {
             _m1 = 0;
             _mn = null;
             _length = 0;
             _hash = 0;
+            _setBitsCount = 0;
 
             Set(positions);
         }
@@ -134,7 +142,12 @@ namespace CodexECS
 
             int position = i % SizeOfPartInBits;
             MaskInternal shifted = 1;
-            m |= (MaskInternal)(shifted << position);
+            shifted <<= position;
+
+            if ((m & shifted) == 0)
+                _setBitsCount++;
+
+            m |= shifted;
 
             //update length
             i++;
@@ -214,48 +227,58 @@ namespace CodexECS
             MaskInternal shifted = (MaskInternal)1 << position;
             bool wasSet = (m & shifted) != 0;
             m &= ~shifted;
-    
-            // RecalculateLength
-            if (wasSet && i == Length - 1)
+
+            if (wasSet)
             {
-                if (_mn != null)
+                _setBitsCount--;
+
+#if DEBUG && !ECS_PERF_TEST
+                if (_setBitsCount < 0)
+                    throw new EcsException("negative set bits count");
+#endif
+
+                // RecalculateLength
+                if (i == Length - 1)
                 {
-                    for (int j = _mn.Length - 1; j >= 0; j--)
+                    if (_mn != null)
                     {
-                        if (_mn[j] == 0) continue;
-            
+                        for (int j = _mn.Length - 1; j >= 0; j--)
+                        {
+                            if (_mn[j] == 0) continue;
+
+                            int msb = SizeOfPartInBits - 1;
+                            MaskInternal mask = (MaskInternal)1 << msb;
+
+                            while ((mask & _mn[j]) == 0 && msb > 0)
+                            {
+                                msb--;
+                                mask >>= 1;
+                            }
+
+                            _length = (j + 1) * SizeOfPartInBits + msb + 1;
+                            return;
+                        }
+                    }
+
+                    // Check _m1
+                    if (_m1 != 0)
+                    {
                         int msb = SizeOfPartInBits - 1;
                         MaskInternal mask = (MaskInternal)1 << msb;
-            
-                        while ((mask & _mn[j]) == 0 && msb > 0)
+
+                        while ((mask & _m1) == 0 && msb > 0)
                         {
                             msb--;
                             mask >>= 1;
                         }
-            
-                        _length = (j + 1) * SizeOfPartInBits + msb + 1;
+
+                        _length = msb + 1;
                         return;
                     }
+
+                    // No bits set
+                    _length = 0;
                 }
-    
-                // Check _m1
-                if (_m1 != 0)
-                {
-                    int msb = SizeOfPartInBits - 1;
-                    MaskInternal mask = (MaskInternal)1 << msb;
-        
-                    while ((mask & _m1) == 0 && msb > 0)
-                    {
-                        msb--;
-                        mask >>= 1;
-                    }
-        
-                    _length = msb + 1;
-                    return;
-                }
-    
-                // No bits set
-                _length = 0;
             }
     
             _hash = 0;
