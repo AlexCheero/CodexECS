@@ -88,6 +88,7 @@ namespace CodexECS
         {
             _m1 = other._m1;
             _length = other._length;
+            _setBitsCount = other._setBitsCount;
 
             var otherArrLength = other._mn != null ? other._mn.Length : 0;
             if (otherArrLength > 0)
