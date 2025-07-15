@@ -349,6 +349,9 @@ namespace CodexECS
                     if (mask.InclusivePass(key))
                         _dirtyMatchMasksSet.Add(key);
                 }
+
+                if (!Have<MatchReact>(eid))
+                    Add<MatchReact>(eid);
             }
 
 #if HEAVY_ECS_DEBUG
@@ -609,6 +612,8 @@ namespace CodexECS
                 _dirtyMatchMasksSet.Clear();
                 for (int i = 0; i < _dirtyMatchMasksList.Count; i++)
                     _onMatchCallbacks[_dirtyMatchMasksList[i]](this);
+
+                RemoveAll<MatchReact>();
             }
         }
 

@@ -6,4 +6,6 @@
     {
         public T removingComponent;
     }
+
+    public struct MatchReact : IComponent {}
 }
