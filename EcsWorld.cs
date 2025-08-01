@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Text;
 using EntityType = System.Int32;//duplicated in EntityExtension
-using System.Linq;
 
 #if DEBUG
 using CodexECS.Utility;
@@ -145,11 +144,12 @@ namespace CodexECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Have<T>(EntityType eid)
         {
+            var componentId = ComponentMeta<T>.Id;
 #if DEBUG && !ECS_PERF_TEST
-            if (_archetypes.Have<T>(eid) != _componentManager.Have<T>(eid))
+            if (_archetypes.Have(componentId, eid) != _componentManager.Have(componentId, eid))
                 throw new EcsException("Components and archetypes desynch");
 #endif
-            return _archetypes.Have<T>(eid);
+            return _archetypes.Have(componentId, eid);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -174,36 +174,42 @@ namespace CodexECS
 
         public void SubscribeOnAdd<T>(Action<EcsWorld> callback)
         {
+            var componentId = ComponentMeta<T>.Id;
 #if DEBUG && !ECS_PERF_TEST
-            if (IsReactWrapperType<T>())
+            if (IsReactWrapperType(componentId))
                 throw new EcsException("Cannot subscribe on reactive wrappers manually");
 #endif
-            _addReactGuard.Set(ComponentMeta<T>.Id);
-            SubscribeOnExistenceChange<AddReact<T>>(_onAddCallbacks, callback);
+            _addReactGuard.Set(componentId);
+            var wrapperId = ComponentMeta<AddReact<T>>.Id;
+            SubscribeOnExistenceChange(wrapperId, _onAddCallbacks, callback);
         }
         
         public void SubscribeOnRemove<T>(Action<EcsWorld> callback)
         {
+            var componentId = ComponentMeta<T>.Id;
 #if DEBUG && !ECS_PERF_TEST
-            if (IsReactWrapperType<T>())
+            if (IsReactWrapperType(componentId))
                 throw new EcsException("Cannot subscribe on reactive wrappers manually");
 #endif
-            _removeReactGuard.Set(ComponentMeta<T>.Id);
-            SubscribeOnExistenceChange<RemoveReact<T>>(_onRemoveCallbacks, callback);
+            _removeReactGuard.Set(componentId);
+            var wrapperId = ComponentMeta<RemoveReact<T>>.Id;
+            SubscribeOnExistenceChange(wrapperId, _onRemoveCallbacks, callback);
         }
         
-        private void SubscribeOnExistenceChange<T>(SparseSet<Action<EcsWorld>> callbacks, Action<EcsWorld> callback)
+        private void SubscribeOnExistenceChange(
+            int wrapperId,
+            SparseSet<Action<EcsWorld>> callbacks,
+            Action<EcsWorld> callback)
         {
 #if DEBUG && !ECS_PERF_TEST
-            if (!IsReactWrapperType<T>())
+            if (!IsReactWrapperType(wrapperId))
                 throw new EcsException("Subscription on the direct type instead of reactive wrapper");
 #endif
             
-            var reactWrapperId = ComponentMeta<T>.Id;
-            if (!callbacks.ContainsIdx(reactWrapperId))
-                callbacks.Add(reactWrapperId, callback);
+            if (!callbacks.ContainsIdx(wrapperId))
+                callbacks.Add(wrapperId, callback);
             else
-                callbacks[reactWrapperId] += callback;
+                callbacks[wrapperId] += callback;
         }
 
         private HashSet<BitMask> _dirtyMatchMasksSet;
@@ -223,16 +229,6 @@ namespace CodexECS
                     _componentToMatchMaskMapping.Add(componentId, new(BitMask.MaskComparer));
                 _componentToMatchMaskMapping[componentId].Add(mask);
             }
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ref T AddMultiple<T>(EntityType eid)
-        {
-#if DEBUG && !ECS_PERF_TEST
-            if (ComponentMeta<T>.IsTag)
-                throw new EcsException("Tags are not assumed to be added multiple times, use component with counter instead");
-#endif
-            return ref AddMultiple(eid, _componentManager.GetNextFree<T>());
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -300,7 +296,17 @@ namespace CodexECS
 #endif
             )
         {
-            var defaultValue = ComponentMeta<T>.IsTag ? default : _componentManager.GetNextFree<T>();
+
+            T defaultValue;
+            if (ComponentMeta<T>.IsTag)
+            {
+                defaultValue = default;
+            }
+            else
+            {
+                var pool = (ComponentsPool<T>)_componentManager.GetPool(ComponentMeta<T>.Id);
+                defaultValue = pool.GetNextFree();
+            }
             Add(eid, defaultValue);
 
 #if USE_DEBUG_TRACE_COMPONENT && DEBUG
@@ -318,15 +324,15 @@ namespace CodexECS
 #endif
             )
         {
+            var componentId = ComponentMeta<T>.Id;
 #if DEBUG && !ECS_PERF_TEST
-            if (IsReactWrapperType<T>())
+            if (IsReactWrapperType(componentId))
                 throw new EcsException("Cannot add reactive wrappers manually");
 #endif
             
-            _archetypes.AddComponent<T>(eid);
+            _archetypes.AddComponent(eid, componentId);
             _componentManager.Add<T>(eid, component);
 
-            var componentId = ComponentMeta<T>.Id;
             if (_addReactGuard.Check(componentId))
             {
                 var reactWrapperId = ComponentMeta<AddReact<T>>.Id;
@@ -334,7 +340,7 @@ namespace CodexECS
                 //if (_onAddCallbacks.ContainsIdx(reactWrapperId))
                 {
                     //unrolled Add<AddReact<T>>(eid); without wrapper check
-                    _archetypes.AddComponent<AddReact<T>>(eid);
+                    _archetypes.AddComponent(eid, reactWrapperId);
                     _componentManager.Add<AddReact<T>>(eid);
 
                     _dirtyAddMask.Set(reactWrapperId);
@@ -366,8 +372,6 @@ namespace CodexECS
         }
 
 #if DEBUG
-        private bool IsReactWrapperType<T>() => IsReactWrapperType(ComponentMeta<T>.Id);
-
         private bool IsReactWrapperType(int componentId)
         {
             var gtd = Utils.GetGenericTypeDefinition(ComponentMapping.GetTypeForId(componentId));
@@ -449,20 +453,21 @@ namespace CodexECS
 #endif
             )
         {
+            var componentId = ComponentMeta<T>.Id;
 #if DEBUG && !ECS_PERF_TEST
-            if (IsReactWrapperType<T>())
+            if (IsReactWrapperType(componentId))
                 throw new EcsException("Cannot remove reactive wrappers manually");
             if (Have<MultipleComponents<T>>(eid))
                 throw new EcsException($"entity have multiple components of type {typeof(T).Name}, use {nameof(RemoveMultiple)} instead");
 #endif
 
-            if (_removeReactGuard.Check(ComponentMeta<T>.Id))
+            if (_removeReactGuard.Check(componentId))
             {
                 var reactWrapperId = ComponentMeta<RemoveReact<T>>.Id;
                 //excess check- it already checked in react type guard
                 //if (_onRemoveCallbacks.ContainsIdx(reactWrapperId))
                 {
-                    _archetypes.AddComponent<RemoveReact<T>>(eid);
+                    _archetypes.AddComponent(eid, reactWrapperId);
                     _componentManager.Add(eid, new RemoveReact<T>
                     {
                         removingComponent = Get<T>(eid)
@@ -472,8 +477,8 @@ namespace CodexECS
                 }
             }
             
-            _archetypes.RemoveComponent<T>(eid);
-            _componentManager.Remove<T>(eid);
+            _archetypes.RemoveComponent(eid, componentId);
+            _componentManager.Remove(componentId, eid);
 
             if (_archetypes.GetMask(eid).Length == 0)
                 Delete(eid);

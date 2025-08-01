@@ -121,23 +121,15 @@ namespace CodexECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void AddComponent<T>(EntityType eid) { AddComponent(eid, ComponentMeta<T>.Id); }
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void AddComponent(EntityType eid, int componentId)
         {
             MoveBetweenArchetypes(eid, componentId, true);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void RemoveComponent<T>(EntityType eid) { RemoveComponent(eid, ComponentMeta<T>.Id); }
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void RemoveComponent(EntityType eid, int componentId)
-        {
+        public void RemoveComponent(EntityType eid, int componentId) =>
             MoveBetweenArchetypes(eid, componentId, false);
-        }
-        
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void RemoveAll<T>() { RemoveAll(ComponentMeta<T>.Id); }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void RemoveAll(int componentId)
         {
@@ -212,9 +204,6 @@ namespace CodexECS
 
             return true;
         }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Have<T>(EntityType eid) => _eToA[eid].Mask.Check(ComponentMeta<T>.Id);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Have(in BitMask mask, EntityType eid) => _eToA[eid].Mask.InclusivePass(mask);

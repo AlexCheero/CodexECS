@@ -19,16 +19,10 @@ namespace CodexECS
         }
         
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool IsTypeRegistered<T>() => IsTypeRegistered(ComponentMeta<T>.Id);
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool IsTypeRegistered(int componentId) =>
             componentId < _poolsEnd && _pools[componentId] != DummyPool;
 
-        [Obsolete("slow, use Archetypes.Have instead")]
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Have<T>(EntityType eid) => Have(ComponentMeta<T>.Id, eid);
-
+#if DEBUG && !ECS_PERF_TEST
         [Obsolete("slow, use Archetypes.Have instead")]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Have(int componentId, EntityType eid) => componentId < _poolsEnd && _pools[componentId] != DummyPool && _pools[componentId].Contains(eid);
@@ -42,6 +36,7 @@ namespace CodexECS
                 have &= componentId < _poolsEnd && _pools[componentId] != DummyPool && _pools[componentId].Contains(eid);
             return have;
         }
+#endif
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Add<T>(EntityType eid, T component = default)
@@ -76,29 +71,8 @@ namespace CodexECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ref T GetNextFree<T>()
-        {
-#if DEBUG && !ECS_PERF_TEST
-            if (ComponentMeta<T>.IsTag)
-                throw new EcsException("can only be called for non empty components");
-#endif
-
-            var componentId = ComponentMeta<T>.Id;
-            var shouldAddPool = componentId >= _poolsEnd || _pools[componentId] == DummyPool;
-            if (shouldAddPool)
-                AddPool(componentId, new ComponentsPool<T>());
-            return ref ((ComponentsPool<T>)_pools[componentId]).GetNextFree();
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Remove<T>(EntityType eid) => _pools[ComponentMeta<T>.Id].Remove(eid);
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Remove(int componentId, EntityType eid) => _pools[componentId].Remove(eid);
         
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void RemoveAll<T>() => _pools[ComponentMeta<T>.Id].Clear();
-
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void RemoveAll(int componentId) => _pools[componentId].Clear();
 
