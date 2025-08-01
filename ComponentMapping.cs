@@ -48,7 +48,7 @@ namespace CodexECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool HaveId(int id) => _idToType.ContainsKey(id);
         
-        public static void Add<T>(Type type, int id)
+        public static void Add(Type type, int id)
         {
 #if DEBUG && !ECS_PERF_TEST
             if (_typeToId.ContainsKey(type))
@@ -59,7 +59,9 @@ namespace CodexECS
             
             _typeToId[type] = id;
             _idToType[id] = type;
-            CallDispatchers[type] = new WorldCallDispatcher<T>();
+            
+            var closedType = typeof(WorldCallDispatcher<>).MakeGenericType(type);
+            CallDispatchers[type] = (IWorldCallDispatcher)Activator.CreateInstance(closedType);
 
 #if DEBUG && !ECS_PERF_TEST
             foreach (var pair in _typeToId)
