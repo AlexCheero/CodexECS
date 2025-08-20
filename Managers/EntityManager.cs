@@ -31,10 +31,10 @@ namespace CodexECS
 
         //CODEX_TODO: looks like it is redundant
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ref Entity GetRefById(EntityType eid)
+        public ref Entity GetById(EntityType eid)
         {
 #if DEBUG && !ECS_PERF_TEST
-            if (eid == EntityExtension.NullEntity.GetId())
+            if (eid == EntityExtension.NullId)
                 throw new EcsException("null entity id");
             if (!IsEntityInRange(eid))
                 throw new EcsException("wrong entity id: " + eid);
@@ -44,14 +44,14 @@ namespace CodexECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool IsDead(EntityType eid) => GetRefById(eid).GetId() != eid;
+        public bool IsDead(EntityType eid) => GetById(eid).GetId() != eid;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static bool IsNull(EntityType eid) => eid == EntityExtension.NullEntity.GetId();
+        public static bool IsNull(EntityType eid) => eid == EntityExtension.NullId;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Equals(EntityType eid1, EntityType eid2) =>
-            eid1 == eid2 && GetRefById(eid1).GetVersion() == GetRefById(eid2).GetVersion();
+            eid1 == eid2 && GetById(eid1).GetVersion() == GetById(eid2).GetVersion();
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool IsEntityValid(Entity entity)
@@ -59,11 +59,11 @@ namespace CodexECS
             if (entity.IsNull())
                 return false;
             var eid = entity.GetId();
-            return !IsDead(eid) && entity.GetVersion() == GetRefById(eid).GetVersion();
+            return !IsDead(eid) && entity.GetVersion() == GetById(eid).GetVersion();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool IsIdValid(EntityType eid) => eid >= 0 && eid != EntityExtension.NullEntity.GetId() && !IsDead(eid);
+        public bool IsIdValid(EntityType eid) => eid >= 0 && eid != EntityExtension.NullId && !IsDead(eid);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private EntityType GetRecycledId()
@@ -84,7 +84,7 @@ namespace CodexECS
             }
             else
             {
-                ref Entity nextToHead = ref GetRefById(headId);
+                ref Entity nextToHead = ref GetById(headId);
                 _recycleListHead.SetId(nextToHead.GetId());
                 nextToHead.SetId(headId);
                 nextToHead.IncrementVersion();
@@ -97,7 +97,7 @@ namespace CodexECS
         public void Delete(EntityType eid)
         {
 #if DEBUG && !ECS_PERF_TEST
-            if (GetRefById(eid).IsNull())
+            if (GetById(eid).IsNull())
                 throw new EcsException("trying to delete null entity");
             if (IsDead(eid))
                 throw new EcsException("trying to delete already dead entity");
@@ -109,7 +109,7 @@ namespace CodexECS
                 _recycleListHead.SetId(eid);
             else
                 _entities[_recycleListEndIdx].SetId(eid);
-            ref Entity deletedEntity = ref GetRefById(eid);
+            ref Entity deletedEntity = ref GetById(eid);
             deletedEntity.SetNullId();
             _recycleListEndIdx = eid;
         }

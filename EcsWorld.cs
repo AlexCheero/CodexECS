@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Text;
 using EntityType = System.Int32;//duplicated in EntityExtension
-using System.Linq;
 
 #if DEBUG
 using CodexECS.Utility;
@@ -52,26 +51,16 @@ namespace CodexECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ref Entity GetRefById(int id) => ref _entityManager.GetRefById(id);
+        public ref Entity GetById(int id) => ref _entityManager.GetById(id);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ref Entity GetRefById(Entity other) => ref _entityManager.GetRefById(other.GetId());
+        public bool IsDead(int id) => _entityManager.IsDead(id);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool IsEntityInRange(int id) => _entityManager.IsEntityInRange(id);
+        public bool IsDead(Entity entity) => IsDead(entity.GetId());
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public Entity GetById(int id) => GetRefById(id);
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool IsDead(int id) => GetRefById(id).GetId() != id;
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool IsNull(int id) => id == EntityExtension.NullEntity.GetId();
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Equals(int entity1, int entity2) =>
-            entity1 == entity2 && GetById(entity1).GetVersion() == GetById(entity2).GetVersion();
+        public bool IsNull(int id) => id == EntityExtension.NullId;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool IsEntityValid(Entity entity)
@@ -83,7 +72,7 @@ namespace CodexECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool IsIdValid(int id) => id >= 0 && id != EntityExtension.NullEntity.GetId() && !IsDead(id);
+        public bool IsIdValid(int id) => id >= 0 && id != EntityExtension.NullId && !IsDead(id);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public EntityType Create()
@@ -682,7 +671,7 @@ namespace CodexECS
         private StringBuilder _debugEntityStringBuilder;
         public string DebugEntity(int id, bool printFields)
         {
-            if (id == EntityExtension.NullEntity.GetId())
+            if (id == EntityExtension.NullId)
                 return "null entity";
             if (IsDead(id))
                 return "dead entity";

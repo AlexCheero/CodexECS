@@ -18,9 +18,10 @@ namespace CodexECS
         public const int BitSizeHalved = sizeof(EntityType) * 4;
         public const EntityType VersionMask = -1 << BitSizeHalved;
         public const EntityType IdMask = ~VersionMask;
+        public const EntityType NullId = IdMask;
         public const EntityType VersionIncrement = IdMask + 1;
 
-        public static readonly Entity NullEntity = new(IdMask);
+        public static readonly Entity NullEntity = new(NullId);
 
 #if DEBUG
         static EntityExtension()
@@ -49,10 +50,10 @@ namespace CodexECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void SetNullId(this ref Entity entity) => entity.Val = NullEntity.GetId() | (entity.Val & VersionMask);
+        public static void SetNullId(this ref Entity entity) => entity.Val = NullId | (entity.Val & VersionMask);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static bool IsNull(this in Entity entity) => entity.GetId() == NullEntity.GetId();
+        public static bool IsNull(this in Entity entity) => entity.GetId() == NullId;
 
         //CODEX_TODO: use smaller part for version
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
