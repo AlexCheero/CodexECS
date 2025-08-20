@@ -20,21 +20,9 @@ namespace CodexECS
             public void AddMultiple(EcsWorld world, int id, object obj) => world.AddMultiple(id, (T)obj);
         }
 
-        public readonly static Dictionary<Type, IWorldCallDispatcher> CallDispatchers;
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static WorldCallDispatcher<T> GetCallDispatcher<T>() =>
-            (WorldCallDispatcher<T>)CallDispatchers[typeof(T)];
-
-        private static Dictionary<Type, int> _typeToId;
-        private static Dictionary<int, Type> _idToType;
-
-        static ComponentMapping()
-        {
-            _typeToId = new();
-            _idToType = new();
-            CallDispatchers = new();
-        }
+        public readonly static Dictionary<Type, IWorldCallDispatcher> CallDispatchers = new();
+        private static Dictionary<Type, int> _typeToId = new();
+        private static Dictionary<int, Type> _idToType = new();
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static int GetIdForType(Type type) => _typeToId[type];
