@@ -161,6 +161,9 @@ namespace CodexECS
             return _archetypes.Have(componentId, eid);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ref readonly BitMask GetMask(int eid) => ref _archetypes.GetMask(eid);
+
         public void SubscribeOnAdd<T>(Action<EcsWorld> callback)
         {
 #if DEBUG && !ECS_PERF_TEST
