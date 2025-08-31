@@ -125,6 +125,25 @@ namespace CodexECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Set(in BitMask other)
+        {
+            _m1 |= other._m1;
+
+            var otherMnLength = other._mn != null ? other._mn.Length : 0;
+            if (otherMnLength == 0)
+                return;
+
+            if (_mn == null || _mn.Length < otherMnLength)
+            {
+                const int maxResizeDelta = 8;
+                Utils.ResizeArray(otherMnLength, ref _mn, maxResizeDelta);
+            }
+
+            for (int i = 0; i < otherMnLength; i++)
+                _mn[i] |= other._mn[i];
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Set(int i)
         {
             var chunkIdx = i / SizeOfPartInBits;
