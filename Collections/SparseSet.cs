@@ -153,6 +153,32 @@ namespace CodexECS
             Array.Copy(other._dense, _dense, _valuesEnd);
         }
 
+        public Enumerator GetEnumerator() => new(this);
+
+        public struct Enumerator
+        {
+            private SparseSet<T> _set;
+            private int _currentIdx;
+            public Enumerator(SparseSet<T> set)
+            {
+                _set = set;
+                _currentIdx = 0;
+            }
+
+            public readonly (int, T) Current
+            {
+                [MethodImpl(MethodImplOptions.AggressiveInlining)]
+                get => (_set._dense[_currentIdx], _set._values[_currentIdx]);
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public bool MoveNext()
+            {
+                _currentIdx++;
+                return _currentIdx < _set._values.Length;
+            }
+        }
+
 #if HEAVY_ECS_DEBUG
         public bool CheckInvariant()
         {
