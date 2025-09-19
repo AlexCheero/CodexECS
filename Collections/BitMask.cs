@@ -233,6 +233,25 @@ namespace CodexECS
         private bool CheckChunkIdx(int idx) => idx < 1 || (_mn != null && _mn.Length > idx - 1);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Unset(in BitMask other)
+        {
+            _m1 &= ~other._m1;
+
+            var otherMnLength = other._mn != null ? other._mn.Length : 0;
+            if (otherMnLength == 0)
+                return;
+
+            if (_mn == null || _mn.Length < otherMnLength)
+            {
+                const int maxResizeDelta = 8;
+                Utils.ResizeArray(otherMnLength, ref _mn, maxResizeDelta);
+            }
+
+            for (int i = 0; i < otherMnLength; i++)
+                _mn[i] &= ~other._mn[i];
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Unset(int i)
         {
             int chunkIdx = i / SizeOfPartInBits;
