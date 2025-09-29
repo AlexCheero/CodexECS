@@ -71,5 +71,25 @@ namespace CodexECS
             _elements[_end] = element;
             _end++;
         }
+
+        public struct Enumerator
+        {
+            private readonly SimpleList<T> _list;
+            private int _index;
+            public Enumerator(SimpleList<T> list)
+            {
+                _list = list;
+                _index = -1;
+            }
+            public bool MoveNext()
+            {
+                _index++;
+                return _index < _list._end;
+            }
+            public void Reset() => _index = -1;
+            public ref T Current => ref _list._elements[_index];
+        }
+
+        public Enumerator GetEnumerator() => new Enumerator(this);
     }
 }
