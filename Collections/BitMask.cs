@@ -11,10 +11,10 @@ namespace CodexECS
     public static class BitMaskExtensions
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static ref BitMask SetTypeId<T>(this ref BitMask mask)
+        public static BitMask SetTypeId<T>(this BitMask mask)
         {
             mask.Set(ComponentMeta<T>.Id);
-            return ref mask;
+            return mask;
         }
     }
 
