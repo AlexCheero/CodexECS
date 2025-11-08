@@ -257,7 +257,7 @@ namespace CodexECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void RemoveMultiple<T>(EntityType eid)
+        public void RemoveMultiple<T>(EntityType eid, int removeAt = 0)
         {
             if (!Have<MultipleComponents<T>>(eid))
             {
@@ -268,7 +268,7 @@ namespace CodexECS
             ref var firstComponent = ref Get<T>(eid);
             ComponentMeta<T>.Cleanup(ref firstComponent);
             var components = Get<MultipleComponents<T>>(eid).components;
-            components.SwapRemoveAt(0);
+            components.SwapRemoveAt(removeAt);
             if (components.Length == 0)
                 Remove<MultipleComponents<T>>(eid);
             else
