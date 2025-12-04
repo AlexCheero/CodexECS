@@ -357,6 +357,63 @@ namespace CodexECS
 #endif
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void CopyComponents(in BitMask mask, EntityType from, EntityType to
+#if USE_DEBUG_TRACE_COMPONENT && DEBUG
+            , [CallerMemberName] string memberName = "",
+            [CallerFilePath] string filePath = "",
+            [CallerLineNumber] int lineNumber = 0
+#endif
+        )
+        {
+            foreach (var typeId in mask)
+            {
+                var componentType = ComponentMapping.GetTypeForId(typeId);
+#if USE_DEBUG_TRACE_COMPONENT && DEBUG
+                if (!IsCalledFromWorld(filePath))
+                    SaveTraceData(to, componentType, DebugTraceData.EMethodType.Add, memberName, filePath, lineNumber);
+#endif
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void CopyComponent(int typeId, EntityType from, EntityType to
+#if USE_DEBUG_TRACE_COMPONENT && DEBUG
+            , [CallerMemberName] string memberName = "",
+            [CallerFilePath] string filePath = "",
+            [CallerLineNumber] int lineNumber = 0
+#endif
+        )
+        {
+            var componentType = ComponentMapping.GetTypeForId(typeId);
+#if USE_DEBUG_TRACE_COMPONENT && DEBUG
+            if (!IsCalledFromWorld(filePath))
+                SaveTraceData(to, componentType, DebugTraceData.EMethodType.Add, memberName, filePath, lineNumber);
+#endif
+            
+            ComponentMapping.CallDispatchers[componentType].Copy(this, from, to);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void CopyComponent<T>(EntityType from, EntityType to
+#if USE_DEBUG_TRACE_COMPONENT && DEBUG
+            , [CallerMemberName] string memberName = "",
+            [CallerFilePath] string filePath = "",
+            [CallerLineNumber] int lineNumber = 0
+#endif
+        )
+        {
+#if USE_DEBUG_TRACE_COMPONENT && DEBUG
+            if (!IsCalledFromWorld(filePath))
+                SaveTraceData(to, typeof(T), DebugTraceData.EMethodType.Add, memberName, filePath, lineNumber);
+#endif
+            if (!Have<T>(from))
+                return;
+            if (!Have<T>(to))
+                Add<T>(to);
+            Get<T>(to) = Get<T>(from);
+        }
+
 #if DEBUG
         private bool IsReactWrapperType<T>() => IsReactWrapperType(ComponentMeta<T>.Id);
 
