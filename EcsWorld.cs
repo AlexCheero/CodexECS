@@ -373,6 +373,7 @@ namespace CodexECS
                 if (!IsCalledFromWorld(filePath))
                     SaveTraceData(to, componentType, DebugTraceData.EMethodType.Add, memberName, filePath, lineNumber);
 #endif
+                ComponentMapping.CallDispatchers[componentType].Copy(this, from, to);
             }
         }
 
