@@ -11,7 +11,7 @@ namespace CodexECS
         public IComponentsPool[] _pools;
         private int _poolsEnd;
         private struct DummyStruct { }
-        private static readonly IComponentsPool DummyPool = new ComponentsPool<DummyStruct>();
+        private static readonly IComponentsPool DummyPool = new ComponentsPool<DummyStruct>(0);
 
         public ComponentManager()
         {
@@ -106,7 +106,7 @@ namespace CodexECS
         public IComponentsPool GetPool(int componentId)
         {
             if (!(componentId < _poolsEnd && _pools[componentId] != DummyPool))
-                AddPool(componentId, PoolFactory.FactoryMethods[componentId](/*EcsCacheSettings.PoolSize*/32));
+                AddPool(componentId, PoolFactory.FactoryMethods[componentId]());
             return _pools[componentId];
         }
 

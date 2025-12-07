@@ -4,7 +4,7 @@ namespace CodexECS
 {
     internal static class PoolFactory
     {
-        internal static readonly SparseSet<Func<int, IComponentsPool>> FactoryMethods;
+        internal static readonly SparseSet<Func<IComponentsPool>> FactoryMethods;
 
         static PoolFactory() => FactoryMethods = new ();
     }

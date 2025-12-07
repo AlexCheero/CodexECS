@@ -190,7 +190,8 @@ namespace CodexECS
             Add(to, _values[_sparse[from]]);
         }
 
-        public ComponentsPool(int initialCapacity = 2)
+        public ComponentsPool() : this(ComponentMeta<T>.InitialPoolSize) {}
+        public ComponentsPool(int initialCapacity)
         {
             _sparse = new int[initialCapacity];
             _dense = new int[initialCapacity];

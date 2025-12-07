@@ -57,6 +57,8 @@ namespace CodexECS
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             private set;
         } = DefaultCleanup;
+
+        public static readonly int InitialPoolSize;
         
         static ComponentMeta()
         {
@@ -89,12 +91,38 @@ namespace CodexECS
                 if (cleanupMethod != null)
                     Cleanup = (CleanupDelegate)Delegate.CreateDelegate(typeof(CleanupDelegate), cleanupMethod);
                 
-                PoolFactory.FactoryMethods.Add(Id, (poolSize) => new ComponentsPool<T>(poolSize));
+                var initialPoolSizeField = type.GetField(nameof(InitialPoolSize), BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
+                if (initialPoolSizeField != null)
+                    InitialPoolSize = (int)initialPoolSizeField.GetRawConstantValue();
+                else
+                    InitialPoolSize = 2;//default value
+                
+                PoolFactory.FactoryMethods.Add(Id, GetComponentsPool);
             }
             else
             {
-                PoolFactory.FactoryMethods.Add(Id, (_) => new TagsPool<T>());  
+                PoolFactory.FactoryMethods.Add(Id, GetTagsPool);  
             }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static IComponentsPool GetComponentsPool()
+        {
+#if DEBUG
+            if (IsTag)
+                throw new EcsException("trying to get tags pool for data component");
+#endif
+            return new ComponentsPool<T>();
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static IComponentsPool GetTagsPool()
+        {
+#if DEBUG
+            if (!IsTag)
+                throw new EcsException("trying to get components pool for tag component");
+#endif
+            return new TagsPool<T>();
         }
     }
 }
