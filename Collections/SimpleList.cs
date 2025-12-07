@@ -55,9 +55,14 @@ namespace CodexECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Clear()
+        public void Clear(bool full = false)
         {
             _end = 0;
+            if (full)
+            {
+                for (int i = 0; i < _elements.Length; i++)
+                    _elements[i] = default;
+            }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
