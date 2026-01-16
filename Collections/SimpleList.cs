@@ -58,12 +58,15 @@ namespace CodexECS
         public void Clear(bool full = false)
         {
             _end = 0;
-            if (full)
-            {
-                for (int i = 0; i < _elements.Length; i++)
-                    _elements[i] = default;
-            }
+            for (int i = 0; i < _elements.Length; i++)
+                _elements[i] = default;
         }
+        
+        /// <summary>
+        /// if this is the set of reference types, then they will still be in memory
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void ClearFast(bool full = false) => _end = 0;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Add(T element)

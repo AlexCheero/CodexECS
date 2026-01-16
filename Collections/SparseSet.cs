@@ -20,26 +20,55 @@ namespace CodexECS
         public ref T this[int i]
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get => ref _values[_sparse[i]];
+            get
+            {
+                var index = _sparse[i];
+#if UNITY_EDITOR || !ECS_OPTIMIZATIONS
+                if (index < 0 || index >= _valuesEnd)
+                    throw new IndexOutOfRangeException();
+#endif
+                return ref _values[index];
+            }
         }
-        
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ref T GetNthValue(int n) => ref _values[n];
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public int GetIdx(int num) => _sparse[_dense[num]];
-
-        public SparseSet(int initialCapacity = 2)
+        public ref T GetNthValue(int n)
         {
-            _sparse = new int[initialCapacity];
-            for (int i = 0; i < initialCapacity; i++)
-                _sparse[i] = -1;
-            _values = new T[initialCapacity];
-            _dense = new int[initialCapacity];
+#if UNITY_EDITOR || !ECS_OPTIMIZATIONS
+            if (n < 0 || n >= _valuesEnd)
+                throw new IndexOutOfRangeException();
+#endif
+            return ref _values[n];
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool ContainsIdx(int outerIdx) => outerIdx < _sparse.Length && _sparse[outerIdx] > -1;
+        public int GetIdx(int num)
+        {
+#if UNITY_EDITOR || !ECS_OPTIMIZATIONS
+            if (num < 0 || num >= _valuesEnd)
+                throw new IndexOutOfRangeException();
+#endif
+            return _sparse[_dense[num]];
+        }
+
+        public SparseSet(int initialCapacity = 2) : this(initialCapacity, initialCapacity)
+        { }
+        
+        public SparseSet(int initialSparseCapacity, int initialDenseCapacity)
+        {
+            _sparse = new int[initialSparseCapacity];
+            for (int i = 0; i < initialSparseCapacity; i++)
+                _sparse[i] = -1;
+            _values = new T[initialDenseCapacity];
+            _dense = new int[initialDenseCapacity];
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool ContainsIdx(int outerIdx)
+        {
+            var innerIdx = outerIdx < _sparse.Length ? _sparse[outerIdx] : -1;
+            return innerIdx > -1 && innerIdx < _valuesEnd;
+        }
 
         public ref T Add(int outerIdx, T value)
         {
@@ -104,7 +133,7 @@ namespace CodexECS
             }
 
             _values[_valuesEnd] = default;
-            //_dense[_valuesEnd] = -1;
+            _dense[_valuesEnd] = -1;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -120,6 +149,46 @@ namespace CodexECS
             }
 
             _valuesEnd = 0;
+        }
+        
+        /// <summary>
+        /// if this is the set of reference types, then they will still be in memory
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void ClearFast() => _valuesEnd = 0;
+
+        /// <summary>
+        /// just "opens" already existing element. use only for preallocated sets!
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ref T GetOrAddFast(int outerIdx)
+        {
+            ref var innerIdx= ref _sparse[outerIdx];
+            if (innerIdx > -1 && innerIdx < _valuesEnd)
+                return ref _values[innerIdx];
+            
+            innerIdx = _valuesEnd;
+            _dense[_valuesEnd] = outerIdx;
+            _valuesEnd++;
+            return ref _values[innerIdx];
+        }
+        
+        /// <summary>
+        /// just "opens" already existing element. use only for preallocated sets!
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ref T AddFast(int outerIdx)
+        {
+#if UNITY_EDITOR || !ECS_OPTIMIZATIONS
+            if (ContainsIdx(outerIdx))
+                throw new Exception("Already contains element at this index");
+#endif
+            
+            ref var innerIdx= ref _sparse[outerIdx];
+            innerIdx = _valuesEnd;
+            _dense[_valuesEnd] = outerIdx;
+            _valuesEnd++;
+            return ref _values[innerIdx];
         }
 
         public void Copy(in SparseSet<T> other)
@@ -157,7 +226,7 @@ namespace CodexECS
 
         public struct Enumerator
         {
-            private SparseSet<T> _set;
+            private readonly SparseSet<T> _set;
             private int _currentIdx;
             public Enumerator(SparseSet<T> set)
             {
@@ -175,7 +244,7 @@ namespace CodexECS
             public bool MoveNext()
             {
                 _currentIdx++;
-                return _currentIdx < _set._values.Length;
+                return _currentIdx < _set._valuesEnd;
             }
         }
 
