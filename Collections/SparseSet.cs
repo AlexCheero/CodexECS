@@ -66,7 +66,7 @@ namespace CodexECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool ContainsIdx(int outerIdx)
         {
-            var innerIdx = outerIdx < _sparse.Length ? _sparse[outerIdx] : -1;
+            var innerIdx = outerIdx > -1 && outerIdx < _sparse.Length ? _sparse[outerIdx] : -1;
             return innerIdx > -1 && innerIdx < _valuesEnd;
         }
 
