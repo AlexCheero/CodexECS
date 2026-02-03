@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using CodexECS.Utility;
 using System.Runtime.CompilerServices;
@@ -332,6 +333,9 @@ namespace CodexECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public DistributedView GetDistributedView(int batch) => new(this, batch);
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Enumerator GetEnumerator()
         {
             Lock();
@@ -375,6 +379,78 @@ namespace CodexECS
             {
                 _entityIndex = -1;
                 _filter.Unlock();
+            }
+        }
+
+        //TODO: view should save previous index
+        public class DistributedView
+        {
+            private readonly EcsFilter _filter;
+            private readonly int _maxEntitiesPerTick;
+            private int _lastProcessedIdx;
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public DistributedView(EcsFilter filter, int maxEntitiesPerTick)
+            {
+                _filter = filter;
+                _maxEntitiesPerTick = maxEntitiesPerTick;
+                _lastProcessedIdx = -1;
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public DistributedEnumerator GetEnumerator()
+            {
+                _filter.Lock();
+                var maxEntitiesPerTick = _maxEntitiesPerTick;
+                if (_filter.EntitiesCount < maxEntitiesPerTick)
+                    maxEntitiesPerTick = _filter.EntitiesCount;
+                return new (this, maxEntitiesPerTick, _lastProcessedIdx);
+            }
+
+            private void Unlock(int lastProcessedIdx)
+            {
+                _lastProcessedIdx = lastProcessedIdx;
+                _filter.Unlock();
+            }
+
+            public struct DistributedEnumerator : IDisposable
+            {
+                private readonly DistributedView _view;
+                private readonly int _count;
+                private readonly EntityType[] _dense;
+                
+                private int _idx;
+                private int _iterationsLeft;
+
+                [MethodImpl(MethodImplOptions.AggressiveInlining)]
+                public DistributedEnumerator(DistributedView view, int maxEntitiesPerTick, int startIdx)
+                {
+                    _view = view;
+                    _dense = _view._filter._dense;
+                    _count = _view._filter.EntitiesCount;
+                    if (_count < 1)
+                        _count = 1; //just to prevent problems with % in MoveNext
+                    
+                    _iterationsLeft = maxEntitiesPerTick;
+                    _idx = _count > startIdx ? startIdx : -1;
+                }
+            
+                [MethodImpl(MethodImplOptions.AggressiveInlining)]
+                public bool MoveNext()
+                {
+                    _idx = (_idx + 1) % _count;
+                    _iterationsLeft--;
+                    return _iterationsLeft > -1;
+                }
+
+                [MethodImpl(MethodImplOptions.AggressiveInlining)]
+                public void Dispose() => _view.Unlock(_idx - 1);
+
+                public int Current
+                {
+                    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+                    get => _dense[_idx];
+                }
             }
         }
     }
