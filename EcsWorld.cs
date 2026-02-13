@@ -433,6 +433,8 @@ namespace CodexECS
         public void Add_Dynamic(Type type, int id, object component) =>
             ComponentMapping.CallDispatchers[type].Add(this, id, component);
 
+        public IComponentsPool GetPool<T>() => _componentManager.GetPool(ComponentMeta<T>.Id);
+        
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ref T Get<T>(EntityType eid)
         {
@@ -443,7 +445,7 @@ namespace CodexECS
             var pool = (ComponentsPool<T>)_pools[ComponentMeta<T>.Id];
 
             //return ref pool.Get(eid);
-            return ref pool._values[pool._sparse[eid]];
+            return ref pool.Values[pool.Sparse[eid]];
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

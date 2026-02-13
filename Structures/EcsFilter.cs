@@ -43,7 +43,9 @@ namespace CodexECS
         
         // private SparseSet<EntityType> _entitiesSet;
         private int[] _sparse;
-        private EntityType[] _dense;
+        
+        public EntityType[] Dense;
+        
         private int _valuesEnd;
         
         private BitMask _pendingAdd;
@@ -59,12 +61,12 @@ namespace CodexECS
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             // get => _entitiesSet._values[idx];
-            get => _dense[idx];
+            get => Dense[idx];
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         // public EntityType GetNthEntitySafe(int idx) => _entitiesSet.Length > idx ? _entitiesSet._values[idx] : -1;
-        public EntityType GetNthEntitySafe(int idx) => _valuesEnd > idx ? _dense[idx] : -1;
+        public EntityType GetNthEntitySafe(int idx) => _valuesEnd > idx ? Dense[idx] : -1;
 
         public EcsFilter(EcsWorld world)
         {
@@ -76,7 +78,7 @@ namespace CodexECS
             _sparse = new int[initialCapacity];
             for (int i = 0; i < initialCapacity; i++)
                 _sparse[i] = -1;
-            _dense = new int[initialCapacity];
+            Dense = new int[initialCapacity];
             
             _pendingAdd = new();
             _pendingDelete = new();
@@ -141,16 +143,16 @@ namespace CodexECS
 #endif
 
             _sparse[eid] = _valuesEnd;
-            if (_valuesEnd >= _dense.Length)
+            if (_valuesEnd >= Dense.Length)
             {
                 const int maxResizeDelta = 256;
-                Utils.ResizeArray(_valuesEnd, ref _dense, maxResizeDelta);
+                Utils.ResizeArray(_valuesEnd, ref Dense, maxResizeDelta);
             }
-            _dense[_valuesEnd] = eid;
+            Dense[_valuesEnd] = eid;
             _valuesEnd++;
 
 #if DEBUG && !ECS_PERF_TEST
-            if (_dense[_sparse[eid]] != eid)
+            if (Dense[_sparse[eid]] != eid)
                 throw new EcsException("wrong sparse set entities");
 #endif
 
@@ -204,10 +206,10 @@ namespace CodexECS
             //backswap using _dense
             var lastIdx = _valuesEnd - 1;
             if (innerIndex < lastIdx)
-                _sparse[_dense[lastIdx]] = innerIndex;
-            _dense[innerIndex] = -1;
+                _sparse[Dense[lastIdx]] = innerIndex;
+            Dense[innerIndex] = -1;
             _valuesEnd--;
-            _dense[innerIndex] = _dense[_valuesEnd];
+            Dense[innerIndex] = Dense[_valuesEnd];
 
 #endregion
             
@@ -287,16 +289,16 @@ namespace CodexECS
 #endif
 
                 _sparse[eid] = _valuesEnd;
-                if (_valuesEnd >= _dense.Length)
+                if (_valuesEnd >= Dense.Length)
                 {
                     const int maxResizeDelta = 256;
-                    Utils.ResizeArray(_valuesEnd, ref _dense, maxResizeDelta);
+                    Utils.ResizeArray(_valuesEnd, ref Dense, maxResizeDelta);
                 }
-                _dense[_valuesEnd] = eid;
+                Dense[_valuesEnd] = eid;
                 _valuesEnd++;
 
 #if DEBUG && !ECS_PERF_TEST
-                if (_dense[_sparse[eid]] != eid)
+                if (Dense[_sparse[eid]] != eid)
                     throw new EcsException("wrong sparse set idices");
 #endif
             }
@@ -315,10 +317,10 @@ namespace CodexECS
                 //backswap using _dense
                 var lastIdx = _valuesEnd - 1;
                 if (innerIndex < lastIdx)
-                    _sparse[_dense[lastIdx]] = innerIndex;
-                _dense[innerIndex] = -1;
+                    _sparse[Dense[lastIdx]] = innerIndex;
+                Dense[innerIndex] = -1;
                 _valuesEnd--;
-                _dense[innerIndex] = _dense[_valuesEnd];
+                Dense[innerIndex] = Dense[_valuesEnd];
             }
             _pendingDelete.Clear();
 
@@ -356,7 +358,7 @@ namespace CodexECS
             public Enumerator(EcsFilter filter)
             {
                 _filter = filter;
-                _dense = _filter._dense;
+                _dense = _filter.Dense;
                 _valuesEnd = _filter._valuesEnd;
                 _entityIndex = -1;
             }
@@ -426,7 +428,7 @@ namespace CodexECS
                 public DistributedEnumerator(DistributedView view, int maxEntitiesPerTick, int startIdx)
                 {
                     _view = view;
-                    _dense = _view._filter._dense;
+                    _dense = _view._filter.Dense;
                     _count = _view._filter.EntitiesCount;
                     if (_count < 1)
                         _count = 1; //just to prevent problems with % in MoveNext

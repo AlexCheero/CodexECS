@@ -20,11 +20,12 @@ namespace CodexECS
         public Type GetComponentType();
     }
 
-    class ComponentsPool<T> : IComponentsPool
+    public class ComponentsPool<T> : IComponentsPool
     {
-        public int[] _sparse;
+        public int[] Sparse;
+        public T[] Values;
+        
         private int[] _dense;
-        public T[] _values;
 #if DEBUG
         public int ValuesLength { get; private set; }
 #else
@@ -34,7 +35,7 @@ namespace CodexECS
         public ref T this[int id]
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get => ref _values[_sparse[id]];
+            get => ref Values[Sparse[id]];
         }
 
 #if HEAVY_ECS_DEBUG
@@ -57,14 +58,14 @@ namespace CodexECS
             _debugStringBuilder.Append(typeof(T).Name);
             if (printFields)
             {
-                var props = _values[_sparse[id]].GetType().GetFields();
+                var props = Values[Sparse[id]].GetType().GetFields();
                 if (props.Length > 0)
                     _debugStringBuilder.Append(':');
                 else
                     _debugStringBuilder.Append(" {}");
                 foreach (var p in props)
                 {
-                    var value = p.GetValue(_values[_sparse[id]]);
+                    var value = p.GetValue(Values[Sparse[id]]);
                     var valueString = value != null ? value.ToString() : "null";
                     _debugStringBuilder.Append("\n\t").Append(p.Name).Append(": ").Append(valueString).Append(", ");
                 }
@@ -86,18 +87,18 @@ namespace CodexECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Contains(int id) => id < _sparse.Length && _sparse[id] > -1;
+        public bool Contains(int id) => id < Sparse.Length && Sparse[id] > -1;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Remove(int id)
         {
-            var innerIndex = _sparse[id];
-            _sparse[id] = -1;
+            var innerIndex = Sparse[id];
+            Sparse[id] = -1;
 
 #region Unrolled SimpleList.RemoveAt
 
             // _values[innerIndex] = default;
-            ComponentMeta<T>.Cleanup(ref _values[innerIndex]);
+            ComponentMeta<T>.Cleanup(ref Values[innerIndex]);
             ValuesLength--;
             // if (innerIndex < ValuesLength)
             //     _values[innerIndex] = _values[ValuesLength];
@@ -107,11 +108,11 @@ namespace CodexECS
             if (innerIndex < ValuesLength)
             {
                 //moved from unrolled SimpleList.RemoveAt
-                _values[innerIndex] = _values[ValuesLength];
-                _values[ValuesLength] = default;
+                Values[innerIndex] = Values[ValuesLength];
+                Values[ValuesLength] = default;
 
                 var lastId = _dense[ValuesLength];
-                _sparse[lastId] = innerIndex;
+                Sparse[lastId] = innerIndex;
                 _dense[innerIndex] = lastId;
             }
 
@@ -126,10 +127,10 @@ namespace CodexECS
             for (int i = 0; i < ValuesLength; i++)
             {
                 int id = _dense[i];
-                if (id >= 0 && id < _sparse.Length)
+                if (id >= 0 && id < Sparse.Length)
                 {
-                    _sparse[id] = -1;
-                    ComponentMeta<T>.Cleanup(ref _values[i]);
+                    Sparse[id] = -1;
+                    ComponentMeta<T>.Cleanup(ref Values[i]);
                 }
             }
             ValuesLength = 0;
@@ -140,18 +141,18 @@ namespace CodexECS
         {
             var otherPool = (ComponentsPool<T>)other;
 
-            if (_sparse.Length < otherPool._sparse.Length)
-                Array.Resize(ref _sparse, otherPool._sparse.Length);
-            else if (_sparse.Length > otherPool._sparse.Length)
+            if (Sparse.Length < otherPool.Sparse.Length)
+                Array.Resize(ref Sparse, otherPool.Sparse.Length);
+            else if (Sparse.Length > otherPool.Sparse.Length)
             {
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP2_0_OR_GREATER || NET5_0_OR_GREATER
                 Array.Fill(_sparse, -1, otherPool._sparse.Length, _sparse.Length - otherPool._sparse.Length);
 #else
-                for (int i = otherPool._sparse.Length; i < _sparse.Length; i++)
-                    _sparse[i] = -1;
+                for (int i = otherPool.Sparse.Length; i < Sparse.Length; i++)
+                    Sparse[i] = -1;
 #endif
             }
-            Array.Copy(otherPool._sparse, _sparse, otherPool._sparse.Length);
+            Array.Copy(otherPool.Sparse, Sparse, otherPool.Sparse.Length);
 
             if (_dense.Length < otherPool._dense.Length)
                 Array.Resize(ref _dense, otherPool._dense.Length);
@@ -160,9 +161,9 @@ namespace CodexECS
 #region Unrolled SimpleList.Copy
 
             ValuesLength = otherPool.ValuesLength;
-            if (_values.Length < ValuesLength)
-                Array.Resize(ref _values, otherPool._values.Length);
-            Array.Copy(otherPool._values, _values, ValuesLength);
+            if (Values.Length < ValuesLength)
+                Array.Resize(ref Values, otherPool.Values.Length);
+            Array.Copy(otherPool.Values, Values, ValuesLength);
 
 #endregion
             
@@ -187,53 +188,53 @@ namespace CodexECS
             if (!Contains(from))
                 throw new EcsException("trying to copy non existent component");
 #endif
-            Add(to, _values[_sparse[from]]);
+            Add(to, Values[Sparse[from]]);
         }
 
         public ComponentsPool() : this(ComponentMeta<T>.InitialPoolSize) {}
         public ComponentsPool(int initialCapacity)
         {
-            _sparse = new int[initialCapacity];
+            Sparse = new int[initialCapacity];
             _dense = new int[initialCapacity];
             for (int i = 0; i < initialCapacity; i++)
-                _sparse[i] = -1;
-            _values = new T[initialCapacity];
+                Sparse[i] = -1;
+            Values = new T[initialCapacity];
             for (int i = 0; i < initialCapacity; i++)
-                _values[i] = ComponentMeta<T>.GetDefault();
+                Values[i] = ComponentMeta<T>.GetDefault();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Add(int id, T value)
         {
             // Resize sparse array if needed
-            if (id >= _sparse.Length)
+            if (id >= Sparse.Length)
             {
-                var oldLength = _sparse.Length;
+                var oldLength = Sparse.Length;
                 const int maxResizeDelta = 256;
-                Utils.ResizeArray(id, ref _sparse, maxResizeDelta);
-                for (int i = oldLength; i < _sparse.Length; i++)
-                    _sparse[i] = -1;
+                Utils.ResizeArray(id, ref Sparse, maxResizeDelta);
+                for (int i = oldLength; i < Sparse.Length; i++)
+                    Sparse[i] = -1;
             }
 
 #if DEBUG && !ECS_PERF_TEST
-            if (_sparse[id] > -1)
+            if (Sparse[id] > -1)
                 throw new EcsException(typeof(T) + " sparse set already have element at this index");
 #endif
 
             // Make sure values array has space
-            if (ValuesLength >= _values.Length)
+            if (ValuesLength >= Values.Length)
             {
                 const int maxResizeDelta = 256;
-                Utils.ResizeArray(ValuesLength, ref _values, maxResizeDelta);
+                Utils.ResizeArray(ValuesLength, ref Values, maxResizeDelta);
             }
 
             // Make sure dense array has space
-            if (_dense.Length < _values.Length)
-                Array.Resize(ref _dense, _values.Length);
+            if (_dense.Length < Values.Length)
+                Array.Resize(ref _dense, Values.Length);
 
             // Set up the connections
-            _sparse[id] = ValuesLength;
-            _values[ValuesLength] = value;
+            Sparse[id] = ValuesLength;
+            Values[ValuesLength] = value;
             _dense[ValuesLength] = id;
 
             ValuesLength++;
@@ -244,28 +245,28 @@ namespace CodexECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ref T Get(int id) => ref _values[_sparse[id]];
+        public ref T Get(int id) => ref Values[Sparse[id]];
         
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ref T GetNextFree()
         {
-            if (ValuesLength >= _values.Length)
+            if (ValuesLength >= Values.Length)
             {
                 const int maxResizeDelta = 256;
-                Utils.ResizeArray(ValuesLength, ref _values, maxResizeDelta);
-                _values[ValuesLength] = ComponentMeta<T>.GetDefault();
+                Utils.ResizeArray(ValuesLength, ref Values, maxResizeDelta);
+                Values[ValuesLength] = ComponentMeta<T>.GetDefault();
             }
             else
             {
-                ComponentMeta<T>.Init(ref _values[ValuesLength]);
-                ComponentMeta<T>.Cleanup(ref _values[ValuesLength]);
+                ComponentMeta<T>.Init(ref Values[ValuesLength]);
+                ComponentMeta<T>.Cleanup(ref Values[ValuesLength]);
             }
             
-            return ref _values[ValuesLength];
+            return ref Values[ValuesLength];
         }
     }
 
-    class TagsPool<T> : IComponentsPool
+    public class TagsPool<T> : IComponentsPool
     {
         private BitMask _tags;
         

@@ -72,7 +72,7 @@ namespace CodexECS
             var pool = (ComponentsPool<T>)_pools[ComponentMeta<T>.Id];
 
             //return ref pool.Get(eid);
-            return ref pool._values[pool._sparse[eid]];
+            return ref pool.Values[pool.Sparse[eid]];
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
