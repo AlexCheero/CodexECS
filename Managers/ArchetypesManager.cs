@@ -167,6 +167,7 @@ namespace CodexECS
 #endif
         }
 
+        private BitMask _moveBuffer;
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void MoveBetweenArchetypes(EntityType eid, int componentId, bool isAdd)
         {
@@ -179,15 +180,16 @@ namespace CodexECS
 
             Archetype archetype = _eToA[eid];
             archetype.RemoveEntity(eid);
-            BitMask nextMask = archetype.Mask.Duplicate();
+            //using move buffer to avoid allocations in cases when this bitmask already existed
+            _moveBuffer.Copy(archetype.Mask);
             if (isAdd)
-                nextMask.Set(componentId);
+                _moveBuffer.Set(componentId);
             else
-                nextMask.Unset(componentId);
+                _moveBuffer.Unset(componentId);
 
-            if (!_mToA.ContainsKey(nextMask))
-                AddArchetype(nextMask);
-            UpdateArchetype(eid, nextMask);
+            if (!_mToA.ContainsKey(_moveBuffer))
+                AddArchetype(_moveBuffer.Duplicate());
+            UpdateArchetype(eid, _moveBuffer);
             _eToA[eid].AddEntity(eid);
             
 #if HEAVY_ECS_DEBUG
