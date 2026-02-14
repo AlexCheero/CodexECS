@@ -433,7 +433,7 @@ namespace CodexECS
         public void Add_Dynamic(Type type, int id, object component) =>
             ComponentMapping.CallDispatchers[type].Add(this, id, component);
 
-        public IComponentsPool GetPool<T>() => _componentManager.GetPool(ComponentMeta<T>.Id);
+        public ComponentsPool<T> GetComponentsPool<T>() => (ComponentsPool<T>)_componentManager.GetPool(ComponentMeta<T>.Id);
         
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ref T Get<T>(EntityType eid)
