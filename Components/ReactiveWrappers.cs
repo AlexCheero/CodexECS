@@ -4,7 +4,7 @@
 
     public struct RemoveReact<T> : IComponent
     {
-        public T removingComponent;
+        public T removedComponent;
     }
 
     public struct MatchReact : IComponent {}

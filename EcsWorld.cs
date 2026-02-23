@@ -517,7 +517,7 @@ namespace CodexECS
                     _archetypes.AddComponent<RemoveReact<T>>(eid);
                     _componentManager.Add(eid, new RemoveReact<T>
                     {
-                        removingComponent = Get<T>(eid)
+                        removedComponent = Get<T>(eid)
                     });
 
                     _dirtyRemoveMask.Set(reactWrapperId);
