@@ -15,8 +15,9 @@ namespace CodexECS
 
     static class EntityExtension
     {
-        public const int BitSizeHalved = sizeof(EntityType) * 4;
-        public const EntityType VersionMask = -1 << BitSizeHalved;
+        public const int BitSize = sizeof(EntityType) * 8;
+        public const int BitSizeIdSize = (int)(BitSize * 3f / 4);
+        public const EntityType VersionMask = -1 << BitSizeIdSize;
         public const EntityType IdMask = ~VersionMask;
         public const EntityType NullId = IdMask;
         public const EntityType VersionIncrement = IdMask + 1;
@@ -57,7 +58,7 @@ namespace CodexECS
 
         //CODEX_TODO: use smaller part for version
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static EntityType GetVersion(this in Entity entity) => entity.Val >> BitSizeHalved;
+        public static EntityType GetVersion(this in Entity entity) => entity.Val >> BitSizeIdSize;
 
         //theoretically could overflow, but there is enough room for version
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
