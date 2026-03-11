@@ -55,7 +55,7 @@ namespace CodexECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Clear(bool full = false)
+        public void Clear()
         {
             _end = 0;
             for (int i = 0; i < _elements.Length; i++)
@@ -66,7 +66,7 @@ namespace CodexECS
         /// if this is the set of reference types, then they will still be in memory
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void ClearFast(bool full = false) => _end = 0;
+        public void ClearFast() => _end = 0;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Add(T element)
