@@ -400,10 +400,7 @@ namespace CodexECS
         {
             _m1 = 0;
             if (_mn != null)
-            {
-                for (int i = 0; i < _mn.Length; i++)
-                    _mn[i] = 0;
-            }
+                Array.Clear(_mn, 0, _mn.Length);
 
             _length = 0;
             _hash = 0;
