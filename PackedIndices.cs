@@ -29,17 +29,17 @@ namespace CodexECS
     public static class PackedIndicesBuffer
     {
         private const int BUFFER_START_SIZE = 1024;
-        private static PackedIndices[] _indices = new PackedIndices[BUFFER_START_SIZE];
+        public static PackedIndices[] Indices = new PackedIndices[BUFFER_START_SIZE];
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static PackedIndices[] GetBuffer(int size)
         {
-            if (size <= _indices.Length)
-                return _indices;
+            if (size <= Indices.Length)
+                return Indices;
             
             const int maxResizeDelta = 256;
-            Utils.ResizeArray(size - 1, ref _indices, maxResizeDelta);
-            return _indices;
+            Utils.ResizeArray(size - 1, ref Indices, maxResizeDelta);
+            return Indices;
         }
     }
 }
