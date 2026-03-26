@@ -732,7 +732,7 @@ namespace CodexECS
             _componentManager.GetPool(componentId).DebugString(id, printFields);
 
         private StringBuilder _debugEntityStringBuilder;
-        public string DebugEntity(int id, bool printFields)
+        public string DebugEntity(int id, bool printFields = false)
         {
             if (id == EntityExtension.NullId)
                 return "null entity";
