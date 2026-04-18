@@ -57,7 +57,7 @@ namespace CodexECS.Utility
         {
             int newLength;
             if (arr == null || arr.Length < maxResizeDelta || arr.Length + maxResizeDelta <= lastIdx)
-                newLength = 1 << (BITSize(lastIdx) + 1);
+                newLength = 1 << BITSize(lastIdx);
             else
                 newLength = arr.Length + maxResizeDelta;
 
