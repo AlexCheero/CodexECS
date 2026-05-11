@@ -26,8 +26,6 @@ namespace CodexECS
         private BitMask _addReactGuard;
         private BitMask _removeReactGuard;
 
-        private FilterBuilder _filterBuilder;
-
         private void SetPools(IComponentsPool[] pools) => _pools = pools;
 
         public EcsWorld()
@@ -198,22 +196,22 @@ namespace CodexECS
                 callbacks[reactWrapperId] += callback;
         }
 
-        private HashSet<BitMask> _dirtyMatchMasksSet;
-        private List<BitMask> _dirtyMatchMasksList;
-        private Dictionary<BitMask, Action<EcsWorld>> _onMatchCallbacks;
-        private SparseSet<HashSet<BitMask>> _componentToMatchMaskMapping;
+        private readonly HashSet<BitMask> _dirtyMatchMasksSet;
+        private readonly List<BitMask> _dirtyMatchMasksList;
+        private readonly Dictionary<BitMask, Action<EcsWorld>> _onMatchCallbacks;
+        private readonly SparseSet<HashSet<BitMask>> _componentToMatchMaskMapping;
+
         public void SubscribeOnComponentsSetMatch(BitMask mask, Action<EcsWorld> callback)
         {
-            if (!_onMatchCallbacks.ContainsKey(mask))
-                _onMatchCallbacks.Add(mask, callback);
-            else
-                _onMatchCallbacks[mask] += callback;
+            var maskKey = mask.Duplicate();
+            if (!_onMatchCallbacks.TryAdd(maskKey, callback))
+                _onMatchCallbacks[maskKey] += callback;
 
-            foreach (var componentId in mask)
+            foreach (var componentId in maskKey)
             {
                 if (!_componentToMatchMaskMapping.ContainsIdx(componentId))
                     _componentToMatchMaskMapping.Add(componentId, new(BitMask.MaskComparer));
-                _componentToMatchMaskMapping[componentId].Add(mask);
+                _componentToMatchMaskMapping[componentId].Add(maskKey);
             }
         }
 
@@ -626,7 +624,7 @@ namespace CodexECS
             public EcsFilter Build() => _world.RegisterFilter(_includes, _excludes);
         }
 
-        public FilterBuilder Filter() => new FilterBuilder { _world = this };
+        public FilterBuilder Filter() => new() { _world = this };
 
         private int _lockCounter;
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

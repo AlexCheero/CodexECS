@@ -141,6 +141,9 @@ namespace CodexECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void RemoveAll(int componentId)
         {
+            if (!_cToA.ContainsIdx(componentId))
+                return;
+
             for (var i = 0; i < _cToA[componentId].Count; i++)
             {
                 var archetype = _cToA[componentId][i];
@@ -201,16 +204,22 @@ namespace CodexECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool RegisterFilter(EcsWorld world, FilterMasks masks, out EcsFilter filter)
         {
-            if (_filters.ContainsKey(masks))
+            if (_filters.TryGetValue(masks, out var existingFilter))
             {
-                filter = _filters[masks];
+                filter = existingFilter;
                 return false;
             }
 
+            var key = new FilterMasks
+            {
+                Includes = masks.Includes.Duplicate(),
+                Excludes = masks.Excludes.Duplicate(),
+            };
+            
             filter = new EcsFilter(world);
-            _filters[masks] = filter;
+            _filters[key] = filter;
             foreach (var (_, archetype) in _mToA)
-                TryAddArchetypeToFilter(archetype, masks, filter);
+                TryAddArchetypeToFilter(archetype, key, filter);
 
             return true;
         }
