@@ -447,6 +447,26 @@ namespace CodexECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ref T GetFirst<T>()
+        {
+#if DEBUG && !ECS_PERF_TEST
+            if (ComponentMeta<T>.IsTag)
+                throw new EcsException("can't get specific component from tags pool");
+            if (!HasAny<T>())
+                throw new EcsException($"no components of type {typeof(T).Name} in the pool");
+#endif
+            var pool = (ComponentsPool<T>)_pools[ComponentMeta<T>.Id];
+            return ref pool.Values[0];
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool HasAny<T>()
+        {
+            var componentId = ComponentMeta<T>.Id;
+            return componentId < _pools.Length && _pools[componentId] != null && _pools[componentId].Length > 0;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool TryAdd<T>(EntityType eid
 #if USE_DEBUG_TRACE_COMPONENT && DEBUG
           , [CallerMemberName] string memberName = "",
