@@ -509,7 +509,7 @@ namespace CodexECS
         //private bool InclusivePass_Internal(MaskInternal value, MaskInternal filter) => (filter & (value ^ filter)) == 0;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool InclusivePass(in BitMask filter)
+        public readonly bool InclusivePass(in BitMask filter)
         {
             if (filter.Length > Length)
                 return false;
@@ -533,7 +533,7 @@ namespace CodexECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool ExclusivePass(in BitMask filter)
+        public readonly bool ExclusivePass(in BitMask filter)
         {
             if ((filter._m1 & _m1) != 0)
                 return false;
