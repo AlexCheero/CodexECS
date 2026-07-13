@@ -1,5 +1,4 @@
-﻿using CodexECS.Utility;
-using System.Runtime.CompilerServices;
+﻿using System.Runtime.CompilerServices;
 using EntityType = System.Int32;//duplicated in EntityExtension
 
 namespace CodexECS
@@ -24,6 +23,8 @@ namespace CodexECS
             _recycleListEndIdx = RECYCLE_LIST_HEAD_IDX;
 
             _entities = new SimpleList<Entity>();
+            // Index 0 is reserved for NullId / NullEntity
+            _entities.Add(EntityExtension.NullEntity);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -122,7 +123,7 @@ namespace CodexECS
 
             Entity lastEntity = new Entity(_entities.Length);
 #if DEBUG && !ECS_PERF_TEST
-            if (lastEntity.Val == EntityExtension.NullEntity.Val)
+            if (lastEntity.GetId() > EntityExtension.IdMask || lastEntity.GetId() == EntityExtension.NullId)
                 throw new EcsException("entity limit reached");
             if (_entities.Length < 0)
                 throw new EcsException("entities vector length overflow");

@@ -19,10 +19,10 @@ namespace CodexECS
         public const int BitSizeIdSize = (int)(BitSize * 3f / 4);
         public const EntityType VersionMask = -1 << BitSizeIdSize;
         public const EntityType IdMask = ~VersionMask;
-        public const EntityType NullId = IdMask;
+        public const EntityType NullId = 0;
         public const EntityType VersionIncrement = IdMask + 1;
 
-        public static readonly Entity NullEntity = new(NullId);
+        public static readonly Entity NullEntity = default;
 
 #if DEBUG
         static EntityExtension()
@@ -44,7 +44,7 @@ namespace CodexECS
         public static void SetId(this ref Entity entity, in EntityType id)
         {
 #if DEBUG && !ECS_PERF_TEST
-            if (id >= NullEntity.Val)
+            if (id == NullId || id > IdMask)
                 throw new EcsException("set overflow id");
 #endif
             entity.Val = id | (entity.Val & VersionMask);
