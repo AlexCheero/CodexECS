@@ -1,6 +1,7 @@
 ﻿using CodexECS.Utility;
 using System.Runtime.CompilerServices;
 using System;
+using System.Reflection;
 using System.Text;
 
 namespace CodexECS
@@ -58,18 +59,19 @@ namespace CodexECS
             _debugStringBuilder.Append(typeof(T).Name);
             if (printFields)
             {
-                var props = Values[Sparse[id]].GetType().GetFields();
-                if (props.Length > 0)
+                var fields = Values[Sparse[id]].GetType().GetFields(
+                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                if (fields.Length > 0)
                     _debugStringBuilder.Append(':');
                 else
                     _debugStringBuilder.Append(" {}");
-                foreach (var p in props)
+                foreach (var field in fields)
                 {
-                    var value = p.GetValue(Values[Sparse[id]]);
+                    var value = field.GetValue(Values[Sparse[id]]);
                     var valueString = value != null ? value.ToString() : "null";
-                    _debugStringBuilder.Append("\n\t").Append(p.Name).Append(": ").Append(valueString).Append(", ");
+                    _debugStringBuilder.Append("\n\t").Append(field.Name).Append(": ").Append(valueString).Append(", ");
                 }
-                if (props.Length > 0)
+                if (fields.Length > 0)
                     _debugStringBuilder.Remove(_debugStringBuilder.Length - 2, 2);//remove last comma
             }
             
