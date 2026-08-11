@@ -109,9 +109,7 @@ namespace CodexECS
             
             if (innerIndex < ValuesLength)
             {
-                //moved from unrolled SimpleList.RemoveAt
-                Values[innerIndex] = Values[ValuesLength];
-                Values[ValuesLength] = default;
+                (Values[innerIndex], Values[ValuesLength]) = (Values[ValuesLength], Values[innerIndex]);
 
                 var lastId = _dense[ValuesLength];
                 Sparse[lastId] = innerIndex;
