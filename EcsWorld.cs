@@ -150,6 +150,15 @@ namespace CodexECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool HaveAny(in BitMask mask, EntityType eid)
+        {
+#if DEBUG && !ECS_PERF_TEST
+            //TODO: implement
+#endif
+            return _archetypes.HaveAny(mask, eid);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Have(int componentId, EntityType eid)
         {
 #if DEBUG && !ECS_PERF_TEST

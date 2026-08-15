@@ -308,6 +308,7 @@ namespace CodexECS
             return mask;
         }
         
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Intersects(in BitMask otherMask)
         {
             if ((_m1 & otherMask._m1) != 0)

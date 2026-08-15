@@ -229,6 +229,9 @@ namespace CodexECS
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Have(in BitMask mask, EntityType eid) => _eToA[eid].Mask.InclusivePass(mask);
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool HaveAny(in BitMask mask, EntityType eid) => _eToA[eid].Mask.Intersects(mask);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Have(int componentId, EntityType eid) => _eToA[eid].Mask.Check(componentId);
