@@ -53,6 +53,16 @@ namespace CodexECS
             _end--;
             _elements[idx] = _elements[_end];
         }
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void FastRemoveLast(int idx)
+        {
+#if DEBUG && !ECS_PERF_TEST
+            if (_end < 1)
+                throw new IndexOutOfRangeException("nothing to remove");
+#endif
+            _end--;
+        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Clear()
