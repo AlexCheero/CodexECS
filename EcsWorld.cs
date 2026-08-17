@@ -281,6 +281,13 @@ namespace CodexECS
             else
                 firstComponent = Get<MultipleComponents<T>>(eid).components[0];
         }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void RemoveAllMultiple<T>(EntityType eid)
+        {
+            Remove<MultipleComponents<T>>(eid);
+            Remove<T>(eid);
+        }
         
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void RemoveMultipleAll<T>(EntityType eid)
