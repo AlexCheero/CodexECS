@@ -231,7 +231,7 @@ namespace CodexECS
             public Enumerator(SparseSet<T> set)
             {
                 _set = set;
-                _currentIdx = 0;
+                _currentIdx = -1;
             }
 
             public readonly (int, T) Current
