@@ -55,6 +55,9 @@ namespace CodexECS.Utility
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void ResizeArray<T>(int lastIdx, ref T[] arr, int maxResizeDelta)
         {
+            if (lastIdx < 0 || arr != null && lastIdx < arr.Length)
+                return;
+
             int newLength;
             if (arr == null || arr.Length < maxResizeDelta || arr.Length + maxResizeDelta <= lastIdx)
                 newLength = 1 << BITSize(lastIdx);
