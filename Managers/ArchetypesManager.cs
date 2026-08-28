@@ -136,6 +136,7 @@ namespace CodexECS
             MoveBetweenArchetypes(eid, componentId, false);
         }
         
+        private BitMask _removeAllBuffer;
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void RemoveAll<T>() { RemoveAll(ComponentMeta<T>.Id); }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -148,10 +149,16 @@ namespace CodexECS
             {
                 var archetype = _cToA[componentId][i];
 
-                var nextMask = archetype.Mask.AndNot(componentId);
-                if (!_mToA.ContainsKey(nextMask))
-                    AddArchetype(nextMask);
-                var nextArchetype = _mToA[nextMask];
+                // Keep lookup storage reusable. The scratch mask is never persisted because
+                // mutating a dictionary key's backing array would invalidate its hash/equality.
+                _removeAllBuffer.Copy(archetype.Mask);
+                _removeAllBuffer.Unset(componentId);
+                if (!_mToA.TryGetValue(_removeAllBuffer, out var nextArchetype))
+                {
+                    var persistentMask = _removeAllBuffer.Duplicate();
+                    AddArchetype(persistentMask);
+                    nextArchetype = _mToA[persistentMask];
+                }
                 //hack. we store EntitiesEnd and then clear archetype, before iterating its entities in order for the filters to update
                 //in fact the array of entities is not cleared and it is just EntitiesEnd which is reset to 0
                 var entitiesEnd = archetype.EntitiesEnd;
@@ -159,7 +166,7 @@ namespace CodexECS
                 for (int j = 0; j < entitiesEnd; j++)
                 {
                     var eid = archetype.EntitiesArr[j];
-                    UpdateArchetype(eid, nextMask);
+                    UpdateArchetype(eid, nextArchetype.Mask);
                     nextArchetype.AddEntity(eid);
                 }
             }
