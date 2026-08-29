@@ -273,6 +273,156 @@ namespace CodexECS.Tests
                 "Reactive code must not observe the pre-unlock filter snapshot.");
         }
 
+        [Test]
+        public void Delete_BypassesRemoveSubscriptionsAndDoesNotCreateArchetypes()
+        {
+            var world = new EcsWorld();
+            var removeCalls = 0;
+            world.SubscribeOnRemove<RemovedValue>(_ => removeCalls++);
+
+            var eid = world.CreateWithComponents(new BitMask(
+                ComponentMeta<Anchor>.Id,
+                ComponentMeta<RemovedValue>.Id));
+            var archetypeCountBeforeDelete = GetArchetypeCount(world);
+
+            world.Delete(eid);
+            world.FlushReactives();
+
+            Assert.IsTrue(world.IsDead(eid));
+            Assert.AreEqual(0, removeCalls,
+                "Hard deletion must not turn component cleanup into remove reactions.");
+            Assert.AreEqual(archetypeCountBeforeDelete, GetArchetypeCount(world),
+                "Hard deletion must leave the entity's current archetype directly.");
+        }
+
+        [Test]
+        public void DeleteDuringFilterIteration_UsesTheSameHardDeletePathAfterUnlock()
+        {
+            var world = new EcsWorld();
+            var source = world.Filter().With<Anchor>().Build();
+            var removeCalls = 0;
+            world.SubscribeOnRemove<RemovedValue>(_ => removeCalls++);
+
+            var eid = world.CreateWithComponents(new BitMask(
+                ComponentMeta<Anchor>.Id,
+                ComponentMeta<RemovedValue>.Id));
+            var archetypeCountBeforeDelete = GetArchetypeCount(world);
+
+            foreach (var sourceEid in source)
+            {
+                Assert.AreEqual(eid, sourceEid);
+                world.Delete(sourceEid);
+                Assert.IsFalse(world.IsDead(sourceEid),
+                    "Deletion is deferred while the source filter is locked.");
+            }
+
+            Assert.IsTrue(world.IsDead(eid));
+            Assert.AreEqual(0, removeCalls);
+            Assert.AreEqual(archetypeCountBeforeDelete, GetArchetypeCount(world));
+        }
+
+        [Test]
+        public void Delete_CancelsQueuedAddRemoveAndMatchCallbackInvocations()
+        {
+            var world = new EcsWorld();
+            var addCalls = 0;
+            var removeCalls = 0;
+            var matchCalls = 0;
+
+            world.SubscribeOnAdd<MatchA>(_ => addCalls++);
+            world.SubscribeOnRemove<RemovedValue>(_ => removeCalls++);
+            world.SubscribeOnComponentsSetMatch(
+                new BitMask(ComponentMeta<Anchor>.Id),
+                _ => matchCalls++);
+
+            var eid = world.CreateWithComponents(new BitMask(
+                ComponentMeta<Anchor>.Id,
+                ComponentMeta<MatchA>.Id,
+                ComponentMeta<RemovedValue>.Id));
+            world.Remove<RemovedValue>(eid);
+            world.Delete(eid);
+            world.FlushReactives();
+
+            Assert.IsTrue(world.IsDead(eid));
+            Assert.AreEqual(0, addCalls);
+            Assert.AreEqual(0, removeCalls);
+            Assert.AreEqual(0, matchCalls);
+        }
+
+        [Test]
+        public void DeleteInsideReactiveCallback_CancelsLaterEventsWithoutAnArchetypeTransition()
+        {
+            var world = new EcsWorld();
+            var firstEventFilter = world.Filter()
+                .With<MatchA>()
+                .With<AddReact<MatchA>>()
+                .Build();
+            var firstCalls = 0;
+            var cancelledCalls = 0;
+            var archetypeCountAtDelete = -1;
+
+            world.SubscribeOnAdd<MatchA>(reactiveWorld =>
+            {
+                firstCalls++;
+                foreach (var reactiveEid in firstEventFilter)
+                {
+                    reactiveWorld.Add<MatchB>(reactiveEid);
+                    archetypeCountAtDelete = GetArchetypeCount(reactiveWorld);
+                    reactiveWorld.Delete(reactiveEid);
+                }
+            });
+            world.SubscribeOnAdd<MatchB>(_ => cancelledCalls++);
+
+            var eid = world.CreateWithComponents(new BitMask(ComponentMeta<Anchor>.Id));
+            world.Add<MatchA>(eid);
+            world.FlushReactives();
+
+            Assert.AreEqual(1, firstCalls);
+            Assert.AreEqual(0, cancelledCalls,
+                "A later event for an entity already scheduled for deletion must be discarded.");
+            Assert.IsTrue(world.IsDead(eid));
+            Assert.AreEqual(archetypeCountAtDelete, GetArchetypeCount(world),
+                "Reactive wrapper cleanup must not move an entity that is awaiting hard deletion.");
+        }
+
+        [Test]
+        public void FinalWorldUnlock_IsTheSingleReactiveFlushBoundary()
+        {
+            var world = new EcsWorld();
+            var source = world.Filter().With<Anchor>().Build();
+            var callbackCalls = 0;
+            var sourceCountSeen = -1;
+            world.SubscribeOnAdd<MatchA>(_ =>
+            {
+                callbackCalls++;
+                sourceCountSeen = source.EntitiesCount;
+            });
+
+            var eid = world.CreateWithComponents(new BitMask(ComponentMeta<Anchor>.Id));
+            world.Lock();
+            try
+            {
+                foreach (var sourceEid in source)
+                {
+                    world.Add<MatchA>(sourceEid);
+                    world.Remove<Anchor>(sourceEid);
+                }
+
+                Assert.AreEqual(0, callbackCalls,
+                    "Nested filter unlock must not flush before the system/world scope ends.");
+                Assert.AreEqual(0, source.EntitiesCount,
+                    "The filter must still commit its own pending membership immediately.");
+            }
+            finally
+            {
+                world.Unlock();
+            }
+
+            Assert.AreEqual(1, callbackCalls);
+            Assert.AreEqual(0, sourceCountSeen);
+            Assert.IsTrue(world.Have<MatchA>(eid));
+        }
+
         private static List<int> Snapshot(EcsFilter filter)
         {
             var result = new List<int>();

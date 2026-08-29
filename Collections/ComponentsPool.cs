@@ -46,7 +46,7 @@ namespace CodexECS
             for (int i = 0; i < ValuesLength; i++)
             {
                 var outer = _dense[i];
-                var inner = _sparse[outer];
+                var inner = Sparse[outer];
                 if (inner != i)
                     throw new EcsException("indices mismatch 2");
             }

@@ -867,23 +867,19 @@ namespace CodexECS
 
         public void FlushReactives()
         {
-            if (_lockCounter != 0)
-                return;
-
-            foreach (var eid in _delayedDeleteList)
-                Delete_Impl(eid);
-            _delayedDeleteList.Clear();
-
-            if (_isFlushingReactives)
+            if (_lockCounter != 0 || _isFlushingReactives)
                 return;
 
             _isFlushingReactives = true;
             try
             {
-                while (_dirtyAddMask.Length > 0 ||
+                while (_delayedDeleteList.Length > 0 ||
+                       _dirtyAddMask.Length > 0 ||
                        _dirtyRemoveMask.Length > 0 ||
                        _dirtyMatchNodes.Count > 0)
                 {
+                    DeleteDelayedEntities();
+
                     ReactOnAddRemove(
                         ref _dirtyAddMask,
                         _onAddCallbacks,
@@ -900,7 +896,21 @@ namespace CodexECS
             finally
             {
                 _isFlushingReactives = false;
+                // A callback may throw after scheduling a hard delete. Keep the world
+                // structurally valid without dispatching any more reactive callbacks.
+                if (_lockCounter == 0)
+                    DeleteDelayedEntities();
             }
+        }
+
+        private void DeleteDelayedEntities()
+        {
+            foreach (var eid in _delayedDeleteList)
+            {
+                if (IsIdValid(eid))
+                    Delete_Impl(eid);
+            }
+            _delayedDeleteList.Clear();
         }
 
         private void ReactOnAddRemove(
@@ -924,6 +934,17 @@ namespace CodexECS
                 var processingEntities = pendingEntities[reactWrapperId].Duplicate();
                 pendingEntities[reactWrapperId].Clear();
 
+                var haveLiveReaction = false;
+                foreach (var eid in processingEntities)
+                {
+                    if (_delayedDeleteList.Check(eid) || !IsIdValid(eid) || !Have(reactWrapperId, eid))
+                        continue;
+                    haveLiveReaction = true;
+                    break;
+                }
+                if (!haveLiveReaction)
+                    continue;
+
                 Lock();
                 try
                 {
@@ -935,7 +956,10 @@ namespace CodexECS
                     {
                         // A same-type event raised by the callback owns the wrapper now and
                         // will be handled by the next queue generation.
-                        if (pendingEntities[reactWrapperId].Check(eid) || !IsIdValid(eid) || !Have(reactWrapperId, eid))
+                        if (_delayedDeleteList.Check(eid) ||
+                            pendingEntities[reactWrapperId].Check(eid) ||
+                            !IsIdValid(eid) ||
+                            !Have(reactWrapperId, eid))
                             continue;
 
                         _archetypes.RemoveComponent(eid, reactWrapperId);
@@ -965,19 +989,22 @@ namespace CodexECS
                 {
                     foreach (var eid in processingEntities)
                     {
-                        if (!IsIdValid(eid) || !_archetypes.GetMask(eid).InclusivePass(node.RequiredMask))
+                        if (_delayedDeleteList.Check(eid) ||
+                            !IsIdValid(eid) ||
+                            !_archetypes.GetMask(eid).InclusivePass(node.RequiredMask))
                             continue;
                         EnsureMatchReact(eid);
                         markedEntities.Set(eid);
                     }
 
-                    node.Invoke(this);
+                    if (markedEntities.Length > 0)
+                        node.Invoke(this);
                 }
                 finally
                 {
                     foreach (var eid in markedEntities)
                     {
-                        if (!IsIdValid(eid) || !Have<MatchReact>(eid))
+                        if (_delayedDeleteList.Check(eid) || !IsIdValid(eid) || !Have<MatchReact>(eid))
                             continue;
                         RemoveInternal<MatchReact>(eid);
                         if (_archetypes.GetMask(eid).Length == 0)

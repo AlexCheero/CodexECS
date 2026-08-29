@@ -226,8 +226,8 @@ namespace CodexECS
         {
             for (int i = 0; i < _valuesEnd; i++)
             {
-                var outerIdx = _dense[i];
-                if (outerIdx != _dense[_sparse[outerIdx]])
+                var outerIdx = Dense[i];
+                if (outerIdx != Dense[_sparse[outerIdx]])
                     return false;
             }
 
@@ -242,7 +242,7 @@ namespace CodexECS
                 {
                     if (i == j)
                         continue;
-                    if (_dense[i] == _dense[j])
+                    if (Dense[i] == Dense[j])
                         return false;
                 }
             }
