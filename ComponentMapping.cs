@@ -10,9 +10,11 @@ namespace CodexECS
     {
         public interface IWorldCallDispatcher
         {
+            public void AddDefault(EcsWorld world, int id);
             public void Add(EcsWorld world, int id, object obj);
             public void AddMultiple(EcsWorld world, int id, object obj);
             public void Set(EcsWorld world, int id, object obj);
+            public void Remove(EcsWorld world, int id);
             public void Copy(EcsWorld world, int from, int to);
             public void ReactOnAdd(EcsWorld world, int id, bool checkComponentsSetMatch);
             public void ReactOnRemove(EcsWorld world, int id);
@@ -21,11 +23,15 @@ namespace CodexECS
         private class WorldCallDispatcher<T> : IWorldCallDispatcher
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public void AddDefault(EcsWorld world, int id) => world.Add<T>(id);
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void Add(EcsWorld world, int id, object obj) => world.Add(id, (T)obj);
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void AddMultiple(EcsWorld world, int id, object obj) => world.AddMultiple(id, (T)obj);
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void Set(EcsWorld world, int id, object obj) => world.Replace(id, (T)obj);
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public void Remove(EcsWorld world, int id) => world.Remove<T>(id);
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void Copy(EcsWorld world, int from, int to) => world.CopyComponent<T>(from, to);
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -51,6 +57,24 @@ namespace CodexECS
         
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool HaveId(int id) => IDToType.ContainsKey(id);
+
+        /// <summary>
+        /// Ensures that the closed ComponentMeta type has registered the supplied runtime
+        /// component type, then returns its id. Editor tooling uses this before building
+        /// filters for component types that may not have appeared in the world yet.
+        /// </summary>
+        public static int EnsureTypeRegistered(Type type)
+        {
+            if (type == null)
+                throw new ArgumentNullException(nameof(type));
+            if (!HaveType(type))
+            {
+                var componentMetaType = typeof(ComponentMeta<>).MakeGenericType(type);
+                RuntimeHelpers.RunClassConstructor(componentMetaType.TypeHandle);
+            }
+
+            return GetIdForType(type);
+        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static bool TryGetMultipleStorageId(int componentId, out int storageId)

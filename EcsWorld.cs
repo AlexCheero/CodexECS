@@ -20,6 +20,7 @@ namespace CodexECS
         
         private readonly SparseSet<Action<EcsWorld>> _onAddCallbacks;
         private readonly SparseSet<Action<EcsWorld>> _onRemoveCallbacks;
+        internal event Action<EcsFilter, FilterMasks> FilterResolved;
         private BitMask _dirtyAddMask;
         private BitMask _dirtyRemoveMask;
 
@@ -600,16 +601,34 @@ namespace CodexECS
 #endif
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Add_Dynamic(Type type, int id)
+        {
+            ComponentMapping.EnsureTypeRegistered(type);
+            ComponentMapping.CallDispatchers[type].AddDefault(this, id);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void AddMultiple_Dynamic(Type type, int id, object component) =>
-            ComponentMapping.CallDispatchers[type].AddMultiple(this, id, component);
+            GetDynamicDispatcher(type).AddMultiple(this, id, component);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Add_Dynamic(Type type, int id, object component) =>
-            ComponentMapping.CallDispatchers[type].Add(this, id, component);
+            GetDynamicDispatcher(type).Add(this, id, component);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Set_Dynamic(Type type, int id, object component) =>
-            ComponentMapping.CallDispatchers[type].Set(this, id, component);
+            GetDynamicDispatcher(type).Set(this, id, component);
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Remove_Dynamic(Type type, int id) =>
+            GetDynamicDispatcher(type).Remove(this, id);
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static ComponentMapping.IWorldCallDispatcher GetDynamicDispatcher(Type type)
+        {
+            ComponentMapping.EnsureTypeRegistered(type);
+            return ComponentMapping.CallDispatchers[type];
+        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Replace<T>(EntityType eid, T component)
@@ -811,6 +830,9 @@ namespace CodexECS
         public EcsFilter RegisterFilter(FilterMasks masks)
         {
             _archetypes.RegisterFilter(this, masks, out EcsFilter filter);
+            // Pipelines observe every resolution while constructing a system so shared,
+            // already-registered filters are still associated with that system.
+            FilterResolved?.Invoke(filter, masks);
             return filter;
         }
 

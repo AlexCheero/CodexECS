@@ -40,6 +40,7 @@ namespace CodexECS
 #endif
 
         public readonly EcsWorld World;
+        internal event Action EmptinessChanged;
         
         // private SparseSet<EntityType> _entitiesSet;
         private int[] _sparse;
@@ -123,6 +124,8 @@ namespace CodexECS
                 
                 return;
             }
+
+            var wasEmpty = _valuesEnd == 0;
             
             // _entitiesSet.Add(eid, eid);
 #region SparseSet.Add unrolled
@@ -165,6 +168,7 @@ namespace CodexECS
             if (!CheckUniqueness())
                 throw new EcsException("Entities not unique!");
 #endif
+            NotifyIfEmptinessChanged(wasEmpty);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -191,6 +195,8 @@ namespace CodexECS
                 
                 return;
             }
+
+            var wasEmpty = _valuesEnd == 0;
 
             // _entitiesSet.RemoveAt(eid);
 #region SparseSet.RemoveAt unrolled
@@ -219,6 +225,14 @@ namespace CodexECS
             if (!CheckUniqueness())
                 throw new EcsException("Entities not unique!");
 #endif
+            NotifyIfEmptinessChanged(wasEmpty);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void NotifyIfEmptinessChanged(bool wasEmpty)
+        {
+            if (wasEmpty != (_valuesEnd == 0))
+                EmptinessChanged?.Invoke();
         }
 
 #if HEAVY_ECS_DEBUG
@@ -270,6 +284,8 @@ namespace CodexECS
 #endif
                 if (_lockCounter != 0 || !_dirty)
                     return;
+
+                var wasEmpty = _valuesEnd == 0;
 
                 foreach (var eid in _pendingAdd)
                 {
@@ -326,6 +342,7 @@ namespace CodexECS
                 _pendingDelete.Clear();
 
                 _dirty = false;
+                NotifyIfEmptinessChanged(wasEmpty);
 
 #if HEAVY_ECS_DEBUG
                 if (!CheckEntitiesSynch())
