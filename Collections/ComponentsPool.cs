@@ -15,6 +15,7 @@ namespace CodexECS
         public void Copy(in IComponentsPool other);
         public IComponentsPool Duplicate();
 
+        public void AddDefault(int id);
         public void CopyItem(int from, int to);
 
         public string DebugString(int id, bool printFields);
@@ -140,13 +141,18 @@ namespace CodexECS
         public void Copy(in IComponentsPool other)
         {
             var otherPool = (ComponentsPool<T>)other;
+            if (ReferenceEquals(this, otherPool))
+                return;
+
+            for (var i = 0; i < ValuesLength; i++)
+                ComponentMeta<T>.Cleanup(ref Values[i]);
 
             if (Sparse.Length < otherPool.Sparse.Length)
                 Array.Resize(ref Sparse, otherPool.Sparse.Length);
             else if (Sparse.Length > otherPool.Sparse.Length)
             {
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP2_0_OR_GREATER || NET5_0_OR_GREATER
-                Array.Fill(_sparse, -1, otherPool._sparse.Length, _sparse.Length - otherPool._sparse.Length);
+                Array.Fill(Sparse, -1, otherPool.Sparse.Length, Sparse.Length - otherPool.Sparse.Length);
 #else
                 for (int i = otherPool.Sparse.Length; i < Sparse.Length; i++)
                     Sparse[i] = -1;
@@ -163,7 +169,8 @@ namespace CodexECS
             ValuesLength = otherPool.ValuesLength;
             if (Values.Length < ValuesLength)
                 Array.Resize(ref Values, otherPool.Values.Length);
-            Array.Copy(otherPool.Values, Values, ValuesLength);
+            for (var i = 0; i < ValuesLength; i++)
+                ComponentMeta<T>.Copy(in otherPool.Values[i], ref Values[i]);
 
 #endregion
             
@@ -188,8 +195,13 @@ namespace CodexECS
             if (!Contains(from))
                 throw new EcsException("trying to copy non existent component");
 #endif
-            Add(to, Values[Sparse[from]]);
+            var copiedValue = default(T);
+            ComponentMeta<T>.Copy(in Values[Sparse[from]], ref copiedValue);
+            Add(to, copiedValue);
         }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void AddDefault(int id) => Add(id, GetNextFree());
 
         public ComponentsPool() : this(ComponentMeta<T>.InitialPoolSize) {}
         public ComponentsPool(int initialCapacity)
@@ -199,8 +211,6 @@ namespace CodexECS
             for (int i = 0; i < initialCapacity; i++)
                 Sparse[i] = -1;
             Values = new T[initialCapacity];
-            for (int i = 0; i < initialCapacity; i++)
-                Values[i] = ComponentMeta<T>.GetDefault();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -254,13 +264,12 @@ namespace CodexECS
             {
                 const int maxResizeDelta = 256;
                 Utils.ResizeArray(ValuesLength, ref Values, maxResizeDelta);
-                Values[ValuesLength] = ComponentMeta<T>.GetDefault();
             }
-            else
-            {
-                ComponentMeta<T>.Init(ref Values[ValuesLength]);
-                ComponentMeta<T>.Cleanup(ref Values[ValuesLength]);
-            }
+
+            // Free slots have already been cleaned by Remove/Clear. Assigning a fresh
+            // metadata default makes every allocation run Init exactly once and avoids
+            // both eager initialization and double Cleanup when a slot is reused.
+            Values[ValuesLength] = ComponentMeta<T>.GetDefault();
             
             return ref Values[ValuesLength];
         }
@@ -308,6 +317,9 @@ namespace CodexECS
 #endif
             Add(to);
         }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void AddDefault(int id) => Add(id);
 
         public TagsPool() => _tags = new BitMask();
 

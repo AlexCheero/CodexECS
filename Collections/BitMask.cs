@@ -201,7 +201,7 @@ namespace CodexECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public BitMask Duplicate()
+        public readonly BitMask Duplicate()
         {
             var copy = new BitMask();
             copy.Copy(this);

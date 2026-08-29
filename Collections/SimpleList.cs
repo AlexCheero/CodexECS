@@ -45,13 +45,15 @@ namespace CodexECS
         public void SwapRemoveAt(int idx)
         {
 #if DEBUG && !ECS_PERF_TEST
-            if (idx >= _end)
+            if (idx < 0 || idx >= _end)
                 throw new EcsException("idx should be smaller than _end");
 #endif
-            //needed to cleanup reference types even if this is the last element in collection
-            _elements[idx] = default;
             _end--;
-            _elements[idx] = _elements[_end];
+            if (idx < _end)
+                _elements[idx] = _elements[_end];
+            // Release the old final slot after the swap so reference values are not
+            // retained twice in the backing array.
+            _elements[_end] = default;
         }
         
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

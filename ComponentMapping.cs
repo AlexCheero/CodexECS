@@ -12,7 +12,10 @@ namespace CodexECS
         {
             public void Add(EcsWorld world, int id, object obj);
             public void AddMultiple(EcsWorld world, int id, object obj);
+            public void Set(EcsWorld world, int id, object obj);
             public void Copy(EcsWorld world, int from, int to);
+            public void ReactOnAdd(EcsWorld world, int id, bool checkComponentsSetMatch);
+            public void ReactOnRemove(EcsWorld world, int id);
         }
 
         private class WorldCallDispatcher<T> : IWorldCallDispatcher
@@ -22,12 +25,20 @@ namespace CodexECS
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void AddMultiple(EcsWorld world, int id, object obj) => world.AddMultiple(id, (T)obj);
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public void Set(EcsWorld world, int id, object obj) => world.Replace(id, (T)obj);
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void Copy(EcsWorld world, int from, int to) => world.CopyComponent<T>(from, to);
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public void ReactOnAdd(EcsWorld world, int id, bool checkComponentsSetMatch) =>
+                world.ReactOnAdd<T>(id, checkComponentsSetMatch);
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public void ReactOnRemove(EcsWorld world, int id) => world.ReactOnRemove<T>(id);
         }
 
         public static readonly Dictionary<Type, IWorldCallDispatcher> CallDispatchers = new();
         private static readonly Dictionary<Type, int> TypeToId = new();
         private static readonly Dictionary<int, Type> IDToType = new();
+        private static readonly Dictionary<Type, int> MultipleStorageIds = new();
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static int GetIdForType(Type type) => TypeToId[type];
@@ -40,6 +51,14 @@ namespace CodexECS
         
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool HaveId(int id) => IDToType.ContainsKey(id);
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static bool TryGetMultipleStorageId(int componentId, out int storageId)
+        {
+            storageId = -1;
+            return IDToType.TryGetValue(componentId, out var componentType) &&
+                   MultipleStorageIds.TryGetValue(componentType, out storageId);
+        }
         
         public static void Add(Type type, int id)
         {
@@ -52,6 +71,10 @@ namespace CodexECS
             
             TypeToId[type] = id;
             IDToType[id] = type;
+
+            if (type.IsGenericType &&
+                type.GetGenericTypeDefinition() == typeof(MultipleComponents<>))
+                MultipleStorageIds[type.GetGenericArguments()[0]] = id;
             
             var closedType = typeof(WorldCallDispatcher<>).MakeGenericType(type);
             CallDispatchers[type] = (IWorldCallDispatcher)Activator.CreateInstance(closedType);

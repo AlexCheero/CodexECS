@@ -261,77 +261,86 @@ namespace CodexECS
 
         public void Unlock()
         {
-            World.Unlock();
-            _lockCounter--;
-#if DEBUG && !ECS_PERF_TEST
-            if (_lockCounter < 0)
-                throw new EcsException("negative lock counter");
-#endif
-            if (_lockCounter != 0 || !_dirty)
-                return;
-
-            foreach (var eid in _pendingAdd)
+            try
             {
-                // _entitiesSet.Add(eid, eid);
-                if (eid >= _sparse.Length)
+                _lockCounter--;
+#if DEBUG && !ECS_PERF_TEST
+                if (_lockCounter < 0)
+                    throw new EcsException("negative lock counter");
+#endif
+                if (_lockCounter != 0 || !_dirty)
+                    return;
+
+                foreach (var eid in _pendingAdd)
                 {
-                    var oldLength = _sparse.Length;
+                    // _entitiesSet.Add(eid, eid);
+                    if (eid >= _sparse.Length)
+                    {
+                        var oldLength = _sparse.Length;
 
-                    const int maxResizeDelta = 256;
-                    Utils.ResizeArray(eid, ref _sparse, maxResizeDelta);
-                    for (int i = oldLength; i < _sparse.Length; i++)
-                        _sparse[i] = -1;
-                }
+                        const int maxResizeDelta = 256;
+                        Utils.ResizeArray(eid, ref _sparse, maxResizeDelta);
+                        for (int i = oldLength; i < _sparse.Length; i++)
+                            _sparse[i] = -1;
+                    }
 
 #if DEBUG && !ECS_PERF_TEST
-                if (_sparse[eid] > -1)
-                    throw new EcsException("sparse set already have element at this index");
+                    if (_sparse[eid] > -1)
+                        throw new EcsException("sparse set already have element at this index");
 #endif
 
-                _sparse[eid] = _valuesEnd;
-                if (_valuesEnd >= Dense.Length)
+                    _sparse[eid] = _valuesEnd;
+                    if (_valuesEnd >= Dense.Length)
+                    {
+                        const int maxResizeDelta = 256;
+                        Utils.ResizeArray(_valuesEnd, ref Dense, maxResizeDelta);
+                    }
+                    Dense[_valuesEnd] = eid;
+                    _valuesEnd++;
+
+#if DEBUG && !ECS_PERF_TEST
+                    if (Dense[_sparse[eid]] != eid)
+                        throw new EcsException("wrong sparse set idices");
+#endif
+                }
+                _pendingAdd.Clear();
+                foreach (var eid in _pendingDelete)
                 {
-                    const int maxResizeDelta = 256;
-                    Utils.ResizeArray(_valuesEnd, ref Dense, maxResizeDelta);
+                    // _entitiesSet.RemoveAt(eid);
+                    var innerIndex = _sparse[eid];
+                    _sparse[eid] = -1;
+
+#if DEBUG && !ECS_PERF_TEST
+                    if (innerIndex >= _valuesEnd)
+                        throw new EcsException("innerIndex should be smaller than _valuesEnd");
+#endif
+
+                    //backswap using Dense
+                    var lastIdx = _valuesEnd - 1;
+                    if (innerIndex < lastIdx)
+                        _sparse[Dense[lastIdx]] = innerIndex;
+                    Dense[innerIndex] = -1;
+                    _valuesEnd--;
+                    Dense[innerIndex] = Dense[_valuesEnd];
                 }
-                Dense[_valuesEnd] = eid;
-                _valuesEnd++;
+                _pendingDelete.Clear();
 
-#if DEBUG && !ECS_PERF_TEST
-                if (Dense[_sparse[eid]] != eid)
-                    throw new EcsException("wrong sparse set idices");
-#endif
-            }
-            _pendingAdd.Clear();
-            foreach (var eid in _pendingDelete)
-            {
-                // _entitiesSet.RemoveAt(eid);
-                var innerIndex = _sparse[eid];
-                _sparse[eid] = -1;
-            
-#if DEBUG && !ECS_PERF_TEST
-                if (innerIndex >= _valuesEnd)
-                    throw new EcsException("innerIndex should be smaller than _valuesEnd");
-#endif
-            
-                //backswap using _dense
-                var lastIdx = _valuesEnd - 1;
-                if (innerIndex < lastIdx)
-                    _sparse[Dense[lastIdx]] = innerIndex;
-                Dense[innerIndex] = -1;
-                _valuesEnd--;
-                Dense[innerIndex] = Dense[_valuesEnd];
-            }
-            _pendingDelete.Clear();
+                _dirty = false;
 
-            _dirty = false;
-            
 #if HEAVY_ECS_DEBUG
-            if (!CheckEntitiesSynch())
-                throw new EcsException("Entities desynched!");
-            if (!CheckUniqueness())
-                throw new EcsException("Entities not unique!");
+                if (!CheckEntitiesSynch())
+                    throw new EcsException("Entities desynched!");
+                if (!CheckUniqueness())
+                    throw new EcsException("Entities not unique!");
 #endif
+            }
+            finally
+            {
+                // Reactive callbacks must observe the source filter after its pending
+                // membership changes have been committed. The world unlock can flush
+                // reactions, so it deliberately happens last and remains exception-safe.
+                World.Unlock();
+            }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

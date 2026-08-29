@@ -113,12 +113,23 @@ namespace CodexECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void AddToEmptyArchetype(EntityType eid)
+        public void AddToArchetype(EntityType eid, in BitMask mask)
         {
-            var emptyMask = new BitMask();
-            _mToA[emptyMask].AddEntity(eid);
-            UpdateArchetype(eid, emptyMask);
+            if (!_mToA.TryGetValue(mask, out var archetype))
+            {
+                // BitMask may own reference-backed chunks. Never persist the caller's
+                // storage as a dictionary key because later mutation would invalidate it.
+                var persistentMask = mask.Duplicate();
+                AddArchetype(persistentMask);
+                archetype = _mToA[persistentMask];
+            }
+
+            archetype.AddEntity(eid);
+            UpdateArchetype(eid, archetype.Mask);
         }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void AddToEmptyArchetype(EntityType eid) => AddToArchetype(eid, default);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void AddComponent<T>(EntityType eid) { AddComponent(eid, ComponentMeta<T>.Id); }
@@ -140,7 +151,7 @@ namespace CodexECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void RemoveAll<T>() { RemoveAll(ComponentMeta<T>.Id); }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void RemoveAll(int componentId)
+        public void RemoveAll(int componentId, SimpleList<EntityType> entitiesMovedToEmpty = null)
         {
             if (!_cToA.ContainsIdx(componentId))
                 return;
@@ -168,6 +179,8 @@ namespace CodexECS
                     var eid = archetype.EntitiesArr[j];
                     UpdateArchetype(eid, nextArchetype.Mask);
                     nextArchetype.AddEntity(eid);
+                    if (nextArchetype.Mask.Length == 0)
+                        entitiesMovedToEmpty?.Add(eid);
                 }
             }
 
@@ -175,6 +188,21 @@ namespace CodexECS
             if (!CheckMappingSynch())
                 throw new EcsException("mappings desynch");
 #endif
+        }
+
+        public void CollectEntitiesWithComponent(int componentId, SimpleList<EntityType> buffer)
+        {
+            buffer.Clear();
+            if (!_cToA.ContainsIdx(componentId))
+                return;
+
+            var archetypes = _cToA[componentId];
+            for (var i = 0; i < archetypes.Count; i++)
+            {
+                var archetype = archetypes[i];
+                for (var entityIndex = 0; entityIndex < archetype.EntitiesEnd; entityIndex++)
+                    buffer.Add(archetype.EntitiesArr[entityIndex]);
+            }
         }
 
         private BitMask _moveBuffer;

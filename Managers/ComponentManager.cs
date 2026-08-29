@@ -63,6 +63,9 @@ namespace CodexECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void AddDefault(EntityType eid, int componentId) => GetPool(componentId).AddDefault(eid);
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ref T Get<T>(EntityType eid)
         {
 #if DEBUG && !ECS_PERF_TEST

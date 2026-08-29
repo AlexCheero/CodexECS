@@ -58,6 +58,21 @@ namespace CodexECS
             private set;
         } = DefaultCleanup;
 
+        private static void DefaultCopy(in T source, ref T destination) => destination = source;
+        public delegate void CopyDelegate(in T source, ref T destination);
+        /// <summary>
+        /// Copies an initialized component into an unowned or already-cleaned destination.
+        /// Components with container ownership can provide a static Copy method to clone that
+        /// storage; ordinary components retain value-assignment semantics.
+        /// </summary>
+        public static CopyDelegate Copy
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get;
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            private set;
+        } = DefaultCopy;
+
         public static readonly int InitialPoolSize;
         
         static ComponentMeta()
@@ -90,6 +105,10 @@ namespace CodexECS
                 var cleanupMethod = type.GetMethod(nameof(Cleanup), BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
                 if (cleanupMethod != null)
                     Cleanup = (CleanupDelegate)Delegate.CreateDelegate(typeof(CleanupDelegate), cleanupMethod);
+
+                var copyMethod = type.GetMethod(nameof(Copy), BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+                if (copyMethod != null)
+                    Copy = (CopyDelegate)Delegate.CreateDelegate(typeof(CopyDelegate), copyMethod);
                 
                 var initialPoolSizeField = type.GetField(nameof(InitialPoolSize), BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
                 if (initialPoolSizeField != null)

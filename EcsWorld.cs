@@ -25,6 +25,8 @@ namespace CodexECS
 
         private BitMask _addReactGuard;
         private BitMask _removeReactGuard;
+        private readonly SimpleList<EntityType> _entitiesMovedToEmpty;
+        private readonly SimpleList<EntityType> _removeAllEntities;
 
         private void SetPools(IComponentsPool[] pools) => _pools = pools;
 
@@ -41,11 +43,14 @@ namespace CodexECS
             _onRemoveCallbacks = new();
             _dirtyAddMask = new();
             _dirtyRemoveMask = new();
+            _entitiesMovedToEmpty = new();
+            _removeAllEntities = new();
 
-            _dirtyMatchMasksSet = new(BitMask.MaskComparer);
-            _dirtyMatchMasksList = new();
-            _onMatchCallbacks = new(BitMask.MaskComparer);
-            _componentToMatchMaskMapping = new();
+            _componentsSetMatchGraph = new();
+            _matchCollectionBuffer = new();
+            _dirtyMatchNodes = new();
+            _pendingAddEntities = new();
+            _pendingRemoveEntities = new();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -73,14 +78,39 @@ namespace CodexECS
         public bool IsIdValid(int id) => id >= 0 && id != EntityExtension.NullId && !IsDead(id);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public EntityType Create()
+        public EntityType Create() => CreateWithComponents(default);
+
+        public EntityType CreateWithComponents(in BitMask componentsMask)
         {
-            var entity = _entityManager.Create();
-            _archetypes.AddToEmptyArchetype(entity);
+            var destinationMask = componentsMask.Duplicate();
 
 #if USE_DEBUG_TRACE_COMPONENT && DEBUG
-            Add<DebugTraceData>(entity);
+            destinationMask.Set(ComponentMeta<DebugTraceData>.Id);
 #endif
+
+#if DEBUG && !ECS_PERF_TEST
+            foreach (var componentId in destinationMask)
+            {
+                if (!ComponentMapping.HaveId(componentId))
+                    throw new EcsException($"component id {componentId} is not registered");
+                if (IsReactWrapperType(componentId))
+                    throw new EcsException("Cannot create entities with reactive wrapper components");
+            }
+#endif
+
+            var entity = _entityManager.Create();
+            _archetypes.AddToArchetype(entity, destinationMask);
+
+            foreach (var componentId in destinationMask)
+                _componentManager.AddDefault(entity, componentId);
+
+            foreach (var componentId in destinationMask)
+            {
+                var componentType = ComponentMapping.GetTypeForId(componentId);
+                ComponentMapping.CallDispatchers[componentType].ReactOnAdd(this, entity, false);
+            }
+
+            ReactOnComponentsSetCreated(entity, destinationMask);
 
             return entity;
         }
@@ -205,23 +235,31 @@ namespace CodexECS
                 callbacks[reactWrapperId] += callback;
         }
 
-        private readonly HashSet<BitMask> _dirtyMatchMasksSet;
-        private readonly List<BitMask> _dirtyMatchMasksList;
-        private readonly Dictionary<BitMask, Action<EcsWorld>> _onMatchCallbacks;
-        private readonly SparseSet<HashSet<BitMask>> _componentToMatchMaskMapping;
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static void QueueExistenceReaction(
+            SparseSet<BitMask> pendingEntities,
+            int reactWrapperId,
+            EntityType eid)
+        {
+            if (!pendingEntities.ContainsIdx(reactWrapperId))
+                pendingEntities.Add(reactWrapperId, new BitMask());
+            pendingEntities[reactWrapperId].Set(eid);
+        }
+
+        private readonly ComponentsSetMatchGraph _componentsSetMatchGraph;
+        private readonly List<ComponentsSetMatchGraph.Node> _matchCollectionBuffer;
+        private readonly Queue<ComponentsSetMatchGraph.Node> _dirtyMatchNodes;
+        private readonly SparseSet<BitMask> _pendingAddEntities;
+        private readonly SparseSet<BitMask> _pendingRemoveEntities;
+        private BitMask _previousComponentsMaskBuffer;
 
         public void SubscribeOnComponentsSetMatch(BitMask mask, Action<EcsWorld> callback)
         {
-            var maskKey = mask.Duplicate();
-            if (!_onMatchCallbacks.TryAdd(maskKey, callback))
-                _onMatchCallbacks[maskKey] += callback;
-
-            foreach (var componentId in maskKey)
-            {
-                if (!_componentToMatchMaskMapping.ContainsIdx(componentId))
-                    _componentToMatchMaskMapping.Add(componentId, new(BitMask.MaskComparer));
-                _componentToMatchMaskMapping[componentId].Add(maskKey);
-            }
+            var requiredMask = mask.Duplicate();
+            requiredMask.Unset(ComponentMeta<MatchReact>.Id);
+            if (requiredMask.SetBitsCount == 0)
+                throw new ArgumentException("components-set match requires at least one non-reactive component", nameof(mask));
+            _componentsSetMatchGraph.Subscribe(requiredMask, callback);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -231,7 +269,7 @@ namespace CodexECS
             if (ComponentMeta<T>.IsTag)
                 throw new EcsException("Tags are not assumed to be added multiple times, use component with counter instead");
 #endif
-            return ref AddMultiple(eid, _componentManager.GetNextFree<T>());
+            return ref AddMultiple(eid, ComponentMeta<T>.GetDefault());
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -249,11 +287,10 @@ namespace CodexECS
             }
 
             SimpleList<T> components;
-            if (!Have<MultipleComponents<T>>(eid))
+            if (!HaveMultipleStorage<T>(eid))
             {
-                Add<MultipleComponents<T>>(eid);
+                AddInternal<MultipleComponents<T>>(eid, ComponentMeta<MultipleComponents<T>>.GetDefault());
                 components = Get<MultipleComponents<T>>(eid).components;
-                components.Add(Get<T>(eid));
             }
             else
             {
@@ -266,35 +303,75 @@ namespace CodexECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void RemoveMultiple<T>(EntityType eid, int removeAt = 0)
         {
-            if (!Have<MultipleComponents<T>>(eid))
+#if DEBUG && !ECS_PERF_TEST
+            if (!Have<T>(eid))
+                throw new EcsException($"entity has no components of type {typeof(T).Name}");
+#endif
+
+            if (!HaveMultipleStorage<T>(eid))
             {
+#if DEBUG && !ECS_PERF_TEST
+                if (removeAt != 0)
+                    throw new EcsException("single component can only be removed at index 0");
+#endif
                 Remove<T>(eid);
                 return;
             }
-            
-            ref var firstComponent = ref Get<T>(eid);
-            ComponentMeta<T>.Cleanup(ref firstComponent);
+
             var components = Get<MultipleComponents<T>>(eid).components;
-            components.SwapRemoveAt(removeAt);
-            if (components.Length == 0)
-                Remove<MultipleComponents<T>>(eid);
+
+#if DEBUG && !ECS_PERF_TEST
+            if (removeAt < 0 || removeAt > components.Length)
+                throw new EcsException("multiple component index is out of range");
+#endif
+
+            if (removeAt == 0)
+            {
+                ref var firstComponent = ref Get<T>(eid);
+                ComponentMeta<T>.Cleanup(ref firstComponent);
+                var promotedComponent = components[0];
+                components.SwapRemoveAt(0);
+                firstComponent = promotedComponent;
+            }
             else
-                firstComponent = Get<MultipleComponents<T>>(eid).components[0];
+            {
+                var additionalIndex = removeAt - 1;
+                ComponentMeta<T>.Cleanup(ref components[additionalIndex]);
+                components.SwapRemoveAt(additionalIndex);
+            }
+
+            if (components.Length == 0)
+                RemoveInternal<MultipleComponents<T>>(eid);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void RemoveAllMultiple<T>(EntityType eid)
         {
-            Remove<MultipleComponents<T>>(eid);
+            if (HaveMultipleStorage<T>(eid))
+                RemoveInternal<MultipleComponents<T>>(eid);
             Remove<T>(eid);
         }
-        
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void RemoveMultipleAll<T>(EntityType eid)
+        internal bool HaveMultipleStorage<T>(EntityType eid)
         {
-            Remove<T>(eid);
-            if (Have<MultipleComponents<T>>(eid))
-                Remove<MultipleComponents<T>>(eid);
+            return ComponentMapping.TryGetMultipleStorageId(ComponentMeta<T>.Id, out var storageId) &&
+                   Have(storageId, eid);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool HaveMultiple<T>(EntityType eid) =>
+            Have<T>(eid) && HaveMultipleStorage<T>(eid) &&
+            Get<MultipleComponents<T>>(eid).components.Length > 0;
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public MultipleComponentCollection<T> GetMultiple<T>(EntityType eid)
+        {
+#if DEBUG && !ECS_PERF_TEST
+            if (!Have<T>(eid))
+                throw new EcsException($"entity has no components of type {typeof(T).Name}");
+#endif
+            return new MultipleComponentCollection<T>(this, eid);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -329,36 +406,8 @@ namespace CodexECS
                 throw new EcsException("Cannot add reactive wrappers manually");
 #endif
             
-            _archetypes.AddComponent<T>(eid);
-            _componentManager.Add<T>(eid, component);
-
-            var componentId = ComponentMeta<T>.Id;
-            if (_addReactGuard.Check(componentId))
-            {
-                var reactWrapperId = ComponentMeta<AddReact<T>>.Id;
-                //excess check- it already checked in react type guard
-                //if (_onAddCallbacks.ContainsIdx(reactWrapperId))
-                {
-                    //unrolled Add<AddReact<T>>(eid); without wrapper check
-                    _archetypes.AddComponent<AddReact<T>>(eid);
-                    _componentManager.Add<AddReact<T>>(eid);
-
-                    _dirtyAddMask.Set(reactWrapperId);
-                }
-            }
-
-            if (_componentToMatchMaskMapping.ContainsIdx(componentId))
-            {
-                ref readonly var mask = ref _archetypes.GetMask(eid);
-                foreach (var key in _componentToMatchMaskMapping[componentId])
-                {
-                    if (mask.InclusivePass(key))
-                        _dirtyMatchMasksSet.Add(key);
-                }
-
-                if (!Have<MatchReact>(eid))
-                    Add<MatchReact>(eid);
-            }
+            AddInternal(eid, component);
+            ReactOnAdd<T>(eid, true);
 
 #if HEAVY_ECS_DEBUG
             if (!ExistenceSynched<T>(eid))
@@ -369,6 +418,97 @@ namespace CodexECS
             if (!IsCalledFromWorld(filePath))
                 SaveTraceData(eid, typeof(T), DebugTraceData.EMethodType.Add, memberName, filePath, lineNumber);
 #endif
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void AddInternal<T>(EntityType eid, T component)
+        {
+            _archetypes.AddComponent<T>(eid);
+            _componentManager.Add(eid, component);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void RemoveInternal<T>(EntityType eid)
+        {
+            _archetypes.RemoveComponent<T>(eid);
+            _componentManager.Remove<T>(eid);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal void ReactOnAdd<T>(EntityType eid, bool checkComponentsSetMatch)
+        {
+            var componentId = ComponentMeta<T>.Id;
+            if (_addReactGuard.Check(componentId))
+            {
+                var reactWrapperId = ComponentMeta<AddReact<T>>.Id;
+                if (!Have<AddReact<T>>(eid))
+                    AddInternal(eid, default(AddReact<T>));
+                QueueExistenceReaction(_pendingAddEntities, reactWrapperId, eid);
+                _dirtyAddMask.Set(reactWrapperId);
+            }
+
+            if (checkComponentsSetMatch)
+                ReactOnComponentSetAdded(eid, componentId);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal void ReactOnRemove<T>(EntityType eid)
+        {
+            var componentId = ComponentMeta<T>.Id;
+            if (!_removeReactGuard.Check(componentId))
+                return;
+
+            var reactWrapperId = ComponentMeta<RemoveReact<T>>.Id;
+            var removedComponent = ComponentMeta<T>.IsTag ? default : Get<T>(eid);
+            if (Have<RemoveReact<T>>(eid))
+            {
+                Get<RemoveReact<T>>(eid).removedComponent = removedComponent;
+            }
+            else
+            {
+                AddInternal(eid, new RemoveReact<T> { removedComponent = removedComponent });
+            }
+
+            QueueExistenceReaction(_pendingRemoveEntities, reactWrapperId, eid);
+            _dirtyRemoveMask.Set(reactWrapperId);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void EnsureMatchReact(EntityType eid)
+        {
+            if (!Have<MatchReact>(eid))
+                AddInternal(eid, default(MatchReact));
+        }
+
+        private void ReactOnComponentsSetCreated(EntityType eid, in BitMask componentsMask)
+        {
+            _componentsSetMatchGraph.CollectNewMatches(default, componentsMask, _matchCollectionBuffer);
+            QueueComponentsSetMatches(eid);
+        }
+
+        private void ReactOnComponentSetAdded(EntityType eid, int componentId)
+        {
+            ref readonly var componentsMask = ref _archetypes.GetMask(eid);
+            _previousComponentsMaskBuffer.Copy(componentsMask);
+            _previousComponentsMaskBuffer.Unset(componentId);
+            _componentsSetMatchGraph.CollectNewMatches(
+                _previousComponentsMaskBuffer,
+                componentsMask,
+                _matchCollectionBuffer);
+            QueueComponentsSetMatches(eid);
+        }
+
+        private void QueueComponentsSetMatches(EntityType eid)
+        {
+            for (int i = 0; i < _matchCollectionBuffer.Count; i++)
+            {
+                var node = _matchCollectionBuffer[i];
+                node.PendingEntities.Set(eid);
+                if (node.IsQueued)
+                    continue;
+                node.IsQueued = true;
+                _dirtyMatchNodes.Enqueue(node);
+            }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -424,9 +564,28 @@ namespace CodexECS
 #endif
             if (!Have<T>(from))
                 return;
+            if (from == to)
+                return;
+
+            if (ComponentMeta<T>.IsTag)
+            {
+                if (!Have<T>(to))
+                    Add<T>(to);
+                return;
+            }
+
+            ref var source = ref Get<T>(from);
             if (!Have<T>(to))
-                Add<T>(to);
-            Get<T>(to) = Get<T>(from);
+            {
+                var copiedComponent = default(T);
+                ComponentMeta<T>.Copy(in source, ref copiedComponent);
+                Add(to, copiedComponent);
+                return;
+            }
+
+            ref var destination = ref Get<T>(to);
+            ComponentMeta<T>.Cleanup(ref destination);
+            ComponentMeta<T>.Copy(in source, ref destination);
         }
 
 #if DEBUG
@@ -434,8 +593,9 @@ namespace CodexECS
 
         private bool IsReactWrapperType(int componentId)
         {
-            var gtd = Utils.GetGenericTypeDefinition(ComponentMapping.GetTypeForId(componentId));
-            return gtd == typeof(AddReact<>) || gtd == typeof(RemoveReact<>);
+            var type = ComponentMapping.GetTypeForId(componentId);
+            var gtd = Utils.GetGenericTypeDefinition(type);
+            return type == typeof(MatchReact) || gtd == typeof(AddReact<>) || gtd == typeof(RemoveReact<>);
         }
 #endif
 
@@ -446,6 +606,18 @@ namespace CodexECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Add_Dynamic(Type type, int id, object component) =>
             ComponentMapping.CallDispatchers[type].Add(this, id, component);
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Set_Dynamic(Type type, int id, object component) =>
+            ComponentMapping.CallDispatchers[type].Set(this, id, component);
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Replace<T>(EntityType eid, T component)
+        {
+            ref var current = ref Get<T>(eid);
+            ComponentMeta<T>.Cleanup(ref current);
+            current = component;
+        }
 
         public ComponentsPool<T> GetComponentsPool<T>() => (ComponentsPool<T>)_componentManager.GetPool(ComponentMeta<T>.Id);
         
@@ -538,28 +710,14 @@ namespace CodexECS
 #if DEBUG && !ECS_PERF_TEST
             if (IsReactWrapperType<T>())
                 throw new EcsException("Cannot remove reactive wrappers manually");
-            if (Have<MultipleComponents<T>>(eid))
-                throw new EcsException($"entity have multiple components of type {typeof(T).Name}, use {nameof(RemoveMultiple)} instead");
 #endif
+            if (HaveMultipleStorage<T>(eid))
+                throw new EcsException(
+                    $"entity has multiple components of type {typeof(T).Name}; use {nameof(RemoveMultiple)} or {nameof(RemoveAllMultiple)} instead");
 
-            if (_removeReactGuard.Check(ComponentMeta<T>.Id))
-            {
-                var reactWrapperId = ComponentMeta<RemoveReact<T>>.Id;
-                //excess check- it already checked in react type guard
-                //if (_onRemoveCallbacks.ContainsIdx(reactWrapperId))
-                {
-                    _archetypes.AddComponent<RemoveReact<T>>(eid);
-                    _componentManager.Add(eid, new RemoveReact<T>
-                    {
-                        removedComponent = Get<T>(eid)
-                    });
+            ReactOnRemove<T>(eid);
 
-                    _dirtyRemoveMask.Set(reactWrapperId);
-                }
-            }
-            
-            _archetypes.RemoveComponent<T>(eid);
-            _componentManager.Remove<T>(eid);
+            RemoveInternal<T>(eid);
 
             if (_archetypes.GetMask(eid).Length == 0)
                 Delete(eid);
@@ -589,15 +747,42 @@ namespace CodexECS
             if (!_componentManager.IsTypeRegistered(componentId))
                 return;
 
-            //TODO: RemoveAll for reactive types not implemented
-            //TODO: _onRemoveCallbacks contains Ids for wrappers, not for components itself 
-            // if (_onRemoveCallbacks.ContainsIdx(componentId))
-            // {
-            //     throw new NotImplementedException("RemoveAll for reactive components not implemented");
-            // }
+            RemoveAllMultipleStorage(componentId);
+
+            if (_removeReactGuard.Check(componentId))
+            {
+                _archetypes.CollectEntitiesWithComponent(componentId, _removeAllEntities);
+                var componentType = ComponentMapping.GetTypeForId(componentId);
+                var dispatcher = ComponentMapping.CallDispatchers[componentType];
+                for (var i = 0; i < _removeAllEntities.Length; i++)
+                    dispatcher.ReactOnRemove(this, _removeAllEntities[i]);
+                _removeAllEntities.Clear();
+            }
             
-            _archetypes.RemoveAll(componentId);
+            RemoveAllInternal(componentId);
+        }
+
+        private void RemoveAllMultipleStorage(int componentId)
+        {
+            if (ComponentMapping.TryGetMultipleStorageId(componentId, out var storageId) &&
+                _componentManager.IsTypeRegistered(storageId))
+                RemoveAllInternal(storageId);
+        }
+
+        private void RemoveAllInternal(int componentId)
+        {
+            _entitiesMovedToEmpty.Clear();
+            _archetypes.RemoveAll(componentId, _entitiesMovedToEmpty);
             _componentManager.RemoveAll(componentId);
+            DeleteEntitiesMovedToEmpty();
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void DeleteEntitiesMovedToEmpty()
+        {
+            for (int i = 0; i < _entitiesMovedToEmpty.Length; i++)
+                Delete(_entitiesMovedToEmpty[i]);
+            _entitiesMovedToEmpty.Clear();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -663,6 +848,7 @@ namespace CodexECS
         public FilterBuilder Filter() => new() { _world = this };
 
         private int _lockCounter;
+        private bool _isFlushingReactives;
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Lock() { _lockCounter++; }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -675,58 +861,140 @@ namespace CodexECS
 #endif
             if (_lockCounter != 0)
                 return;
+
+            FlushReactives();
+        }
+
+        public void FlushReactives()
+        {
+            if (_lockCounter != 0)
+                return;
+
             foreach (var eid in _delayedDeleteList)
                 Delete_Impl(eid);
             _delayedDeleteList.Clear();
 
-            if (_dirtyAddMask.Length > 0)
-                ReactOnAddRemove(ref _dirtyAddMask, _onAddCallbacks);
-            if (_dirtyRemoveMask.Length > 0)
-                ReactOnAddRemove(ref _dirtyRemoveMask, _onRemoveCallbacks);
+            if (_isFlushingReactives)
+                return;
 
-            if (_dirtyMatchMasksSet.Count > 0)
+            _isFlushingReactives = true;
+            try
             {
-                _dirtyMatchMasksList.Clear();
-                foreach (var mask in _dirtyMatchMasksSet)
-                    _dirtyMatchMasksList.Add(mask);
-                _dirtyMatchMasksList.Sort((m1, m2) =>
+                while (_dirtyAddMask.Length > 0 ||
+                       _dirtyRemoveMask.Length > 0 ||
+                       _dirtyMatchNodes.Count > 0)
                 {
-                    //branchless sign function
-                    int diff = m1.SetBitsCount - m2.SetBitsCount;
-                    return (diff >> 31) | ((-diff) >> 31 & 1);
-                });
-                _dirtyMatchMasksSet.Clear();
-                for (int i = 0; i < _dirtyMatchMasksList.Count; i++)
-                    _onMatchCallbacks[_dirtyMatchMasksList[i]](this);
-
-                RemoveAll<MatchReact>();
+                    ReactOnAddRemove(
+                        ref _dirtyAddMask,
+                        _onAddCallbacks,
+                        _pendingAddEntities,
+                        "add");
+                    ReactOnAddRemove(
+                        ref _dirtyRemoveMask,
+                        _onRemoveCallbacks,
+                        _pendingRemoveEntities,
+                        "remove");
+                    ReactOnComponentsSetMatches();
+                }
+            }
+            finally
+            {
+                _isFlushingReactives = false;
             }
         }
 
-        private void ReactOnAddRemove(ref BitMask dirtyMask, SparseSet<Action<EcsWorld>> callbacks)
+        private void ReactOnAddRemove(
+            ref BitMask dirtyMask,
+            SparseSet<Action<EcsWorld>> callbacks,
+            SparseSet<BitMask> pendingEntities,
+            string reactionName)
         {
-            Lock();
-                
-            foreach (var reactWrapperId in dirtyMask)
+            while (dirtyMask.Length > 0)
             {
+                var reactWrapperId = dirtyMask.GetNextSetBit(0);
+                dirtyMask.Unset(reactWrapperId);
+
                 var callback = callbacks[reactWrapperId];
 #if DEBUG && !ECS_PERF_TEST
                 if (callback == null)
-                    throw new EcsException("no registered on add callback for type " + ComponentMapping.GetTypeForId(reactWrapperId));
+                    throw new EcsException($"no registered on {reactionName} callback for type " +
+                                           ComponentMapping.GetTypeForId(reactWrapperId));
 #endif
-                callback(this);
-                //unrolled RemoveAll(reactWrapperId); without wrapper check
-                //MUST already be registered!
-                // if (!_componentManager.IsTypeRegistered(reactWrapperId)) continue;
-                _archetypes.RemoveAll(reactWrapperId);
-                _componentManager.RemoveAll(reactWrapperId);
+
+                var processingEntities = pendingEntities[reactWrapperId].Duplicate();
+                pendingEntities[reactWrapperId].Clear();
+
+                Lock();
+                try
+                {
+                    callback(this);
+                }
+                finally
+                {
+                    foreach (var eid in processingEntities)
+                    {
+                        // A same-type event raised by the callback owns the wrapper now and
+                        // will be handled by the next queue generation.
+                        if (pendingEntities[reactWrapperId].Check(eid) || !IsIdValid(eid) || !Have(reactWrapperId, eid))
+                            continue;
+
+                        _archetypes.RemoveComponent(eid, reactWrapperId);
+                        _componentManager.Remove(reactWrapperId, eid);
+                        if (_archetypes.GetMask(eid).Length == 0)
+                            Delete(eid);
+                    }
+
+                    Unlock();
+                }
             }
-            dirtyMask.Clear();
-                
-            Unlock();
+        }
+
+        private void ReactOnComponentsSetMatches()
+        {
+            while (_dirtyMatchNodes.Count > 0)
+            {
+                var node = _dirtyMatchNodes.Dequeue();
+                node.IsQueued = false;
+
+                var processingEntities = node.PendingEntities.Duplicate();
+                node.PendingEntities.Clear();
+                var markedEntities = new BitMask();
+
+                Lock();
+                try
+                {
+                    foreach (var eid in processingEntities)
+                    {
+                        if (!IsIdValid(eid) || !_archetypes.GetMask(eid).InclusivePass(node.RequiredMask))
+                            continue;
+                        EnsureMatchReact(eid);
+                        markedEntities.Set(eid);
+                    }
+
+                    node.Invoke(this);
+                }
+                finally
+                {
+                    foreach (var eid in markedEntities)
+                    {
+                        if (!IsIdValid(eid) || !Have<MatchReact>(eid))
+                            continue;
+                        RemoveInternal<MatchReact>(eid);
+                        if (_archetypes.GetMask(eid).Length == 0)
+                            Delete(eid);
+                    }
+
+                    Unlock();
+                }
+            }
         }
 
         private BitMask _delayedDeleteList;
+        /// <summary>
+        /// Destroys an entity as a hard lifecycle operation. This intentionally bypasses
+        /// component-remove subscriptions; remove components explicitly first when their
+        /// reactive teardown callbacks are required.
+        /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Delete(EntityType eid)
         {
