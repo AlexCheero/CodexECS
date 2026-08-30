@@ -44,6 +44,38 @@ namespace CodexECS.Tests
         private struct Padding30 : IComponent { }
         private struct Padding31 : IComponent { }
         private struct Padding32 : IComponent { }
+        private struct Padding33 : IComponent { }
+        private struct Padding34 : IComponent { }
+        private struct Padding35 : IComponent { }
+        private struct Padding36 : IComponent { }
+        private struct Padding37 : IComponent { }
+        private struct Padding38 : IComponent { }
+        private struct Padding39 : IComponent { }
+        private struct Padding40 : IComponent { }
+        private struct Padding41 : IComponent { }
+        private struct Padding42 : IComponent { }
+        private struct Padding43 : IComponent { }
+        private struct Padding44 : IComponent { }
+        private struct Padding45 : IComponent { }
+        private struct Padding46 : IComponent { }
+        private struct Padding47 : IComponent { }
+        private struct Padding48 : IComponent { }
+        private struct Padding49 : IComponent { }
+        private struct Padding50 : IComponent { }
+        private struct Padding51 : IComponent { }
+        private struct Padding52 : IComponent { }
+        private struct Padding53 : IComponent { }
+        private struct Padding54 : IComponent { }
+        private struct Padding55 : IComponent { }
+        private struct Padding56 : IComponent { }
+        private struct Padding57 : IComponent { }
+        private struct Padding58 : IComponent { }
+        private struct Padding59 : IComponent { }
+        private struct Padding60 : IComponent { }
+        private struct Padding61 : IComponent { }
+        private struct Padding62 : IComponent { }
+        private struct Padding63 : IComponent { }
+        private struct Padding64 : IComponent { }
         private struct HighIdComponent : IComponent { public int Value; }
 
         [Test]
@@ -209,6 +241,38 @@ namespace CodexECS.Tests
             _ = ComponentMeta<Padding30>.Id;
             _ = ComponentMeta<Padding31>.Id;
             _ = ComponentMeta<Padding32>.Id;
+            _ = ComponentMeta<Padding33>.Id;
+            _ = ComponentMeta<Padding34>.Id;
+            _ = ComponentMeta<Padding35>.Id;
+            _ = ComponentMeta<Padding36>.Id;
+            _ = ComponentMeta<Padding37>.Id;
+            _ = ComponentMeta<Padding38>.Id;
+            _ = ComponentMeta<Padding39>.Id;
+            _ = ComponentMeta<Padding40>.Id;
+            _ = ComponentMeta<Padding41>.Id;
+            _ = ComponentMeta<Padding42>.Id;
+            _ = ComponentMeta<Padding43>.Id;
+            _ = ComponentMeta<Padding44>.Id;
+            _ = ComponentMeta<Padding45>.Id;
+            _ = ComponentMeta<Padding46>.Id;
+            _ = ComponentMeta<Padding47>.Id;
+            _ = ComponentMeta<Padding48>.Id;
+            _ = ComponentMeta<Padding49>.Id;
+            _ = ComponentMeta<Padding50>.Id;
+            _ = ComponentMeta<Padding51>.Id;
+            _ = ComponentMeta<Padding52>.Id;
+            _ = ComponentMeta<Padding53>.Id;
+            _ = ComponentMeta<Padding54>.Id;
+            _ = ComponentMeta<Padding55>.Id;
+            _ = ComponentMeta<Padding56>.Id;
+            _ = ComponentMeta<Padding57>.Id;
+            _ = ComponentMeta<Padding58>.Id;
+            _ = ComponentMeta<Padding59>.Id;
+            _ = ComponentMeta<Padding60>.Id;
+            _ = ComponentMeta<Padding61>.Id;
+            _ = ComponentMeta<Padding62>.Id;
+            _ = ComponentMeta<Padding63>.Id;
+            _ = ComponentMeta<Padding64>.Id;
             return ComponentMeta<HighIdComponent>.Id;
         }
     }

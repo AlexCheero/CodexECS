@@ -9,7 +9,7 @@ using CodexECS.Utility;
 
 namespace CodexECS
 {
-    using MaskInternal = UInt32;
+    using MaskInternal = Int64;
 
     public static class BitMaskExtensions
     {
@@ -21,6 +21,9 @@ namespace CodexECS
         }
     }
 
+    /// <summary>
+    /// A mutable bit mask. Struct copies share storage; use Duplicate for an independent mask.
+    /// </summary>
     public struct BitMask
     {
         public class EqualityComparer : IEqualityComparer<BitMask>
@@ -45,18 +48,17 @@ namespace CodexECS
             if (Length == 0)
                 return 0;
             
-            var hash = (int)(17 * 23 * _m1);
-            var dynamicChunksLength = GetDynamicChunksLength(_length);
-            for (int i = 0; i < dynamicChunksLength; ++i)
-                hash = hash * 23 + (int)_mn[i];
+            var hash = 17;
+            var partsLength = GetPartsLength(_length);
+            for (int i = 0; i < partsLength; ++i)
+                hash = unchecked(hash * 23 + _parts[i].GetHashCode());
 
             _hash = hash == 0 ? 1 : hash;
             return _hash;
         }
 
         public const int SizeOfPartInBits = sizeof(MaskInternal) * 8;
-        private MaskInternal _m1;
-        private MaskInternal[] _mn;
+        private MaskInternal[] _parts;
 
         private int _length;
         public int Length
@@ -74,8 +76,7 @@ namespace CodexECS
 
         public BitMask(params int[] positions)
         {
-            _m1 = 0;
-            _mn = null;
+            _parts = null;
             _length = 0;
             _hash = 0;
             _setBitsCount = 0;
@@ -84,25 +85,21 @@ namespace CodexECS
         }
         
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static int GetDynamicChunksLength(int length)
+        private static int GetPartsLength(int length)
         {
-            var chunkSizeInBits = sizeof(MaskInternal) * 8;
-            if (length <= chunkSizeInBits)
-                return 0;
-
-            return ((length + chunkSizeInBits - 1) / chunkSizeInBits) - 1;
+            return length == 0 ? 0 : (length - 1) / SizeOfPartInBits + 1;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static int CountSetBits(MaskInternal value)
         {
 #if BITMASK_USE_BITOPERATIONS
-            return BitOperations.PopCount(value);
+            return BitOperations.PopCount(unchecked((ulong)value));
 #else
             int count = 0;
             while (value != 0)
             {
-                value &= value - 1;
+                value &= unchecked(value - 1);
                 count++;
             }
 
@@ -114,14 +111,15 @@ namespace CodexECS
         private static int GetHighestSetBitIndex(MaskInternal value)
         {
 #if BITMASK_USE_BITOPERATIONS
-            return value == 0 ? -1 : (SizeOfPartInBits - 1 - BitOperations.LeadingZeroCount(value));
+            return value == 0 ? -1 : (SizeOfPartInBits - 1 - BitOperations.LeadingZeroCount(unchecked((ulong)value)));
 #else
             if (value == 0)
                 return -1;
 
             int msb = SizeOfPartInBits - 1;
-            MaskInternal mask = (MaskInternal)1 << msb;
-            while ((mask & value) == 0 && msb > 0)
+            // Shift an unsigned mask so bit 63 does not sign-extend.
+            ulong mask = 1UL << msb;
+            while ((mask & unchecked((ulong)value)) == 0 && msb > 0)
             {
                 msb--;
                 mask >>= 1;
@@ -135,7 +133,7 @@ namespace CodexECS
         private static int GetLowestSetBitIndex(MaskInternal value)
         {
 #if BITMASK_USE_BITOPERATIONS
-            return value == 0 ? -1 : BitOperations.TrailingZeroCount(value);
+            return value == 0 ? -1 : BitOperations.TrailingZeroCount(unchecked((ulong)value));
 #else
             if (value == 0)
                 return -1;
@@ -154,19 +152,19 @@ namespace CodexECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void RecalculateLengthAndSetBitsCount()
         {
-            var setBitsCount = CountSetBits(_m1);
-            int length = _m1 == 0 ? 0 : GetHighestSetBitIndex(_m1) + 1;
+            int setBitsCount = 0;
+            int length = 0;
 
-            if (_mn != null)
+            if (_parts != null)
             {
-                for (int i = 0; i < _mn.Length; i++)
+                for (int i = 0; i < _parts.Length; i++)
                 {
-                    var chunk = _mn[i];
+                    var chunk = _parts[i];
                     if (chunk == 0)
                         continue;
 
                     setBitsCount += CountSetBits(chunk);
-                    length = (i + 1) * SizeOfPartInBits + GetHighestSetBitIndex(chunk) + 1;
+                    length = i * SizeOfPartInBits + GetHighestSetBitIndex(chunk) + 1;
                 }
             }
 
@@ -177,24 +175,20 @@ namespace CodexECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Copy(in BitMask other)
         {
-            _m1 = other._m1;
             _length = other._length;
             _setBitsCount = other._setBitsCount;
 
-            var otherArrLength = other._mn != null ? other._mn.Length : 0;
+            var otherArrLength = other._parts != null ? other._parts.Length : 0;
             if (otherArrLength > 0)
             {
-                if (_mn == null || _mn.Length < otherArrLength)
-                    _mn = new MaskInternal[other._mn.Length];
-                for (int i = 0; i < other._mn.Length; i++)
-                    _mn[i] = other._mn[i];
-                for (int i = other._mn.Length; i < _mn.Length; i++)
-                    _mn[i] = 0;
+                if (_parts == null || _parts.Length < otherArrLength)
+                    _parts = new MaskInternal[otherArrLength];
+                Array.Copy(other._parts, _parts, otherArrLength);
+                Array.Clear(_parts, otherArrLength, _parts.Length - otherArrLength);
             }
-            else if (_mn != null)
+            else if (_parts != null)
             {
-                for (int i = 0; i < _mn.Length; i++)
-                    _mn[i] = 0;
+                Array.Clear(_parts, 0, _parts.Length);
             }
 
             _hash = 0;
@@ -218,19 +212,17 @@ namespace CodexECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Set(in BitMask other)
         {
-            _m1 |= other._m1;
-
-            var otherMnLength = other._mn != null ? other._mn.Length : 0;
-            if (otherMnLength > 0)
+            var otherPartsLength = GetPartsLength(other._length);
+            if (otherPartsLength > 0)
             {
-                if (_mn == null || _mn.Length < otherMnLength)
+                if (_parts == null || _parts.Length < otherPartsLength)
                 {
                     const int maxResizeDelta = 8;
-                    Utils.ResizeArray(otherMnLength, ref _mn, maxResizeDelta);
+                    Utils.ResizeArray(otherPartsLength - 1, ref _parts, maxResizeDelta);
                 }
 
-                for (int i = 0; i < otherMnLength; i++)
-                    _mn[i] |= other._mn[i];
+                for (int i = 0; i < otherPartsLength; i++)
+                    _parts[i] |= other._parts[i];
             }
 
             RecalculateLengthAndSetBitsCount();
@@ -244,22 +236,15 @@ namespace CodexECS
                 return;
 
             var chunkIdx = i / SizeOfPartInBits;
-            ref var m = ref _m1;
-            if (chunkIdx > 0)
+            if (_parts == null || _parts.Length <= chunkIdx)
             {
-                chunkIdx--;
-                //resize if needed
-                if (_mn == null || _mn.Length <= chunkIdx)
-                {
-                    const int maxResizeDelta = 8;
-                    Utils.ResizeArray(chunkIdx, ref _mn, maxResizeDelta);
-                }
-                m = ref _mn[chunkIdx];
+                const int maxResizeDelta = 8;
+                Utils.ResizeArray(chunkIdx, ref _parts, maxResizeDelta);
             }
 
+            ref var m = ref _parts[chunkIdx];
             int position = i % SizeOfPartInBits;
-            MaskInternal shifted = 1;
-            shifted <<= position;
+            MaskInternal shifted = 1L << position;
 
             if ((m & shifted) == 0)
                 _setBitsCount++;
@@ -311,16 +296,11 @@ namespace CodexECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Intersects(in BitMask otherMask)
         {
-            if ((_m1 & otherMask._m1) != 0)
-                return true;
-            var otherMn = otherMask._mn;
-            if (_mn == null || otherMn == null)
-                return false;
-            var minLength = _mn.Length < otherMn.Length ? _mn.Length : otherMn.Length;
+            var minLength = GetPartsLength(Math.Min(_length, otherMask._length));
     
             for (int i = 0; i < minLength; ++i)
             {
-                if ((_mn[i] & otherMn[i]) != 0)
+                if ((_parts[i] & otherMask._parts[i]) != 0)
                     return true;
             }
     
@@ -328,20 +308,14 @@ namespace CodexECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool CheckChunkIdx(int idx) => idx < 1 || (_mn != null && _mn.Length > idx - 1);
+        private bool CheckChunkIdx(int idx) => _parts != null && idx >= 0 && idx < _parts.Length;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Unset(in BitMask other)
         {
-            _m1 &= ~other._m1;
-
-            var otherMnLength = other._mn != null ? other._mn.Length : 0;
-            if (_mn != null && otherMnLength > 0)
-            {
-                int minLength = _mn.Length < otherMnLength ? _mn.Length : otherMnLength;
-                for (int i = 0; i < minLength; i++)
-                    _mn[i] &= ~other._mn[i];
-            }   
+            var minLength = GetPartsLength(Math.Min(_length, other._length));
+            for (int i = 0; i < minLength; i++)
+                _parts[i] &= ~other._parts[i];
 
             RecalculateLengthAndSetBitsCount();
             _hash = 0;
@@ -357,14 +331,13 @@ namespace CodexECS
             if (!CheckChunkIdx(chunkIdx))
                 return;
 
-            ref var m = ref _m1;
-            if (chunkIdx > 0)
-                m = ref _mn[chunkIdx - 1];
+            ref var m = ref _parts[chunkIdx];
 
             int position = i % SizeOfPartInBits;
-            MaskInternal shifted = (MaskInternal)1 << position;
+            MaskInternal shifted = 1L << position;
             bool wasSet = (m & shifted) != 0;
             m &= ~shifted;
+            _hash = 0;
 
             if (wasSet)
             {
@@ -378,22 +351,11 @@ namespace CodexECS
                 // RecalculateLength
                 if (i == Length - 1)
                 {
-                    if (_mn != null)
+                    for (int j = chunkIdx; j >= 0; j--)
                     {
-                        for (int j = _mn.Length - 1; j >= 0; j--)
-                        {
-                            if (_mn[j] == 0) continue;
-                            int msb = GetHighestSetBitIndex(_mn[j]);
-                            _length = (j + 1) * SizeOfPartInBits + msb + 1;
-                            return;
-                        }
-                    }
-
-                    // Check _m1
-                    if (_m1 != 0)
-                    {
-                        int msb = GetHighestSetBitIndex(_m1);
-                        _length = msb + 1;
+                        if (_parts[j] == 0) continue;
+                        int msb = GetHighestSetBitIndex(_parts[j]);
+                        _length = j * SizeOfPartInBits + msb + 1;
                         return;
                     }
 
@@ -401,8 +363,6 @@ namespace CodexECS
                     _length = 0;
                 }
             }
-    
-            _hash = 0;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -415,11 +375,9 @@ namespace CodexECS
             if (!CheckChunkIdx(chunkIdx))
                 return false;
 
-            var m = _m1;
-            if (chunkIdx > 0)
-                m = _mn[chunkIdx - 1];
+            var m = _parts[chunkIdx];
             int position = i % SizeOfPartInBits;
-            return (m & (1 << position)) != 0;
+            return (m & (1L << position)) != 0;
         }
 
         public int GetNextSetBit(int fromPosition)
@@ -433,27 +391,10 @@ namespace CodexECS
             int chunkIdx = fromPosition / SizeOfPartInBits;
             int bitOffset = fromPosition % SizeOfPartInBits;
 
-            while (chunkIdx * SizeOfPartInBits < Length)
+            var partsLength = GetPartsLength(_length);
+            while (chunkIdx < partsLength)
             {
-                MaskInternal chunk;
-                if (chunkIdx == 0)
-                {
-                    chunk = _m1;
-                }
-                else
-                {
-                    int dynamicChunkIdx = chunkIdx - 1;
-                    if (_mn == null || dynamicChunkIdx >= _mn.Length)
-                        return -1;
-
-                    chunk = _mn[dynamicChunkIdx];
-                }
-
-                if (bitOffset > 0)
-                {
-                    MaskInternal lowerBitsMask = ((MaskInternal)1 << bitOffset) - 1;
-                    chunk &= ~lowerBitsMask;
-                }
+                MaskInternal chunk = _parts[chunkIdx] & (-1L << bitOffset);
 
                 if (chunk != 0)
                 {
@@ -497,36 +438,27 @@ namespace CodexECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Clear()
         {
-            _m1 = 0;
-            if (_mn != null)
-                Array.Clear(_mn, 0, _mn.Length);
+            if (_parts != null)
+                Array.Clear(_parts, 0, _parts.Length);
 
             _length = 0;
             _setBitsCount = 0;
             _hash = 0;
         }
 
-        //[MethodImpl(MethodImplOptions.AggressiveInlining)]
-        //private bool InclusivePass_Internal(MaskInternal value, MaskInternal filter) => (filter & (value ^ filter)) == 0;
-
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public readonly bool InclusivePass(in BitMask filter)
         {
             if (filter.Length > Length)
                 return false;
-            if ((filter._m1 & (_m1 ^ filter._m1)) != 0)
-            //if (!InclusivePass_Internal(_m1, filter._m1))
-                return false;
-
-            var dynamicChunksLength = GetDynamicChunksLength(filter._length);
-            for (int i = 0; i < dynamicChunksLength; i++)
+            var partsLength = GetPartsLength(filter._length);
+            for (int i = 0; i < partsLength; i++)
             {
-                var filterChunk = filter._mn[i];
+                var filterChunk = filter._parts[i];
                 if (filterChunk == 0)
                     continue;
 
-                if ((filterChunk & (_mn[i] ^ filterChunk)) != 0)
-                //if (!InclusivePass_Internal(_mn[i], filterChunk))
+                if ((filterChunk & ~_parts[i]) != 0)
                     return false;
             }
 
@@ -536,16 +468,11 @@ namespace CodexECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public readonly bool ExclusivePass(in BitMask filter)
         {
-            if ((filter._m1 & _m1) != 0)
-                return false;
-            if (filter._mn != null && _mn != null)
+            var minLength = GetPartsLength(Math.Min(_length, filter._length));
+            for (int i = 0; i < minLength; i++)
             {
-                var dynamicChunksLength = GetDynamicChunksLength(filter._length);
-                for (int i = 0; i < dynamicChunksLength && i < _mn.Length; i++)
-                {
-                    if ((filter._mn[i] & _mn[i]) != 0)
-                        return false;
-                }
+                if ((filter._parts[i] & _parts[i]) != 0)
+                    return false;
             }
 
             return true;
@@ -557,17 +484,11 @@ namespace CodexECS
             if (Length != other.Length)
                 return false;
 
-            if (_m1 != other._m1)
-                return false;
-
-            if (_mn != null)
+            var partsLength = GetPartsLength(_length);
+            for (int i = 0; i < partsLength; i++)
             {
-                var dynamicChunksLength = GetDynamicChunksLength(_length);
-                for (int i = 0; i < dynamicChunksLength; i++)
-                {
-                    if (_mn[i] != other._mn[i])
-                        return false;
-                }
+                if (_parts[i] != other._parts[i])
+                    return false;
             }
             
             return true;
@@ -586,16 +507,12 @@ namespace CodexECS
             sb.Remove(sb.Length - 2, 2);
             sb.Append(" }");
             
-            // if (_mn != null)
-            //     for (int i = _mn.Length - 1; i > -1; i--)
-            //         sb.Append(Convert.ToString(_mn[i], 2).PadLeft(SizeOfPartInBits, '0'));
-            // sb.Append(Convert.ToString(_m1, 2).PadLeft(SizeOfPartInBits, '0'));
-            // sb.Append(". Length: " + Length);
-
             return sb.ToString();
         }
 
-        public string ChunkToString(MaskInternal chunk) => Convert.ToString(chunk, 2).PadLeft(SizeOfPartInBits, '0');
+        public string ChunkToString(uint chunk) => Convert.ToString(chunk, 2).PadLeft(sizeof(uint) * 8, '0');
+
+        public string ChunkToString(long chunk) => Convert.ToString(chunk, 2).PadLeft(SizeOfPartInBits, '0');
 
         public void SetBits(int[] bits)
         {
