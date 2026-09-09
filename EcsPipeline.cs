@@ -6,8 +6,9 @@ namespace CodexECS
 {
     /// <summary>
     /// Owns and executes ECS systems independently from any engine-specific update loop.
-    /// Filters resolved while a system is being constructed are used to avoid ticking that
-    /// system when none of the filters can produce work.
+    /// Filters resolved with gateSystem enabled while a system is being constructed are
+    /// used to avoid ticking that system when none of its gating filters can produce work.
+    /// Systems with no gating filters run regardless of filter emptiness.
     /// </summary>
     public sealed class EcsPipeline<TGroup> : IDisposable where TGroup : struct, Enum
     {

@@ -827,23 +827,25 @@ namespace CodexECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public EcsFilter RegisterFilter(FilterMasks masks)
+        public EcsFilter RegisterFilter(FilterMasks masks, bool gateSystem = true)
         {
             _archetypes.RegisterFilter(this, masks, out EcsFilter filter);
-            // Pipelines observe every resolution while constructing a system so shared,
-            // already-registered filters are still associated with that system.
-            FilterResolved?.Invoke(filter, masks);
+            // Gating belongs to this registration, not the shared filter. Opted-in
+            // resolutions are captured during system construction even for existing filters.
+            if (gateSystem)
+                FilterResolved?.Invoke(filter, masks);
             return filter;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public EcsFilter RegisterFilter(in BitMask includes, in BitMask excludes = default)
+        public EcsFilter RegisterFilter(in BitMask includes, in BitMask excludes = default,
+            bool gateSystem = true)
         {
             return RegisterFilter(new FilterMasks
             {
                 Includes = includes,
                 Excludes = excludes
-            });
+            }, gateSystem);
         }
         
         public struct FilterBuilder
@@ -864,7 +866,8 @@ namespace CodexECS
                 return this;
             }
 
-            public EcsFilter Build() => _world.RegisterFilter(_includes, _excludes);
+            public EcsFilter Build(bool gateSystem = true) =>
+                _world.RegisterFilter(_includes, _excludes, gateSystem);
         }
 
         public FilterBuilder Filter() => new() { _world = this };

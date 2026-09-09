@@ -105,6 +105,104 @@ namespace CodexECS.Tests
                 "A system using several filters runs when any one of them has entities.");
         }
 
+        [TestCase(0)]
+        [TestCase(1)]
+        [TestCase(2)]
+        public void Tick_UngatedFilterStillQueriesEntitiesButDoesNotSuppressSystem(int registrationApi)
+        {
+            var world = new EcsWorld();
+            using var pipeline = new EcsPipeline<Group>(world, Group.Update);
+            EcsFilter filter = null;
+            var matched = -1;
+            var registration = pipeline.Register(Group.Update, ecs =>
+            {
+                var includes = new BitMask(ComponentMeta<A>.Id);
+                filter = registrationApi switch
+                {
+                    0 => ecs.RegisterFilter(new FilterMasks { Includes = includes }, gateSystem: false),
+                    1 => ecs.RegisterFilter(includes, gateSystem: false),
+                    _ => ecs.Filter().With<A>().Build(gateSystem: false)
+                };
+                return new ActionSystem<AlwaysMarker>(tick: _ => matched = filter.EntitiesCount);
+            });
+            var system = (ActionSystem<AlwaysMarker>)registration.System;
+
+            Assert.AreEqual(0, registration.Filters.Count);
+            pipeline.Tick(Group.Update);
+            Assert.AreEqual(1, system.TickCalls);
+            Assert.AreEqual(0, matched);
+
+            var entity = world.Create();
+            world.Add<A>(entity);
+            pipeline.Tick(Group.Update);
+            Assert.AreEqual(2, system.TickCalls);
+            Assert.AreEqual(1, matched);
+
+            world.Remove<A>(entity);
+            pipeline.Tick(Group.Update);
+            Assert.AreEqual(3, system.TickCalls);
+            Assert.AreEqual(0, matched);
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void Tick_SharedFilterGatingBelongsToEachSystem(bool ungatedFirst)
+        {
+            var world = new EcsWorld();
+            using var pipeline = new EcsPipeline<Group>(world, Group.Update);
+            EcsFilter ungatedFilter = null;
+            Func<EcsWorld, EcsSystem> ungatedFactory = ecs =>
+            {
+                ungatedFilter = ecs.Filter().With<A>().Build(gateSystem: false);
+                return new ActionSystem<AlwaysMarker>();
+            };
+            if (ungatedFirst)
+                pipeline.Register(Group.Update, ungatedFactory);
+            var gated = pipeline.Register(Group.Update, ecs =>
+            {
+                ecs.Filter().With<A>().Build();
+                return new ActionSystem<NormalMarker>();
+            });
+            if (!ungatedFirst)
+                pipeline.Register(Group.Update, ungatedFactory);
+            var ungated = pipeline.GetRegistration<ActionSystem<AlwaysMarker>>(Group.Update);
+
+            Assert.AreSame(ungatedFilter, gated.Filters[0]);
+            pipeline.Tick(Group.Update);
+            Assert.AreEqual(0, ((ActionSystem<NormalMarker>)gated.System).TickCalls);
+            Assert.AreEqual(1, ((ActionSystem<AlwaysMarker>)ungated.System).TickCalls);
+
+            world.Add<A>(world.Create());
+            pipeline.Tick(Group.Update);
+            Assert.AreEqual(1, ((ActionSystem<NormalMarker>)gated.System).TickCalls);
+            Assert.AreEqual(2, ((ActionSystem<AlwaysMarker>)ungated.System).TickCalls);
+        }
+
+        [Test]
+        public void Tick_UngatedFilterDoesNotOverrideOtherGatingFilters()
+        {
+            var world = new EcsWorld();
+            using var pipeline = new EcsPipeline<Group>(world, Group.Update);
+            var registration = pipeline.Register(Group.Update, ecs =>
+            {
+                ecs.Filter().With<A>().Build(gateSystem: false);
+                ecs.Filter().With<A>().Build();
+                ecs.Filter().With<A>().Build(gateSystem: false);
+                ecs.Filter().With<B>().Build(gateSystem: false);
+                return new ActionSystem<NormalMarker>();
+            });
+            var system = (ActionSystem<NormalMarker>)registration.System;
+
+            Assert.AreEqual(1, registration.Filters.Count);
+            world.Add<B>(world.Create());
+            pipeline.Tick(Group.Update);
+            Assert.AreEqual(0, system.TickCalls);
+
+            world.Add<A>(world.Create());
+            pipeline.Tick(Group.Update);
+            Assert.AreEqual(1, system.TickCalls);
+        }
+
         [Test]
         public void Tick_ObservesFilterBecomingNonemptyEarlierInTheSameGroup()
         {
