@@ -337,12 +337,11 @@ namespace CodexECS
         {
             ThrowIfDisposed();
             var state = GetGroup(group);
-            var isPaused = IsPaused && !force;
 
             for (int i = 0; i < state.Registrations.Count; i++)
             {
                 var registration = state.Registrations[i];
-                if (!registration.Active || (isPaused && !registration.NonPausable))
+                if (!registration.Active || (IsPaused && !force && !registration.NonPausable))
                     continue;
                 if (!state.Graph.ShouldRun(i))
                     continue;

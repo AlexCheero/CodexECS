@@ -400,6 +400,60 @@ namespace CodexECS.Tests
             CollectionAssert.AreEqual(new[] { 1, 2 }, order);
             Assert.Throws<ArgumentOutOfRangeException>(() => pipeline.Tick(Group.Init));
         }
+
+        [Test]
+        public void Tick_WeaponReequipPausePreventsAudioFromReadingDetachedSecondary()
+        {
+            var world = new EcsWorld();
+            using var pipeline = new EcsPipeline<Group>(world, Group.Update);
+            var player = world.Create();
+            var primary = world.GetById(world.Create());
+            var secondary = world.GetById(world.Create());
+            world.Add(player, new PlayerWeaponMode { isAkimbo = true });
+            world.Add(player, new PrimaryWeaponComponent { entity = primary });
+            world.Add(player, new SecondaryWeaponComponent { entity = secondary });
+            pipeline.Register(Group.Update, _ => new ActionSystem<ProducerMarker>(tick: ecs =>
+            {
+                pipeline.Pause();
+                ecs.Remove<SecondaryWeaponComponent>(player);
+            }));
+            var audio = (ActionSystem<ConsumerMarker>)pipeline.Register(Group.Update,
+                _ => new ActionSystem<ConsumerMarker>(tick: ecs => WeaponHelper.UpdatePlayerWeaponAudioMix(ecs, player, .016f))).System;
+            var nonPausable = (ActionSystem<NonPausableMarker>)pipeline.Register(Group.Update,
+                _ => new ActionSystem<NonPausableMarker>(), nonPausable: true).System;
+
+            Assert.DoesNotThrow(() => pipeline.Tick(Group.Update));
+            Assert.AreEqual(0, audio.TickCalls);
+            Assert.AreEqual(1, nonPausable.TickCalls);
+            Assert.IsFalse(world.Have<SecondaryWeaponComponent>(player));
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void Tick_ObservesPauseDuringGroupAndPreservesForcedTicks(bool force)
+        {
+            var world = new EcsWorld();
+            using var pipeline = new EcsPipeline<Group>(world, Group.Update);
+            pipeline.Register(Group.Update, _ => new ActionSystem<ProducerMarker>(tick: __ => pipeline.Pause()));
+            var consumer = (ActionSystem<ConsumerMarker>)pipeline.Register(Group.Update,
+                _ => new ActionSystem<ConsumerMarker>()).System;
+            pipeline.Tick(Group.Update, force);
+            Assert.AreEqual(force ? 1 : 0, consumer.TickCalls);
+        }
+
+        [Test]
+        public void Tick_ObservesUnpauseFromNonPausableSystemDuringGroup()
+        {
+            var world = new EcsWorld();
+            using var pipeline = new EcsPipeline<Group>(world, Group.Update);
+            pipeline.Register(Group.Update, _ => new ActionSystem<NonPausableMarker>(tick: __ => pipeline.Unpause()),
+                nonPausable: true);
+            var consumer = (ActionSystem<ConsumerMarker>)pipeline.Register(Group.Update,
+                _ => new ActionSystem<ConsumerMarker>()).System;
+            pipeline.Pause();
+            pipeline.Tick(Group.Update);
+            Assert.AreEqual(1, consumer.TickCalls);
+        }
     }
 }
 #endif
