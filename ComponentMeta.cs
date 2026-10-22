@@ -73,8 +73,6 @@ namespace CodexECS
             private set;
         } = DefaultCopy;
 
-        public static readonly int InitialPoolSize;
-        
         static ComponentMeta()
         {
             var type = typeof(T);
@@ -109,39 +107,17 @@ namespace CodexECS
                 var copyMethod = type.GetMethod(nameof(Copy), BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
                 if (copyMethod != null)
                     Copy = (CopyDelegate)Delegate.CreateDelegate(typeof(CopyDelegate), copyMethod);
-                
-                var initialPoolSizeField = type.GetField(nameof(InitialPoolSize), BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
-                if (initialPoolSizeField != null)
-                    InitialPoolSize = (int)initialPoolSizeField.GetRawConstantValue();
-                else
-                    InitialPoolSize = 2;//default value
-                
-                PoolFactory.FactoryMethods.Add(Id, GetComponentsPool);
+
+                PoolFactory.FactoryMethods.Add(Id, CreateComponentsPool);
             }
             else
             {
-                PoolFactory.FactoryMethods.Add(Id, GetTagsPool);  
+                PoolFactory.FactoryMethods.Add(Id, CreateTagsPool);
             }
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static IComponentsPool GetComponentsPool()
-        {
-#if DEBUG
-            if (IsTag)
-                throw new EcsException("trying to get tags pool for data component");
-#endif
-            return new ComponentsPool<T>();
-        }
+        private static ComponentStorage CreateComponentsPool(EcsWorld world, int id) => new ComponentsPool<T>(world, id);
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static IComponentsPool GetTagsPool()
-        {
-#if DEBUG
-            if (!IsTag)
-                throw new EcsException("trying to get components pool for tag component");
-#endif
-            return new TagsPool<T>();
-        }
+        private static ComponentStorage CreateTagsPool(EcsWorld world, int id) => new TagsPool<T>(world, id);
     }
 }

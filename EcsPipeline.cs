@@ -56,149 +56,40 @@ namespace CodexECS
         }
 
         /// <summary>
-        /// A subset tree of filters. A child is always at least as restrictive as its
-        /// parent, so an empty parent lets the whole branch be pruned safely.
+        /// Gating without cached emptiness: a system with captured filters runs when at least one of them
+        /// matches an entity at the moment it is considered, so changes made by earlier systems of the same
+        /// Tick are observed. IsEmpty scans until the first match.
         /// </summary>
         private sealed class SystemGraph : IDisposable
         {
-            private sealed class Node
-            {
-                public readonly EcsFilter Filter;
-                public readonly FilterMasks Masks;
-                public readonly List<Node> Children = new();
-                public BitMask Systems;
-                public Node Parent;
-
-                public Node(EcsFilter filter, in FilterMasks masks)
-                {
-                    Filter = filter;
-                    Masks = masks;
-                }
-            }
-
-            private readonly Node _root = new(null, default);
-            private readonly Dictionary<EcsFilter, Node> _nodes = new();
-            private BitMask _systemsWithoutFilters;
-            private BitMask _runnableSystems;
-            private bool _dirty = true;
-            private bool _disposed;
+            private readonly List<EcsFilter[]> _filtersBySystem = new();
 
             public void AddSystem(int systemIndex, List<CapturedFilter> filters)
             {
+                while (_filtersBySystem.Count <= systemIndex)
+                    _filtersBySystem.Add(null);
                 if (filters.Count == 0)
-                {
-                    _systemsWithoutFilters.Set(systemIndex);
-                    _dirty = true;
                     return;
-                }
-
+                var systemFilters = new EcsFilter[filters.Count];
                 for (int i = 0; i < filters.Count; i++)
-                {
-                    var node = GetOrAddNode(filters[i]);
-                    node.Systems.Set(systemIndex);
-                }
-
-                _dirty = true;
+                    systemFilters[i] = filters[i].Filter;
+                _filtersBySystem[systemIndex] = systemFilters;
             }
 
             public bool ShouldRun(int systemIndex)
             {
-                RebuildRunnableSystemsIfNeeded();
-                return _runnableSystems.Check(systemIndex);
-            }
-
-            private Node GetOrAddNode(in CapturedFilter captured)
-            {
-                if (_nodes.TryGetValue(captured.Filter, out var existing))
-                    return existing;
-
-                var parent = _root;
-                var parentSpecificity = -1;
-                foreach (var candidate in _nodes.Values)
+                var filters = _filtersBySystem[systemIndex];
+                if (filters == null)
+                    return true;
+                for (int i = 0; i < filters.Length; i++)
                 {
-                    if (!IsDerivative(captured.Masks, candidate.Masks))
-                        continue;
-
-                    var specificity = GetSpecificity(candidate.Masks);
-                    if (specificity <= parentSpecificity)
-                        continue;
-
-                    parent = candidate;
-                    parentSpecificity = specificity;
+                    if (!filters[i].IsEmpty)
+                        return true;
                 }
-
-                var node = new Node(captured.Filter, captured.Masks)
-                {
-                    Parent = parent
-                };
-
-                // Keep the tree as compact as possible when a less restrictive filter is
-                // registered after filters that derive from it.
-                for (int i = parent.Children.Count - 1; i >= 0; i--)
-                {
-                    var child = parent.Children[i];
-                    if (!IsDerivative(child.Masks, node.Masks))
-                        continue;
-
-                    parent.Children.RemoveAt(i);
-                    child.Parent = node;
-                    node.Children.Add(child);
-                }
-
-                parent.Children.Add(node);
-                _nodes.Add(captured.Filter, node);
-                captured.Filter.EmptinessChanged += MarkDirty;
-                return node;
+                return false;
             }
 
-            private static bool IsDerivative(in FilterMasks child, in FilterMasks parent)
-            {
-                return child.Includes.InclusivePass(parent.Includes) &&
-                       child.Excludes.InclusivePass(parent.Excludes);
-            }
-
-            private static int GetSpecificity(in FilterMasks masks)
-            {
-                return masks.Includes.SetBitsCount + masks.Excludes.SetBitsCount;
-            }
-
-            private void RebuildRunnableSystemsIfNeeded()
-            {
-                if (!_dirty)
-                    return;
-
-                _runnableSystems.Clear();
-                _runnableSystems.Set(_systemsWithoutFilters);
-                for (int i = 0; i < _root.Children.Count; i++)
-                    AddRunnableBranch(_root.Children[i]);
-
-                _dirty = false;
-            }
-
-            private void AddRunnableBranch(Node node)
-            {
-                if (node.Filter.EntitiesCount == 0)
-                    return;
-
-                _runnableSystems.Set(node.Systems);
-                for (int i = 0; i < node.Children.Count; i++)
-                    AddRunnableBranch(node.Children[i]);
-            }
-
-            private void MarkDirty() => _dirty = true;
-
-            public void Dispose()
-            {
-                if (_disposed)
-                    return;
-
-                _disposed = true;
-                foreach (var pair in _nodes)
-                    pair.Key.EmptinessChanged -= MarkDirty;
-
-                _nodes.Clear();
-                _root.Children.Clear();
-            }
+            public void Dispose() => _filtersBySystem.Clear();
         }
 
         private sealed class ReferenceComparer<T> : IEqualityComparer<T> where T : class

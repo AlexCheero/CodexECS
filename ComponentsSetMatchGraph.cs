@@ -137,6 +137,34 @@ namespace CodexECS
                 matches);
         }
 
+        /// <summary>
+        /// Reports subscriptions newly satisfied because <paramref name="componentId"/> was just added to
+        /// <paramref name="eid"/>: satisfied now, tested on the world's membership, and containing the added
+        /// component (a satisfied mask without it was already satisfied before the add). No per-entity mask
+        /// is needed. Results are parent-before-child.
+        /// </summary>
+        internal void CollectNewMatchesAfterAdd(EcsWorld world, int eid, int componentId, List<Node> matches)
+        {
+            matches.Clear();
+            CollectNewlySatisfiedAfterAdd(_root, world, eid, componentId, matches);
+        }
+
+        private static void CollectNewlySatisfiedAfterAdd(Node node, EcsWorld world, int eid, int componentId, List<Node> matches)
+        {
+            var children = node.ChildrenList;
+            for (var i = 0; i < children.Count; i++)
+            {
+                var child = children[i];
+                if (!world.Have(child.RequiredMask, eid))
+                    continue;
+
+                if (child.RequiredMask.Check(componentId))
+                    matches.Add(child);
+
+                CollectNewlySatisfiedAfterAdd(child, world, eid, componentId, matches);
+            }
+        }
+
         private static void FindClosestSubset(
             Node node,
             in BitMask requiredMask,

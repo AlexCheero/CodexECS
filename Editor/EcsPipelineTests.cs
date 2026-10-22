@@ -243,7 +243,7 @@ namespace CodexECS.Tests
             {
                 filter = ecs.Filter().With<A>().Build();
                 return new ActionSystem<RemoverMarker>(tick: tickWorld =>
-                    tickWorld.Remove<A>(filter[0]));
+                    tickWorld.Remove<A>(filter.First()));
             }).System;
             var consumerRegistration = pipeline.Register(Group.Update, ecs =>
             {
@@ -401,6 +401,7 @@ namespace CodexECS.Tests
             Assert.Throws<ArgumentOutOfRangeException>(() => pipeline.Tick(Group.Init));
         }
 
+#if !CODEX_ECS_STANDALONE // uses game types; compiled only inside the Unity project
         [Test]
         public void Tick_WeaponReequipPausePreventsAudioFromReadingDetachedSecondary()
         {
@@ -427,6 +428,7 @@ namespace CodexECS.Tests
             Assert.AreEqual(1, nonPausable.TickCalls);
             Assert.IsFalse(world.Have<SecondaryWeaponComponent>(player));
         }
+#endif
 
         [TestCase(false)]
         [TestCase(true)]

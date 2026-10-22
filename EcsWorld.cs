@@ -10,14 +10,17 @@ using CodexECS.Utility;
 
 namespace CodexECS
 {
-    public class EcsWorld
+    // Semantics kept from the sparse-set CodexECS:
+    // - entity ids are ints, 0 is null; Entity adds a version to an id;
+    // - Add/Remove take effect immediately, also inside filter loops;
+    // - Delete is deferred while the world is locked (every pipeline system tick and every filter loop
+    //   lock it) and applied at the outermost Unlock, followed by reactive callbacks;
+    // - removing an entity's last component deletes it; Create() makes an empty entity that stays alive.
+    // A running filter loop reads the current page from the word captured at its start; later pages are
+    // read live, so an entity that gains the filter's components further on is visited and one that loses
+    // them is skipped.
+    public partial class EcsWorld
     {
-        private readonly EntityManager _entityManager;
-        private readonly ComponentManager _componentManager;
-        //this is the direct reference from component manager to speed thing up a bit
-        private IComponentsPool[] _pools;
-        private readonly ArchetypesManager _archetypes;
-        
         private readonly SparseSet<Action<EcsWorld>> _onAddCallbacks;
         private readonly SparseSet<Action<EcsWorld>> _onRemoveCallbacks;
         internal event Action<EcsFilter, FilterMasks> FilterResolved;
@@ -26,26 +29,23 @@ namespace CodexECS
 
         private BitMask _addReactGuard;
         private BitMask _removeReactGuard;
-        private readonly SimpleList<EntityType> _entitiesMovedToEmpty;
         private readonly SimpleList<EntityType> _removeAllEntities;
+        private readonly SimpleList<EntityType> _emptiedEntities;
 
-        private void SetPools(IComponentsPool[] pools) => _pools = pools;
+        private readonly Dictionary<FilterMasks, EcsFilter> _filters;
 
         public EcsWorld()
         {
-            _entityManager = new EntityManager();
-            _componentManager = new ComponentManager();
-            _pools = _componentManager._pools;
-            _componentManager.OnPoolsResized = SetPools;
-            _archetypes = new ArchetypesManager();
+            Alive = new SlotSet(this);
             _delayedDeleteList = new();
-            
+
             _onAddCallbacks = new();
             _onRemoveCallbacks = new();
             _dirtyAddMask = new();
             _dirtyRemoveMask = new();
-            _entitiesMovedToEmpty = new();
             _removeAllEntities = new();
+            _emptiedEntities = new();
+            _filters = new Dictionary<FilterMasks, EcsFilter>(FilterMasks.MasksComparer);
 
             _componentsSetMatchGraph = new();
             _matchCollectionBuffer = new();
@@ -55,10 +55,10 @@ namespace CodexECS
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ref Entity GetById(int id) => ref _entityManager.GetById(id);
+        public Entity GetById(int id) => EntityExtension.Make(id, Versions[id]);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool IsDead(int id) => _entityManager.IsDead(id);
+        public bool IsDead(int id) => !IsAliveId(id);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool IsDead(Entity entity) => IsDead(entity.GetId());
@@ -69,24 +69,25 @@ namespace CodexECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool IsEntityValid(Entity entity)
         {
-            if (entity.IsNull())
-                return false;
             var id = entity.GetId();
-            return !IsDead(id) && entity.GetVersion() == GetById(id).GetVersion();
+            return id != EntityExtension.NullId && IsAliveId(id) && Versions[id] == entity.GetVersion();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool IsIdValid(int id) => id >= 0 && id != EntityExtension.NullId && !IsDead(id);
+        public bool IsIdValid(int id) => id > 0 && IsAliveId(id);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public EntityType Create() => CreateWithComponents(default);
 
+        // Adds every component of the mask with its metadata default and places the entity with the other
+        // entities created from the same mask (allocation group by exact mask).
         public EntityType CreateWithComponents(in BitMask componentsMask)
         {
-            var destinationMask = componentsMask.Duplicate();
-
 #if USE_DEBUG_TRACE_COMPONENT && DEBUG
+            var destinationMask = componentsMask.Duplicate();
             destinationMask.Set(ComponentMeta<DebugTraceData>.Id);
+#else
+            ref readonly var destinationMask = ref componentsMask;
 #endif
 
 #if DEBUG && !ECS_PERF_TEST
@@ -99,11 +100,15 @@ namespace CodexECS
             }
 #endif
 
-            var entity = _entityManager.Create();
-            _archetypes.AddToArchetype(entity, destinationMask);
+            var entity = Allocate(GroupFor(in destinationMask));
+            if (destinationMask.SetBitsCount == 0)
+                return entity;
 
             foreach (var componentId in destinationMask)
-                _componentManager.AddDefault(entity, componentId);
+            {
+                GetStorage(componentId).AddDefault(entity);
+                OnComponentAdded(entity, componentId);
+            }
 
             foreach (var componentId in destinationMask)
             {
@@ -163,44 +168,40 @@ namespace CodexECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Have<T>(EntityType eid)
         {
-#if DEBUG && !ECS_PERF_TEST
-            if (_archetypes.Have<T>(eid) != _componentManager.Have<T>(eid))
-                throw new EcsException("Components and archetypes desynch");
-#endif
-            return _archetypes.Have<T>(eid);
+            var storage = FindStorage(ComponentMeta<T>.Id);
+            return storage != null && storage.Has(eid);
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        // All components of the mask.
         public bool Have(in BitMask mask, EntityType eid)
         {
-#if DEBUG && !ECS_PERF_TEST
-            if (_archetypes.Have(mask, eid) != _componentManager.Have(mask, eid))
-                throw new EcsException("Components and archetypes desynch");
-#endif
-            return _archetypes.Have(mask, eid);
+            foreach (var componentId in mask)
+            {
+                var storage = FindStorage(componentId);
+                if (storage == null || !storage.Has(eid))
+                    return false;
+            }
+            return true;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        // At least one component of the mask.
         public bool HaveAny(in BitMask mask, EntityType eid)
         {
-#if DEBUG && !ECS_PERF_TEST
-            //TODO: implement
-#endif
-            return _archetypes.HaveAny(mask, eid);
+            foreach (var componentId in mask)
+            {
+                var storage = FindStorage(componentId);
+                if (storage != null && storage.Has(eid))
+                    return true;
+            }
+            return false;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Have(int componentId, EntityType eid)
         {
-#if DEBUG && !ECS_PERF_TEST
-            if (_archetypes.Have(componentId, eid) != _componentManager.Have(componentId, eid))
-                throw new EcsException("Components and archetypes desynch");
-#endif
-            return _archetypes.Have(componentId, eid);
+            var storage = FindStorage(componentId);
+            return storage != null && storage.Has(eid);
         }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ref readonly BitMask GetMask(int eid) => ref _archetypes.GetMask(eid);
 
         public void SubscribeOnAdd<T>(Action<EcsWorld> callback)
         {
@@ -211,7 +212,7 @@ namespace CodexECS
             _addReactGuard.Set(ComponentMeta<T>.Id);
             SubscribeOnExistenceChange<AddReact<T>>(_onAddCallbacks, callback);
         }
-        
+
         public void SubscribeOnRemove<T>(Action<EcsWorld> callback)
         {
 #if DEBUG && !ECS_PERF_TEST
@@ -221,14 +222,14 @@ namespace CodexECS
             _removeReactGuard.Set(ComponentMeta<T>.Id);
             SubscribeOnExistenceChange<RemoveReact<T>>(_onRemoveCallbacks, callback);
         }
-        
+
         private void SubscribeOnExistenceChange<T>(SparseSet<Action<EcsWorld>> callbacks, Action<EcsWorld> callback)
         {
 #if DEBUG && !ECS_PERF_TEST
             if (!IsReactWrapperType<T>())
                 throw new EcsException("Subscription on the direct type instead of reactive wrapper");
 #endif
-            
+
             var reactWrapperId = ComponentMeta<T>.Id;
             if (!callbacks.ContainsIdx(reactWrapperId))
                 callbacks.Add(reactWrapperId, callback);
@@ -252,7 +253,8 @@ namespace CodexECS
         private readonly Queue<ComponentsSetMatchGraph.Node> _dirtyMatchNodes;
         private readonly SparseSet<BitMask> _pendingAddEntities;
         private readonly SparseSet<BitMask> _pendingRemoveEntities;
-        private BitMask _previousComponentsMaskBuffer;
+        // Every component that appears in a components-set subscription; adds of other components skip the graph.
+        private BitMask _matchComponents;
 
         public void SubscribeOnComponentsSetMatch(BitMask mask, Action<EcsWorld> callback)
         {
@@ -261,6 +263,7 @@ namespace CodexECS
             if (requiredMask.SetBitsCount == 0)
                 throw new ArgumentException("components-set match requires at least one non-reactive component", nameof(mask));
             _componentsSetMatchGraph.Subscribe(requiredMask, callback);
+            _matchComponents.Set(requiredMask);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -384,8 +387,7 @@ namespace CodexECS
 #endif
             )
         {
-            var defaultValue = ComponentMeta<T>.IsTag ? default : _componentManager.GetNextFree<T>();
-            Add(eid, defaultValue);
+            Add(eid, ComponentMeta<T>.IsTag ? default : ComponentMeta<T>.GetDefault());
 
 #if USE_DEBUG_TRACE_COMPONENT && DEBUG
             if (!IsCalledFromWorld(filePath))
@@ -406,33 +408,14 @@ namespace CodexECS
             if (IsReactWrapperType<T>())
                 throw new EcsException("Cannot add reactive wrappers manually");
 #endif
-            
+
             AddInternal(eid, component);
             ReactOnAdd<T>(eid, true);
-
-#if HEAVY_ECS_DEBUG
-            if (!ExistenceSynched<T>(eid))
-                throw new EcsException("Components and archetypes not synched");
-#endif
 
 #if USE_DEBUG_TRACE_COMPONENT && DEBUG
             if (!IsCalledFromWorld(filePath))
                 SaveTraceData(eid, typeof(T), DebugTraceData.EMethodType.Add, memberName, filePath, lineNumber);
 #endif
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void AddInternal<T>(EntityType eid, T component)
-        {
-            _archetypes.AddComponent<T>(eid);
-            _componentManager.Add(eid, component);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void RemoveInternal<T>(EntityType eid)
-        {
-            _archetypes.RemoveComponent<T>(eid);
-            _componentManager.Remove<T>(eid);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -448,7 +431,7 @@ namespace CodexECS
                 _dirtyAddMask.Set(reactWrapperId);
             }
 
-            if (checkComponentsSetMatch)
+            if (checkComponentsSetMatch && _matchComponents.Check(componentId))
                 ReactOnComponentSetAdded(eid, componentId);
         }
 
@@ -489,13 +472,7 @@ namespace CodexECS
 
         private void ReactOnComponentSetAdded(EntityType eid, int componentId)
         {
-            ref readonly var componentsMask = ref _archetypes.GetMask(eid);
-            _previousComponentsMaskBuffer.Copy(componentsMask);
-            _previousComponentsMaskBuffer.Unset(componentId);
-            _componentsSetMatchGraph.CollectNewMatches(
-                _previousComponentsMaskBuffer,
-                componentsMask,
-                _matchCollectionBuffer);
+            _componentsSetMatchGraph.CollectNewMatchesAfterAdd(this, eid, componentId, _matchCollectionBuffer);
             QueueComponentsSetMatches(eid);
         }
 
@@ -546,7 +523,7 @@ namespace CodexECS
             if (!IsCalledFromWorld(filePath))
                 SaveTraceData(to, componentType, DebugTraceData.EMethodType.Add, memberName, filePath, lineNumber);
 #endif
-            
+
             ComponentMapping.CallDispatchers[componentType].Copy(this, from, to);
         }
 
@@ -638,8 +615,16 @@ namespace CodexECS
             current = component;
         }
 
-        public ComponentsPool<T> GetComponentsPool<T>() => (ComponentsPool<T>)_componentManager.GetPool(ComponentMeta<T>.Id);
-        
+        // Cache it for repeated reads: pool[id] skips the world's type lookup and cast.
+        public ComponentsPool<T> GetComponentsPool<T>()
+        {
+#if DEBUG && !ECS_PERF_TEST
+            if (ComponentMeta<T>.IsTag)
+                throw new EcsException("can't get components pool for tags");
+#endif
+            return Pool<T>();
+        }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ref T Get<T>(EntityType eid)
         {
@@ -647,12 +632,11 @@ namespace CodexECS
             if (ComponentMeta<T>.IsTag)
                 throw new EcsException("can't get specific component from tags pool");
 #endif
-            var pool = (ComponentsPool<T>)_pools[ComponentMeta<T>.Id];
-
-            //return ref pool.Get(eid);
-            return ref pool.Values[pool.Sparse[eid]];
+            var pool = (ComponentsPool<T>)Storages[ComponentMeta<T>.Id];
+            return ref pool[eid];
         }
 
+        // The component of the lowest owning id.
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ref T GetFirst<T>()
         {
@@ -662,15 +646,15 @@ namespace CodexECS
             if (!HasAny<T>())
                 throw new EcsException($"no components of type {typeof(T).Name} in the pool");
 #endif
-            var pool = (ComponentsPool<T>)_pools[ComponentMeta<T>.Id];
-            return ref pool.Values[0];
+            var pool = (ComponentsPool<T>)Storages[ComponentMeta<T>.Id];
+            return ref pool[pool.First()];
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool HasAny<T>()
         {
-            var componentId = ComponentMeta<T>.Id;
-            return componentId < _pools.Length && _pools[componentId] != null && _pools[componentId].Length > 0;
+            var storage = FindStorage(ComponentMeta<T>.Id);
+            return storage != null && storage.Length > 0;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -694,7 +678,7 @@ namespace CodexECS
 
             return true;
         }
-        
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ref T GetOrAddComponent<T>(EntityType eid
 #if USE_DEBUG_TRACE_COMPONENT && DEBUG
@@ -716,7 +700,6 @@ namespace CodexECS
             return ref Get<T>(eid);
         }
 
-        //CODEX_TODO: possibly if filter is double looped and in outer loop the component is removed, than it won't be there in the inner loop
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Remove<T>(EntityType eid
 #if USE_DEBUG_TRACE_COMPONENT && DEBUG
@@ -729,22 +712,27 @@ namespace CodexECS
 #if DEBUG && !ECS_PERF_TEST
             if (IsReactWrapperType<T>())
                 throw new EcsException("Cannot remove reactive wrappers manually");
-#endif
             if (HaveMultipleStorage<T>(eid))
                 throw new EcsException(
                     $"entity has multiple components of type {typeof(T).Name}; use {nameof(RemoveMultiple)} or {nameof(RemoveAllMultiple)} instead");
+#endif
+
+            var storage = FindStorage(ComponentMeta<T>.Id);
+            if (storage == null || !storage.Has(eid))
+            {
+#if DEBUG && !ECS_PERF_TEST
+                throw new EcsException($"entity {eid} has no {typeof(T).Name}");
+#else
+                return;
+#endif
+            }
 
             ReactOnRemove<T>(eid);
 
-            RemoveInternal<T>(eid);
-
-            if (_archetypes.GetMask(eid).Length == 0)
+            storage.Remove(eid);
+            _componentCounts[eid]--;
+            if (HasNoComponents(eid))
                 Delete(eid);
-
-#if HEAVY_ECS_DEBUG
-            if (!ExistenceSynched<T>(eid))
-                throw new EcsException("Components and archetypes not synched");
-#endif
 
 #if USE_DEBUG_TRACE_COMPONENT && DEBUG
             if (!IsCalledFromWorld(filePath))
@@ -755,53 +743,75 @@ namespace CodexECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void RemoveAll<T>() => RemoveAll(ComponentMeta<T>.Id);
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void RemoveAll(int componentId)
         {
 #if DEBUG && !ECS_PERF_TEST
             if (IsReactWrapperType(componentId))
                 throw new EcsException("Cannot remove reactive wrappers manually");
 #endif
-            
-            if (!_componentManager.IsTypeRegistered(componentId))
+
+            var storage = FindStorage(componentId);
+            if (storage == null)
                 return;
 
-            RemoveAllMultipleStorage(componentId);
+            if (ComponentMapping.TryGetMultipleStorageId(componentId, out var storageId))
+                RemoveAllInternal(storageId);
 
-            if (_removeReactGuard.Check(componentId))
+            if (_removeReactGuard.Check(componentId) && storage.Length > 0)
             {
-                _archetypes.CollectEntitiesWithComponent(componentId, _removeAllEntities);
+                CollectOwners(storage, _removeAllEntities);
                 var componentType = ComponentMapping.GetTypeForId(componentId);
                 var dispatcher = ComponentMapping.CallDispatchers[componentType];
                 for (var i = 0; i < _removeAllEntities.Length; i++)
                     dispatcher.ReactOnRemove(this, _removeAllEntities[i]);
                 _removeAllEntities.Clear();
             }
-            
+
             RemoveAllInternal(componentId);
         }
 
-        private void RemoveAllMultipleStorage(int componentId)
+        // Owners in slot order.
+        private static void CollectOwners(ComponentStorage storage, SimpleList<EntityType> buffer)
         {
-            if (ComponentMapping.TryGetMultipleStorageId(componentId, out var storageId) &&
-                _componentManager.IsTypeRegistered(storageId))
-                RemoveAllInternal(storageId);
+            buffer.Clear();
+            var words = storage.Words;
+            var nonEmpty = storage.NonEmpty;
+            for (int chunk = 0; chunk < nonEmpty.Length; chunk++)
+            {
+                ulong pages = nonEmpty[chunk];
+                while (pages != 0)
+                {
+                    int page = (chunk << 6) | Bits.TrailingZeros(pages);
+                    pages &= pages - 1;
+                    ulong word = words[page];
+                    while (word != 0)
+                    {
+                        buffer.Add((page << Layout.PageShift) | Bits.TrailingZeros(word));
+                        word &= word - 1;
+                    }
+                }
+            }
         }
 
         private void RemoveAllInternal(int componentId)
         {
-            _entitiesMovedToEmpty.Clear();
-            _archetypes.RemoveAll(componentId, _entitiesMovedToEmpty);
-            _componentManager.RemoveAll(componentId);
-            DeleteEntitiesMovedToEmpty();
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void DeleteEntitiesMovedToEmpty()
-        {
-            for (int i = 0; i < _entitiesMovedToEmpty.Length; i++)
-                Delete(_entitiesMovedToEmpty[i]);
-            _entitiesMovedToEmpty.Clear();
+            var storage = FindStorage(componentId);
+            if (storage == null || storage.Length == 0)
+                return;
+            CollectOwners(storage, _emptiedEntities);
+            for (int i = 0; i < _emptiedEntities.Length; i++)
+            {
+                var eid = _emptiedEntities[i];
+                storage.Remove(eid);
+                _componentCounts[eid]--;
+            }
+            for (int i = 0; i < _emptiedEntities.Length; i++)
+            {
+                var eid = _emptiedEntities[i];
+                if (HasNoComponents(eid))
+                    Delete(eid);
+            }
+            _emptiedEntities.Clear();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -826,10 +836,20 @@ namespace CodexECS
             return true;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        // Filters are shared per pair of masks and never unregistered.
         public EcsFilter RegisterFilter(FilterMasks masks, bool gateSystem = true)
         {
-            _archetypes.RegisterFilter(this, masks, out EcsFilter filter);
+            if (!_filters.TryGetValue(masks, out var filter))
+            {
+                var key = new FilterMasks
+                {
+                    Includes = masks.Includes.Duplicate(),
+                    Excludes = masks.Excludes.Duplicate(),
+                };
+                filter = new EcsFilter(this, in key.Includes, in key.Excludes);
+                _filters[key] = filter;
+            }
+
             // Gating belongs to this registration, not the shared filter. Opted-in
             // resolutions are captured during system construction even for existing filters.
             if (gateSystem)
@@ -847,7 +867,7 @@ namespace CodexECS
                 Excludes = excludes
             }, gateSystem);
         }
-        
+
         public struct FilterBuilder
         {
             public EcsWorld _world;
@@ -874,8 +894,11 @@ namespace CodexECS
 
         private int _lockCounter;
         private bool _isFlushingReactives;
+        internal bool IsLocked => _lockCounter != 0;
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Lock() { _lockCounter++; }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Unlock()
         {
@@ -930,10 +953,12 @@ namespace CodexECS
 
         private void DeleteDelayedEntities()
         {
+            if (_delayedDeleteList.Length == 0)
+                return;
             foreach (var eid in _delayedDeleteList)
             {
                 if (IsIdValid(eid))
-                    Delete_Impl(eid);
+                    DestroyNow(eid);
             }
             _delayedDeleteList.Clear();
         }
@@ -987,9 +1012,8 @@ namespace CodexECS
                             !Have(reactWrapperId, eid))
                             continue;
 
-                        _archetypes.RemoveComponent(eid, reactWrapperId);
-                        _componentManager.Remove(reactWrapperId, eid);
-                        if (_archetypes.GetMask(eid).Length == 0)
+                        RemoveInternal(reactWrapperId, eid);
+                        if (HasNoComponents(eid))
                             Delete(eid);
                     }
 
@@ -1016,7 +1040,7 @@ namespace CodexECS
                     {
                         if (_delayedDeleteList.Check(eid) ||
                             !IsIdValid(eid) ||
-                            !_archetypes.GetMask(eid).InclusivePass(node.RequiredMask))
+                            !Have(node.RequiredMask, eid))
                             continue;
                         EnsureMatchReact(eid);
                         markedEntities.Set(eid);
@@ -1032,7 +1056,7 @@ namespace CodexECS
                         if (_delayedDeleteList.Check(eid) || !IsIdValid(eid) || !Have<MatchReact>(eid))
                             continue;
                         RemoveInternal<MatchReact>(eid);
-                        if (_archetypes.GetMask(eid).Length == 0)
+                        if (HasNoComponents(eid))
                             Delete(eid);
                     }
 
@@ -1045,7 +1069,8 @@ namespace CodexECS
         /// <summary>
         /// Destroys an entity as a hard lifecycle operation. This intentionally bypasses
         /// component-remove subscriptions; remove components explicitly first when their
-        /// reactive teardown callbacks are required.
+        /// reactive teardown callbacks are required. While the world is locked the entity stays
+        /// alive, with its components, until the outermost Unlock; deleting it twice is harmless.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Delete(EntityType eid)
@@ -1053,51 +1078,49 @@ namespace CodexECS
             if (_lockCounter > 0)
             {
                 _delayedDeleteList.Set(eid);
+                return;
             }
-            else
-            {
+
 #if DEBUG && !ECS_PERF_TEST
-                if (_delayedDeleteList.Length > 0)
-                    throw new EcsException("_delayedDeleteList is not empty here");
+            if (_delayedDeleteList.Length > 0)
+                throw new EcsException("_delayedDeleteList is not empty here");
+            if (!IsIdValid(eid))
+                throw new EcsException($"trying to delete dead or null entity {eid}");
+#else
+            if (!IsIdValid(eid))
+                return;
 #endif
-                Delete_Impl(eid);
+            DestroyNow(eid);
+        }
+
+#region Debug methods
+        public void GetTypesForId(int id, HashSet<Type> buffer)
+        {
+            buffer.Clear();
+            if (!IsAliveId(id))
+                return;
+            foreach (var storage in Storages)
+            {
+                if (storage != null && storage.Has(id))
+                    buffer.Add(storage.GetComponentType());
             }
         }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void Delete_Impl(EntityType eid)
-        {
-            //CODEX_TODO: check if manual mask iteration is really faster and if so, use it instead
-            //ref var mask = ref _archetypes.GetMask(eid);
-            //for (int i = mask.GetNextSetBit(0); i >= 0; i = mask.GetNextSetBit(i + 1))
-            //    _componentManager.Remove(i, eid);
-            foreach (var componentId in _archetypes.GetMask(eid))
-                _componentManager.Remove(componentId, eid);
-
-            _archetypes.Delete(eid);
-            _entityManager.Delete(eid);
-        }
-        
-#region Debug methods
-        public void GetTypesForId(int id, HashSet<Type> buffer) =>
-            _componentManager.GetTypesByMask(_archetypes.GetMask(id), buffer);
-        
-        private string DebugString(int id, int componentId, bool printFields) =>
-            _componentManager.GetPool(componentId).DebugString(id, printFields);
 
         private StringBuilder _debugEntityStringBuilder;
         public string DebugEntity(int id, bool printFields = false)
         {
             if (id == EntityExtension.NullId)
                 return "null entity";
-            if (IsDead(id))
-                return "dead entity";
             if (id < 0)
                 return "negative entity";
-            var mask = _archetypes.GetMask(id);
+            if (IsDead(id))
+                return "dead entity";
             _debugEntityStringBuilder ??= new StringBuilder();
-            foreach (var bit in mask)
-                _debugEntityStringBuilder.Append(DebugString(id, bit, printFields)).Append("\n");
+            foreach (var storage in Storages)
+            {
+                if (storage != null && storage.Has(id))
+                    _debugEntityStringBuilder.Append(storage.DebugString(id, printFields)).Append("\n");
+            }
             var result = _debugEntityStringBuilder.ToString();
             _debugEntityStringBuilder.Clear();
             return result;
@@ -1105,23 +1128,14 @@ namespace CodexECS
 
         public void DebugAll(StringBuilder sb, bool printFields)
         {
-            for (int i = 0; i < _entityManager.EntitiesCount; i++)
+            for (int id = 1; id < SlotCapacity; id++)
             {
-                var entity = _entityManager.GetEntity(i);
-                if (IsEntityValid(entity))
-                {
-                    var id = entity.GetId();
-                    sb.Append(id + ": " + DebugEntity(id, printFields));
-                    sb.Append('\n');
-                }
+                if (!IsAliveId(id))
+                    continue;
+                sb.Append(id + ": " + DebugEntity(id, printFields));
+                sb.Append('\n');
             }
         }
 #endregion
-        
-#if HEAVY_ECS_DEBUG
-        private bool ExistenceSynched<T>(int eid) => _archetypes.Have<T>(eid) == _componentManager.Have<T>(eid);
-        private bool ExistenceSynched(int componentId, int eid) =>
-            _archetypes.Have(componentId, eid) == _componentManager.Have(componentId, eid);
-#endif
     }
 }

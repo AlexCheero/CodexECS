@@ -192,7 +192,7 @@ namespace CodexECS.Tests
             world.AddMultiple(source, new ValueComponent { Value = 1 });
             world.AddMultiple(source, new ValueComponent { Value = 2 });
 
-            world.CopyComponents(world.GetMask(source), source, destination);
+            world.CopyComponents(MaskOf(world, source), source, destination);
             world.GetMultiple<ValueComponent>(destination)[1].Value = 20;
 
             Assert.AreEqual(2, world.GetMultiple<ValueComponent>(source)[1].Value);
@@ -213,7 +213,7 @@ namespace CodexECS.Tests
             world.AddMultiple(source, new OwnedComponent { Box = new CopyBox { Value = 1 } });
             world.AddMultiple(source, new OwnedComponent { Box = new CopyBox { Value = 2 } });
 
-            world.CopyComponents(world.GetMask(source), source, destination);
+            world.CopyComponents(MaskOf(world, source), source, destination);
             world.GetMultiple<OwnedComponent>(destination)[0].Box.Value = 10;
             world.GetMultiple<OwnedComponent>(destination)[1].Box.Value = 20;
 
@@ -270,6 +270,13 @@ namespace CodexECS.Tests
             Assert.IsTrue(world.Have<Anchor>(eid));
             Assert.AreEqual(1, first.Calls);
             Assert.AreEqual(1, second.Calls);
+        }
+
+        private static BitMask MaskOf(EcsWorld world, int eid)
+        {
+            var mask = new BitMask();
+            world.CollectMask(eid, ref mask);
+            return mask;
         }
     }
 }

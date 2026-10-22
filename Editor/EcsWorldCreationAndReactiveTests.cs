@@ -431,18 +431,9 @@ namespace CodexECS.Tests
             return result;
         }
 
-        private static int GetArchetypeCount(EcsWorld world)
-        {
-            var managerField = typeof(EcsWorld).GetField(
-                "_archetypes",
-                BindingFlags.Instance | BindingFlags.NonPublic);
-            var manager = managerField.GetValue(world);
-            var mapField = manager.GetType().GetField(
-                "_mToA",
-                BindingFlags.Instance | BindingFlags.NonPublic);
-            var map = (System.Collections.IDictionary)mapField.GetValue(manager);
-            return map.Count;
-        }
+        // Allocation groups are the inverted storage's counterpart of archetypes: one per exact creation mask,
+        // and component changes or deletes never add one.
+        private static int GetArchetypeCount(EcsWorld world) => world.GroupCount;
     }
 }
 #endif

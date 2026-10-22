@@ -6,31 +6,34 @@ using EntityType = System.Int32;
 
 namespace CodexECS
 {
-    public struct Entity
+    // A versioned handle: [version:10][id:22]. Plain ids are slots; id 0 is never used, so default(Entity) is null.
+    // The version advances on every delete of the slot and wraps after 1,024 reuses.
+    public struct Entity : System.IEquatable<Entity>
     {
         public EntityType Val;
 
         public Entity(EntityType entity) => Val = entity;
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool Equals(Entity other) => Val == other.Val;
+        public override bool Equals(object obj) => obj is Entity other && Val == other.Val;
+        public override int GetHashCode() => Val;
     }
 
     static class EntityExtension
     {
         public const int BitSize = sizeof(EntityType) * 8;
-        public const int BitSizeIdSize = (int)(BitSize * 3f / 4);
+        public const int BitSizeIdSize = 22;
         public const EntityType VersionMask = -1 << BitSizeIdSize;
         public const EntityType IdMask = ~VersionMask;
         public const EntityType NullId = 0;
         public const EntityType VersionIncrement = IdMask + 1;
+        // Versions are stored per slot in 10 bits.
+        internal const int VersionLimit = 1 << (BitSize - BitSizeIdSize);
 
         public static readonly Entity NullEntity = default;
 
 #if DEBUG
-        static EntityExtension()
-        {
-            if (NullEntity.GetVersion() > 0)
-                throw new EcsException("NullEntity should always have 0 version");
-        }
-
         public static string ToString(this in Entity entity)
         {
             return Convert.ToString(entity.Val, 2).PadLeft(sizeof(EntityType) * 8, '0');
@@ -56,12 +59,13 @@ namespace CodexECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool IsNull(this in Entity entity) => entity.GetId() == NullId;
 
-        //CODEX_TODO: use smaller part for version
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static EntityType GetVersion(this in Entity entity) => entity.Val >> BitSizeIdSize;
+        public static EntityType GetVersion(this in Entity entity) => (EntityType)((uint)entity.Val >> BitSizeIdSize);
 
-        //theoretically could overflow, but there is enough room for version
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void IncrementVersion(this ref Entity entity) => entity.Val += VersionIncrement;
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static Entity Make(int id, int version) => new Entity((version << BitSizeIdSize) | id);
     }
 }
