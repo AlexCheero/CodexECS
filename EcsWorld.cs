@@ -81,7 +81,13 @@ namespace CodexECS
 
         // Adds every component of the mask with its metadata default and places the entity with the other
         // entities created from the same mask (allocation group by exact mask).
-        public EntityType CreateWithComponents(in BitMask componentsMask)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public EntityType CreateWithComponents(in BitMask componentsMask) =>
+            CreateWithComponents(in componentsMask, in componentsMask);
+
+        // Places the entity in the group of an explicit mask, which must be a subset of the components, so
+        // entities created with different component sets can share pages. Later Add/Remove never move it.
+        public EntityType CreateWithComponents(in BitMask componentsMask, in BitMask groupMask)
         {
 #if USE_DEBUG_TRACE_COMPONENT && DEBUG
             var destinationMask = componentsMask.Duplicate();
@@ -98,9 +104,19 @@ namespace CodexECS
                 if (IsReactWrapperType(componentId))
                     throw new EcsException("Cannot create entities with reactive wrapper components");
             }
+            if (!componentsMask.InclusivePass(in groupMask))
+            {
+                var missing = new System.Text.StringBuilder();
+                foreach (var componentId in groupMask)
+                {
+                    if (!componentsMask.Check(componentId))
+                        missing.Append(' ').Append(ComponentMapping.GetTypeForId(componentId).Name);
+                }
+                throw new EcsException("the group mask must be a subset of the created components; missing:" + missing);
+            }
 #endif
 
-            var entity = Allocate(GroupFor(in destinationMask));
+            var entity = Allocate(GroupFor(in groupMask));
             if (destinationMask.SetBitsCount == 0)
                 return entity;
 

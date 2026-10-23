@@ -68,6 +68,28 @@ namespace CodexECS.Tests
         }
 
         [Test]
+        public void CreateWithComponents_ExplicitGroupSharesPagesAcrossComponentSets()
+        {
+            var world = new EcsWorld();
+            var group = new BitMask(ComponentMeta<Anchor>.Id);
+            var first = world.CreateWithComponents(new BitMask(ComponentMeta<Anchor>.Id, ComponentMeta<MatchA>.Id), group);
+            var second = world.CreateWithComponents(new BitMask(ComponentMeta<Anchor>.Id, ComponentMeta<MatchB>.Id), group);
+            var fullMask = world.CreateWithComponents(new BitMask(ComponentMeta<Anchor>.Id, ComponentMeta<MatchA>.Id));
+
+            Assert.IsTrue(world.Have<MatchA>(first) && !world.Have<MatchB>(first));
+            Assert.IsTrue(world.Have<MatchB>(second) && !world.Have<MatchA>(second));
+            Assert.AreEqual(3, GetArchetypeCount(world), "The empty, explicit and full-mask groups should exist.");
+            Assert.AreEqual(first >> Layout.PageShift, second >> Layout.PageShift,
+                "Entities of one explicit group must share a page whatever their other components.");
+            Assert.AreNotEqual(first >> Layout.PageShift, fullMask >> Layout.PageShift,
+                "Default placement must keep its own group.");
+#if DEBUG && !ECS_PERF_TEST
+            Assert.Throws<EcsException>(() => world.CreateWithComponents(new BitMask(ComponentMeta<MatchA>.Id), group),
+                "A group mask outside the created components must be rejected.");
+#endif
+        }
+
+        [Test]
         public void AddAndRemoveSubscriptions_ExposeOnlyTheirEventGeneration()
         {
             var world = new EcsWorld();
