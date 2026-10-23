@@ -68,6 +68,25 @@ namespace CodexECS.Tests
         }
 
         [Test]
+        public void StaleHandle_StaysInvalidAcrossManyReusesOfItsSlot()
+        {
+            // The lowest free slot is reused at once, so one slot can be reused every frame; a 10-bit version
+            // let stale handles match again after 1,024 reuses.
+            var world = new EcsWorld();
+            var mask = new BitMask(ComponentMeta<Anchor>.Id);
+            var id = world.CreateWithComponents(mask);
+            var stale = world.GetById(id);
+            world.Delete(id);
+            for (var i = 0; i < 5000; i++)
+            {
+                var reused = world.CreateWithComponents(mask);
+                Assert.AreEqual(id, reused, "The freed slot must be the one reused.");
+                Assert.IsFalse(world.IsEntityValid(stale), $"A stale handle matched again after {i + 1} reuses.");
+                world.Delete(reused);
+            }
+        }
+
+        [Test]
         public void CreateWithComponents_ExplicitGroupSharesPagesAcrossComponentSets()
         {
             var world = new EcsWorld();

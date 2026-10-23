@@ -6,66 +6,61 @@ using EntityType = System.Int32;
 
 namespace CodexECS
 {
-    // A versioned handle: [version:10][id:22]. Plain ids are slots; id 0 is never used, so default(Entity) is null.
-    // The version advances on every delete of the slot and wraps after 1,024 reuses.
+    // A versioned handle: [version:32][id:32]. Plain ids are slots; id 0 is never used, so default(Entity) is null.
+    // The version advances on every delete of the slot: a stale handle matches again only after 2^32 reuses of
+    // one slot. Loops carry plain ids and build handles only when asked.
     public struct Entity : System.IEquatable<Entity>
     {
-        public EntityType Val;
+        public long Val;
 
-        public Entity(EntityType entity) => Val = entity;
+        public Entity(long entity) => Val = entity;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Equals(Entity other) => Val == other.Val;
         public override bool Equals(object obj) => obj is Entity other && Val == other.Val;
-        public override int GetHashCode() => Val;
+        public override int GetHashCode() => Val.GetHashCode();
     }
 
     static class EntityExtension
     {
-        public const int BitSize = sizeof(EntityType) * 8;
-        public const int BitSizeIdSize = 22;
-        public const EntityType VersionMask = -1 << BitSizeIdSize;
-        public const EntityType IdMask = ~VersionMask;
+        public const int BitSizeIdSize = 32;
+        public const long VersionMask = unchecked((long)0xFFFF_FFFF_0000_0000UL);
+        public const long IdMask = 0xFFFF_FFFFL;
         public const EntityType NullId = 0;
-        public const EntityType VersionIncrement = IdMask + 1;
-        // Versions are stored per slot in 10 bits.
-        internal const int VersionLimit = 1 << (BitSize - BitSizeIdSize);
+        public const long VersionIncrement = 1L << BitSizeIdSize;
 
         public static readonly Entity NullEntity = default;
 
 #if DEBUG
-        public static string ToString(this in Entity entity)
-        {
-            return Convert.ToString(entity.Val, 2).PadLeft(sizeof(EntityType) * 8, '0');
-        }
+        public static string ToString(this in Entity entity) => $"Entity({entity.GetId()} v{entity.GetVersion()})";
 #endif
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static EntityType GetId(this in Entity entity) => entity.Val & IdMask;
+        public static EntityType GetId(this in Entity entity) => (EntityType)(uint)entity.Val;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void SetId(this ref Entity entity, in EntityType id)
         {
 #if DEBUG && !ECS_PERF_TEST
-            if (id == NullId || id > IdMask)
+            if (id <= NullId)
                 throw new EcsException("set overflow id");
 #endif
-            entity.Val = id | (entity.Val & VersionMask);
+            entity.Val = (uint)id | (entity.Val & VersionMask);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void SetNullId(this ref Entity entity) => entity.Val = NullId | (entity.Val & VersionMask);
+        public static void SetNullId(this ref Entity entity) => entity.Val &= VersionMask;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool IsNull(this in Entity entity) => entity.GetId() == NullId;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static EntityType GetVersion(this in Entity entity) => (EntityType)((uint)entity.Val >> BitSizeIdSize);
+        public static uint GetVersion(this in Entity entity) => (uint)((ulong)entity.Val >> BitSizeIdSize);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void IncrementVersion(this ref Entity entity) => entity.Val += VersionIncrement;
+        public static void IncrementVersion(this ref Entity entity) => entity.Val = unchecked(entity.Val + VersionIncrement);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal static Entity Make(int id, int version) => new Entity((version << BitSizeIdSize) | id);
+        internal static Entity Make(int id, uint version) => new Entity((long)(((ulong)version << BitSizeIdSize) | (uint)id));
     }
 }

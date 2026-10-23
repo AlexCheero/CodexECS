@@ -25,8 +25,8 @@ namespace CodexECS
         // Pages ever handed out; filters scan below this.
         internal int PageCount => _pagesUsed;
 
-        // Per slot: the version of its current or next occupant (10 bits) and its number of components.
-        internal ushort[] Versions = Array.Empty<ushort>();
+        // Per slot: the version of its current or next occupant (32 bits) and its number of components.
+        internal uint[] Versions = Array.Empty<uint>();
         private ushort[] _componentCounts = Array.Empty<ushort>();
 
         // Pages belong to allocation groups chosen by an exact component mask (GroupGraph). A page is only
@@ -207,7 +207,7 @@ namespace CodexECS
             Alive.Unset(id);
             _live--;
             _componentCounts[id] = 0;
-            Versions[id] = (ushort)((Versions[id] + 1) & (EntityExtension.VersionLimit - 1));
+            Versions[id] = unchecked(Versions[id] + 1);
             if (Alive.Words[p] == 0)
             {
                 // A page without live entities leaves its group and can serve any group; versions stay.
