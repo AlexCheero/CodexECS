@@ -106,6 +106,9 @@ namespace CodexECS
 
         public EcsWorld World { get; }
         public bool IsPaused { get; private set; }
+#if PERFORMANCE_BENCHMARK
+        public Action<TGroup, EcsSystem, long> SystemTicked;
+#endif
 
         public EcsPipeline(EcsWorld world, params TGroup[] groups)
         {
@@ -237,6 +240,9 @@ namespace CodexECS
                 if (!state.Graph.ShouldRun(i))
                     continue;
 
+#if PERFORMANCE_BENCHMARK
+                var benchmarkStart = SystemTicked != null ? System.Diagnostics.Stopwatch.GetTimestamp() : 0L;
+#endif
                 World.Lock();
                 try
                 {
@@ -248,6 +254,10 @@ namespace CodexECS
                     // emptiness changes raised during the flush dirty the graph before
                     // the next registration is considered.
                     World.Unlock();
+#if PERFORMANCE_BENCHMARK
+                    SystemTicked?.Invoke(group, registration.System,
+                        System.Diagnostics.Stopwatch.GetTimestamp() - benchmarkStart);
+#endif
                 }
             }
         }
