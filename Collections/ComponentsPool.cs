@@ -43,6 +43,13 @@ namespace CodexECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Contains(int id) => Has(id);
 
+        /// <summary>
+        /// Borrows the current membership directory without copying entity data.
+        /// Capture on the world owner thread, and finish all readers before any
+        /// structural mutation. Recapture after the world may have grown.
+        /// </summary>
+        public ComponentMembershipPages CaptureMembershipPages() => new ComponentMembershipPages(Words, NonEmpty);
+
         // The bit must be clear.
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal void Set(int id)
@@ -133,6 +140,13 @@ namespace CodexECS
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ref T Get(int id) => ref this[id];
+
+        /// <summary>
+        /// Borrows membership and payload directories for a synchronous phase.
+        /// Workers may write disjoint owned slots only. The caller must complete
+        /// every worker before resuming world mutation or publishing commands.
+        /// </summary>
+        public ComponentPayloadPages<T> CapturePayloadPages() => new ComponentPayloadPages<T>(Words, NonEmpty, Segments);
 
         // The bit must be clear.
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

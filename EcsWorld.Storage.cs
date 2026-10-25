@@ -25,6 +25,12 @@ namespace CodexECS
         // Pages ever handed out; filters scan below this.
         internal int PageCount => _pagesUsed;
 
+        /// <summary>Pages that may contain entities; capture before starting owned page work.</summary>
+        public int StoragePageCount => _pagesUsed;
+
+        /// <summary>Gets membership storage for either a data component or a tag.</summary>
+        public ComponentStorage GetComponentStorage<T>() => GetStorage(ComponentMeta<T>.Id);
+
         // Per slot: the version of its current or next occupant (32 bits) and its number of components.
         internal uint[] Versions = Array.Empty<uint>();
         private ushort[] _componentCounts = Array.Empty<ushort>();
