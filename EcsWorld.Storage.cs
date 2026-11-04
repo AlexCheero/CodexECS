@@ -161,7 +161,12 @@ namespace CodexECS
         private void RemoveInternal<T>(int id) => RemoveInternal(ComponentMeta<T>.Id, id);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+#if USE_DEBUG_TRACE_COMPONENT && DEBUG
+        // The trace is bookkeeping, so it must not keep an otherwise empty entity alive.
+        private bool HasNoComponents(int id) => _componentCounts[id] == (Have<DebugTraceData>(id) ? 1 : 0);
+#else
         private bool HasNoComponents(int id) => _componentCounts[id] == 0;
+#endif
 
         // A free slot of the group: the lowest free slot of the group's first page with free slots, else an
         // empty page, else a new page. Freed slots are reused before never-used ones and live entities stay

@@ -745,15 +745,16 @@ namespace CodexECS
 
             ReactOnRemove<T>(eid);
 
+#if USE_DEBUG_TRACE_COMPONENT && DEBUG
+            // Before the removal, which can delete the entity and its trace.
+            if (!IsCalledFromWorld(filePath))
+                SaveTraceData(eid, typeof(T), DebugTraceData.EMethodType.Remove, memberName, filePath, lineNumber);
+#endif
+
             storage.Remove(eid);
             _componentCounts[eid]--;
             if (HasNoComponents(eid))
                 Delete(eid);
-
-#if USE_DEBUG_TRACE_COMPONENT && DEBUG
-            if (!IsCalledFromWorld(filePath))
-                SaveTraceData(eid, typeof(T), DebugTraceData.EMethodType.Remove, memberName, filePath, lineNumber);
-#endif
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -842,12 +843,13 @@ namespace CodexECS
             if (!Have<T>(eid))
                 return false;
 
-            Remove<T>(eid);
-
 #if USE_DEBUG_TRACE_COMPONENT && DEBUG
+            // Before Remove, which can delete the entity and its trace.
             if (!IsCalledFromWorld(filePath))
                 SaveTraceData(eid, typeof(T), DebugTraceData.EMethodType.Remove, memberName, filePath, lineNumber);
 #endif
+
+            Remove<T>(eid);
 
             return true;
         }
