@@ -45,6 +45,11 @@ namespace CodexECS
         private static readonly Dictionary<Type, int> TypeToId = new();
         private static readonly Dictionary<int, Type> IDToType = new();
         private static readonly Dictionary<Type, int> MultipleStorageIds = new();
+        // Component ids are small and dense: id-keyed paths (entity creation, copies) skip the Type dictionaries.
+        private static IWorldCallDispatcher[] _dispatchersById = new IWorldCallDispatcher[128];
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static IWorldCallDispatcher GetDispatcher(int id) => _dispatchersById[id];
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static int GetIdForType(Type type) => TypeToId[type];
@@ -101,7 +106,11 @@ namespace CodexECS
                 MultipleStorageIds[type.GetGenericArguments()[0]] = id;
             
             var closedType = typeof(WorldCallDispatcher<>).MakeGenericType(type);
-            CallDispatchers[type] = (IWorldCallDispatcher)Activator.CreateInstance(closedType);
+            var dispatcher = (IWorldCallDispatcher)Activator.CreateInstance(closedType);
+            CallDispatchers[type] = dispatcher;
+            if (id >= _dispatchersById.Length)
+                Array.Resize(ref _dispatchersById, Math.Max(id + 1, _dispatchersById.Length * 2));
+            _dispatchersById[id] = dispatcher;
 
 #if DEBUG && !ECS_PERF_TEST
             foreach (var pair in TypeToId)

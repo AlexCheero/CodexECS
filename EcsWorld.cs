@@ -127,10 +127,7 @@ namespace CodexECS
             }
 
             foreach (var componentId in destinationMask)
-            {
-                var componentType = ComponentMapping.GetTypeForId(componentId);
-                ComponentMapping.CallDispatchers[componentType].ReactOnAdd(this, entity, false);
-            }
+                ComponentMapping.GetDispatcher(componentId).ReactOnAdd(this, entity, false);
 
             ReactOnComponentsSetCreated(entity, destinationMask);
 
@@ -516,12 +513,11 @@ namespace CodexECS
         {
             foreach (var typeId in mask)
             {
-                var componentType = ComponentMapping.GetTypeForId(typeId);
 #if USE_DEBUG_TRACE_COMPONENT && DEBUG
                 if (!IsCalledFromWorld(filePath))
-                    SaveTraceData(to, componentType, DebugTraceData.EMethodType.Add, memberName, filePath, lineNumber);
+                    SaveTraceData(to, ComponentMapping.GetTypeForId(typeId), DebugTraceData.EMethodType.Add, memberName, filePath, lineNumber);
 #endif
-                ComponentMapping.CallDispatchers[componentType].Copy(this, from, to);
+                ComponentMapping.GetDispatcher(typeId).Copy(this, from, to);
             }
         }
 
@@ -534,13 +530,12 @@ namespace CodexECS
 #endif
         )
         {
-            var componentType = ComponentMapping.GetTypeForId(typeId);
 #if USE_DEBUG_TRACE_COMPONENT && DEBUG
             if (!IsCalledFromWorld(filePath))
-                SaveTraceData(to, componentType, DebugTraceData.EMethodType.Add, memberName, filePath, lineNumber);
+                SaveTraceData(to, ComponentMapping.GetTypeForId(typeId), DebugTraceData.EMethodType.Add, memberName, filePath, lineNumber);
 #endif
 
-            ComponentMapping.CallDispatchers[componentType].Copy(this, from, to);
+            ComponentMapping.GetDispatcher(typeId).Copy(this, from, to);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -777,8 +772,7 @@ namespace CodexECS
             if (_removeReactGuard.Check(componentId) && storage.Length > 0)
             {
                 CollectOwners(storage, _removeAllEntities);
-                var componentType = ComponentMapping.GetTypeForId(componentId);
-                var dispatcher = ComponentMapping.CallDispatchers[componentType];
+                var dispatcher = ComponentMapping.GetDispatcher(componentId);
                 for (var i = 0; i < _removeAllEntities.Length; i++)
                     dispatcher.ReactOnRemove(this, _removeAllEntities[i]);
                 _removeAllEntities.Clear();
@@ -912,6 +906,9 @@ namespace CodexECS
 
         private int _lockCounter;
         private bool _isFlushingReactives;
+        // Scratch copies of the pending-entity sets. Callbacks run under Lock, so a flush never
+        // re-enters these methods and one copy per purpose replaces a fresh BitMask per reaction.
+        private BitMask _reactScratch, _matchScratch, _markedScratch;
         internal bool IsLocked => _lockCounter != 0;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -999,7 +996,8 @@ namespace CodexECS
                                            ComponentMapping.GetTypeForId(reactWrapperId));
 #endif
 
-                var processingEntities = pendingEntities[reactWrapperId].Duplicate();
+                _reactScratch.Copy(in pendingEntities[reactWrapperId]);
+                ref var processingEntities = ref _reactScratch;
                 pendingEntities[reactWrapperId].Clear();
 
                 var haveLiveReaction = false;
@@ -1047,9 +1045,11 @@ namespace CodexECS
                 var node = _dirtyMatchNodes.Dequeue();
                 node.IsQueued = false;
 
-                var processingEntities = node.PendingEntities.Duplicate();
+                _matchScratch.Copy(in node.PendingEntities);
+                ref var processingEntities = ref _matchScratch;
                 node.PendingEntities.Clear();
-                var markedEntities = new BitMask();
+                _markedScratch.Clear();
+                ref var markedEntities = ref _markedScratch;
 
                 Lock();
                 try
