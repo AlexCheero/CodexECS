@@ -93,6 +93,58 @@ namespace CodexECS
             return -1;
         }
 
+        // ---- state capture and restore (EcsWorld.CaptureState / RestoreState) ----
+
+        internal virtual StorageState CreateState() => new StorageState();
+
+        internal void CaptureMembership(StorageState state, int pages)
+        {
+            state.EnsurePages(pages);
+            Array.Copy(Words, state.Words, pages);
+            state.Count = _count;
+        }
+
+        // Writes the first `pages` words, clears the rest, and rebuilds the chunk summaries.
+        internal void RestoreMembership(ulong[] words, int pages, int count)
+        {
+            Array.Copy(words, Words, pages);
+            if (Words.Length > pages)
+                Array.Clear(Words, pages, Words.Length - pages);
+            RecomputeNonEmpty();
+            _count = count;
+        }
+
+        internal virtual void CapturePayload(StorageState state, int pages) { }
+
+        internal virtual void RestorePayload(StorageState state, int pages) { }
+
+        // Removes (with Cleanup, without reactions) every owner whose bit is clear in keep[page];
+        // pages at or beyond keepPages lose all owners.
+        internal void Prune(ulong[] keep, int keepPages, int totalPages)
+        {
+            int limit = Math.Min(totalPages, Words.Length);
+            for (int p = 0; p < limit; p++)
+            {
+                ulong remove = Words[p] & ~(p < keepPages ? keep[p] : 0UL);
+                while (remove != 0)
+                {
+                    int id = (p << Layout.PageShift) | Bits.TrailingZeros(remove);
+                    remove &= remove - 1;
+                    Remove(id);
+                }
+            }
+        }
+
+        private void RecomputeNonEmpty()
+        {
+            Array.Clear(NonEmpty, 0, NonEmpty.Length);
+            for (int p = 0; p < Words.Length; p++)
+            {
+                if (Words[p] != 0)
+                    NonEmpty[p >> 6] |= 1UL << (p & 63);
+            }
+        }
+
         public abstract bool IsTag { get; }
         public abstract Type GetComponentType();
         public abstract string DebugString(int id, bool printFields);
@@ -165,6 +217,42 @@ namespace CodexECS
         {
             ComponentMeta<T>.Cleanup(ref Segments[id >> Layout.SegmentShift][id & Layout.SegmentMask]);
             Unset(id);
+        }
+
+        internal override StorageState CreateState() => new StorageState<T>();
+
+        // Only pages with owners are copied; payload entries of slots without the component are stale.
+        internal override void CapturePayload(StorageState state, int pages)
+        {
+#if DEBUG && !ECS_PERF_TEST
+            if (RuntimeHelpers.IsReferenceOrContainsReferences<T>())
+                throw new EcsException($"{typeof(T).Name} holds references and cannot be captured into a WorldState");
+#endif
+            var typed = (StorageState<T>)state;
+            for (int p = 0; p < pages; p++)
+            {
+                if (Words[p] == 0)
+                    continue;
+                T[] segment = Segments[p >> (Layout.SegmentShift - Layout.PageShift)];
+                int offset = (p << Layout.PageShift) & Layout.SegmentMask;
+                Array.Copy(segment, offset, typed.Payload, p << Layout.PageShift, 1 << Layout.PageShift);
+            }
+        }
+
+        // Membership must already be restored. Segments missing in this world are allocated.
+        internal override void RestorePayload(StorageState state, int pages)
+        {
+            var typed = (StorageState<T>)state;
+            for (int p = 0; p < pages; p++)
+            {
+                if (typed.Words[p] == 0)
+                    continue;
+                ref T[] segment = ref Segments[p >> (Layout.SegmentShift - Layout.PageShift)];
+                if (segment == null)
+                    segment = new T[Layout.SegmentSize];
+                int offset = (p << Layout.PageShift) & Layout.SegmentMask;
+                Array.Copy(typed.Payload, p << Layout.PageShift, segment, offset, 1 << Layout.PageShift);
+            }
         }
 
         private StringBuilder _debugStringBuilder;
