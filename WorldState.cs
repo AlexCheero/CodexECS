@@ -12,7 +12,7 @@ namespace CodexECS
     /// The read-only views let callers hash, compare and serialize a state without touching the
     /// world. Payload entries of slots whose membership bit is clear are stale and must be ignored.
     /// </summary>
-    public sealed class WorldState
+    public sealed partial class WorldState
     {
         internal struct PageRecord
         {
@@ -140,16 +140,82 @@ namespace CodexECS
         internal int Count;
 
         internal virtual void EnsurePages(int pages) => StateArrays.EnsureLength(ref Words, pages);
+
+        /// <summary>Bytes per payload element; 0 for tags.</summary>
+        internal virtual int ElementSize => 0;
+
+        /// <summary>Raw bytes of one page of payload (64 elements). Empty for tags.</summary>
+        internal virtual void CopyPageOut(int page, Span<byte> destination) { }
+
+        internal virtual void CopyPageIn(int page, ReadOnlySpan<byte> source) { }
     }
 
     internal sealed class StorageState<T> : StorageState
     {
+        private static readonly int Stride = ComputeStride();
+
         internal T[] Payload = Array.Empty<T>();
 
         internal override void EnsurePages(int pages)
         {
             base.EnsurePages(pages);
             StateArrays.EnsureLength(ref Payload, pages << Layout.PageShift);
+        }
+
+        internal override int ElementSize => Stride;
+
+        internal override void CopyPageOut(int page, Span<byte> destination)
+        {
+            int bytes = Stride << Layout.PageShift;
+            var handle = System.Runtime.InteropServices.GCHandle.Alloc(Payload, System.Runtime.InteropServices.GCHandleType.Pinned);
+            try
+            {
+                IntPtr start = System.Runtime.InteropServices.Marshal.UnsafeAddrOfPinnedArrayElement(Payload, page << Layout.PageShift);
+                for (int i = 0; i < bytes; i++)
+                    destination[i] = System.Runtime.InteropServices.Marshal.ReadByte(start, i);
+            }
+            finally
+            {
+                handle.Free();
+            }
+        }
+
+        internal override void CopyPageIn(int page, ReadOnlySpan<byte> source)
+        {
+            int bytes = Stride << Layout.PageShift;
+            var handle = System.Runtime.InteropServices.GCHandle.Alloc(Payload, System.Runtime.InteropServices.GCHandleType.Pinned);
+            try
+            {
+                IntPtr start = System.Runtime.InteropServices.Marshal.UnsafeAddrOfPinnedArrayElement(Payload, page << Layout.PageShift);
+                for (int i = 0; i < bytes; i++)
+                    System.Runtime.InteropServices.Marshal.WriteByte(start, i, source[i]);
+            }
+            finally
+            {
+                handle.Free();
+            }
+        }
+
+        // Managed stride of T without a generic constraint: the distance between two pinned elements.
+        private static int ComputeStride()
+        {
+            var probe = new T[2];
+            var handle = System.Runtime.InteropServices.GCHandle.Alloc(probe, System.Runtime.InteropServices.GCHandleType.Pinned);
+            try
+            {
+                IntPtr first = System.Runtime.InteropServices.Marshal.UnsafeAddrOfPinnedArrayElement(probe, 0);
+                IntPtr second = System.Runtime.InteropServices.Marshal.UnsafeAddrOfPinnedArrayElement(probe, 1);
+                return (int)((long)second - (long)first);
+            }
+            catch (ArgumentException)
+            {
+                return 0; // holds references: cannot be pinned, and cannot be captured either
+            }
+            finally
+            {
+                if (handle.IsAllocated)
+                    handle.Free();
+            }
         }
     }
 }

@@ -334,6 +334,35 @@ namespace CodexECS.Tests
         }
 
         [Test]
+        public void SerializedStateRestoresIntoAnotherWorld()
+        {
+            var source = new EcsWorld();
+            List<int> ids = Populate(source, 150);
+            Expectation expected = Expectation.Of(source, ids);
+            var state = new WorldState();
+            source.CaptureState(state, SimulationIds);
+            var bytes = new byte[state.SerializedSize];
+            int written = state.Serialize(bytes);
+            Assert.AreEqual(bytes.Length, written, "SerializedSize matches the bytes written");
+
+            var target = new EcsWorld();
+            var received = new WorldState();
+            Assert.IsTrue(received.Deserialize(bytes, target));
+            Assert.AreEqual(state.PageCount, received.PageCount);
+            Assert.AreEqual(state.EntitiesCount, received.EntitiesCount);
+            target.RestoreState(received);
+            expected.AssertMatches(target, ids);
+
+            var roundTrip = new WorldState();
+            target.CaptureState(roundTrip, SimulationIds);
+            AssertSameState(state, roundTrip);
+
+            Assert.IsFalse(new WorldState().Deserialize(new byte[10], target), "truncated input is rejected");
+            bytes[0] ^= 0xFF;
+            Assert.IsFalse(new WorldState().Deserialize(bytes, target), "bad magic is rejected");
+        }
+
+        [Test]
         public void ManagedComponentCannotBeCaptured()
         {
             var world = new EcsWorld();
